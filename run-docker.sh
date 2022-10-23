@@ -1,0 +1,1 @@
+docker run -d -p 8787:8787 -v $PWD:/home/rstudio -e DISABLE_AUTH=true rocker/verse
