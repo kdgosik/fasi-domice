@@ -1,0 +1,2267 @@
+---
+title: "qtl-counts-not-in-ilc.R"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+library(tidyverse)
+library(ggvenn)
+# library(igraph)
+# library(ggforce)
+
+# project_path <- my_path <-"./domice/"
+project_path <-"~/Documents/projects/fasi-domice/"
+# project_path <- "/home/rstudio/"
+results_path <- paste0(project_path, "results/")
+figure_path <- paste0(project_path, "results/figures/")
+data_path <- paste0(project_path, "data/")
+source(paste0(figure_path, "helpers.R"))
+
+# GM_Snps meta data
+ccre <- fread(paste0(data_path, "references/GM_SNPS_Consequence_cCRE.csv"), data.table = FALSE)
+vars <- fread(paste0(data_path, "vars.csv"), data.table = FALSE)
+
+## eQTL counts by gene
+lod_cutoff <- 6
+
+all_ilcs <- unique(c(vars$gene[vars$ilc1_expressed==1],
+                     vars$gene[vars$ilc2_expressed==1],
+                     vars$gene[vars$ilc3_expressed==1],
+                     vars$gene[vars$lti_expressed==1]))
+
+## Gene Data
+ensembl <- as.data.frame(readGFF(paste0(data_path, "references/Mus_musculus.GRCm38.102.gtf"))) %>%
+  filter(seqid %in% c(as.character(1:19), "X"), gene_biotype == "protein_coding", type == "gene") %>%
+  mutate(chr = paste0("chr", seqid))
+```
+
+
+
+
+
+Specifically, we examined the expression of the genes in the ZZ% of QTLs that did not harbor an ILC-expressed gene in several broader contexts: (1) other cell types recovered from the DO mice; "Aviv"
+
+# eQTLs
+
+## ILC1
+
+### ILC1 Genes Summary
+
+```{r ilc1_gene_summary, eval = FALSE}
+
+# ILC1 eGenes but loci gene is not expresssed in ILC1
+ilc1 <- vars %>% 
+  dplyr::count(ilc1_expressed, ilc1_eqtl_loci_genes_cv, ilc1_ciseqtl_assoc_cv) %>% 
+  dplyr::filter(ilc1_eqtl_loci_genes_cv == 1) %>%
+  dplyr::rename(intrinsic = ilc1_expressed,
+                eql_loci_gene = ilc1_eqtl_loci_genes_cv,
+                cis_effect = ilc1_ciseqtl_assoc_cv) %>%
+  dplyr::mutate(percent_intrinsic = n / sum(n))
+
+```
+
+
+### ILC1 QTL Summary
+
+```{r ilc1_qtl_summary, eval = FALSE}
+## ILC1
+ilc1_eqtl <- fread("results/eqtl/qtl-plot-lods-ILC1-cv.csv.gz", data.table = FALSE)
+
+# Counting number of QTLs per eGene
+ilc1_eqtl_count <- ilc1_eqtl %>% 
+  mutate(xpos_floor = floor(xpos)) %>% 
+  group_by(gene, marker_chr, xpos_floor) %>% 
+  summarise(lod = max(value)) %>%
+  group_by(gene) %>%
+  summarise(qtl_count = sum(lod > lod_cutoff)) %>%
+  mutate(cell_type ="ILC1",
+         trait = paste0("ILC1 eQTL: ", gene)) %>%
+  dplyr::rename(name = gene)
+
+
+ilc1_counts <- ilc1_eqtl %>% 
+  mutate(xpos_floor = floor(xpos)) %>% 
+  group_by(gene, marker_chr, xpos_floor) %>% 
+  summarise(lod = max(value)) %>%
+  mutate(ILC1 = as.numeric(lod > lod_cutoff)) %>% 
+  unite("loci", gene:xpos_floor) %>% 
+  dplyr::select(-lod) %>%
+  filter(ILC1 == 1)
+```
+
+
+### ILC1 Loci Genes but not expressed in ILC1
+
+```{r loci_ilc1_not_expressed}
+## genes in ilc1 eQTL loci
+ilc1_loci_genes <- unique(ccre$ensembl_gene[ccre$ilc1_eqtl_loci_cv==1])
+ilc1_loci_genes <-ccre %>% 
+  filter(ilc1_eqtl_loci_cv==1, !is.na(ensembl_gene)) %>% 
+  dplyr::select(marker,ensembl_gene)
+
+# ilc1 expressed genes
+ilc1_expressed_genes <- unique(vars$gene[vars$ilc1_expressed==1])
+
+# genes in ilc1 eQTL loci not expressed in ilc1 cells
+ilc1_loci_not_ilc1_expressed <- setdiff(ilc1_loci_genes, ilc1_expressed_genes)
+
+# genes in ilc1 eQTL loci not expressed in any ilc cells
+ilc1_loci_not_any_ilc_expressed <- setdiff(ilc1_loci_genes, all_ilcs)
+
+## sanity check
+all(ilc1_loci_not_ilc1_expressed %in% ilc1_loci_genes)
+# [1] TRUE
+any(ilc1_loci_not_ilc1_expressed %in% ilc1_expressed_genes)
+# [1] FALSE
+```
+
+
+
+## ILC2
+
+### ILC2 Gene Summary
+
+```{r ilc2_gene_summary, eval = FALSE}
+
+# ILC2 eGenes but loci gene is not expresssed in ILC1
+ilc2 <- vars %>% 
+  dplyr::count(ilc2_expressed, ilc2_eqtl_loci_genes_cv, ilc2_ciseqtl_assoc_cv) %>% 
+  dplyr::filter(ilc2_eqtl_loci_genes_cv == 1) %>%
+  dplyr::rename(intrinsic = ilc2_expressed,
+                eql_loci_gene = ilc2_eqtl_loci_genes_cv,
+                cis_effect = ilc2_ciseqtl_assoc_cv) %>%
+  dplyr::mutate(percent_intrinsic = n / sum(n))
+
+
+```
+
+### ILC2 QTL Summary
+
+```{r ilc2_qtl_summary, eval = FALSE}
+## ILC2
+ilc2_eqtl <- fread("results/eqtl/qtl-plot-lods-ILC2-cv.csv.gz", data.table = FALSE)    
+
+# Counting number of QTLs per eGene
+ilc2_eqtl_count <- ilc2_eqtl %>% 
+  mutate(xpos_floor = floor(xpos)) %>% 
+  group_by(gene, marker_chr, xpos_floor) %>% 
+  summarise(lod = max(value)) %>%
+  group_by(gene) %>%
+  summarise(qtl_count = sum(lod > lod_cutoff)) %>%
+  mutate(cell_type ="ILC2",
+         trait = paste0("ILC2 eQTL: ", gene)) %>%
+  dplyr::rename(name = gene)
+
+
+ilc2_counts <- ilc2_eqtl %>% 
+  mutate(xpos_floor = floor(xpos)) %>% 
+  group_by(gene, marker_chr, xpos_floor) %>% 
+  summarise(lod = max(value)) %>%
+  mutate(ILC2 = as.numeric(lod > lod_cutoff)) %>% 
+  unite("loci", gene:xpos_floor) %>% 
+  dplyr::select(-lod) %>%
+  filter(ILC2 == 1)
+```
+
+
+```{r loci_ilc2_not_expressed}
+## genes in ilc2 eQTL loci
+ilc2_loci_genes <- unique(ccre$ensembl_gene[ccre$ilc2_eqtl_loci_cv==1])
+
+# ilc2 expressed genes
+ilc2_expressed_genes <- unique(vars$gene[vars$ilc2_expressed==1])
+
+# genes in ilc2 eQTL loci not expressed in ilc2 cells
+ilc2_loci_not_ilc2_expressed <- setdiff(ilc2_loci_genes, ilc2_expressed_genes)
+
+# genes in ilc2 eQTL loci not expressed in any ilc cells
+ilc2_loci_not_any_ilc_expressed <- setdiff(ilc2_loci_genes, all_ilcs)
+
+## sanity check
+all(ilc2_loci_not_ilc2_expressed %in% ilc2_loci_genes)
+# [1] TRUE
+any(ilc2_loci_not_ilc2_expressed %in% ilc2_expressed_genes)
+# [1] FALSE
+```
+
+
+
+## ILC3
+
+### ILC3 Gene Summary
+
+```{r ilc3_gene_summary, eval = FALSE}
+
+# ILC3 eGenes but loci gene is not expresssed in ILC1
+ilc3 <- vars %>% 
+  dplyr::count(ilc3_expressed, ilc3_eqtl_loci_genes_cv, ilc3_ciseqtl_assoc_cv) %>% 
+  dplyr::filter(ilc3_eqtl_loci_genes_cv == 1) %>%
+  dplyr::rename(intrinsic = ilc3_expressed,
+                eql_loci_gene = ilc3_eqtl_loci_genes_cv,
+                cis_effect = ilc3_ciseqtl_assoc_cv) %>%
+  dplyr::mutate(percent_intrinsic = n / sum(n))
+
+
+```
+
+
+### ILC3 QTL Summary
+
+```{r ilc3_qtl_summary, eval = FALSE}
+## ILC3
+ilc3_eqtl <- fread("results/eqtl/qtl-plot-lods-Lti ILC3-cv.csv.gz", data.table = FALSE)
+
+# Counting number of QTLs per eGene
+ilc3_eqtl_count <- ilc3_eqtl %>% 
+  mutate(xpos_floor = floor(xpos)) %>% 
+  group_by(gene, marker_chr, xpos_floor) %>% 
+  summarise(lod = max(value)) %>%
+  group_by(gene) %>%
+  summarise(qtl_count = sum(lod > lod_cutoff)) %>%
+  mutate(cell_type ="ILC3",
+         trait = paste0("ILC3 eQTL: ", gene)) %>%
+  dplyr::rename(name = gene)
+
+
+ilc3_counts <- ilc3_eqtl %>% 
+  mutate(xpos_floor = floor(xpos)) %>% 
+  group_by(gene, marker_chr, xpos_floor) %>% 
+  summarise(lod = max(value)) %>%
+  mutate(ILC3 = as.numeric(lod > lod_cutoff)) %>% 
+  unite("loci", gene:xpos_floor) %>% 
+  dplyr::select(-lod) %>%
+  filter(ILC3 == 1)
+
+```
+
+
+
+```{r loci_ilc3_not_expressed}
+## genes in ilc3 eQTL loci
+ilc3_loci_genes <- unique(ccre$ensembl_gene[ccre$ilc3_eqtl_loci_cv==1])
+
+# ilc3 expressed genes
+ilc3_expressed_genes <- unique(vars$gene[vars$ilc3_expressed==1])
+
+# genes in ilc3 eQTL loci not expressed in ilc3 cells
+ilc3_loci_not_ilc3_expressed <- setdiff(ilc3_loci_genes, ilc3_expressed_genes)
+
+# genes in ilc3 eQTL loci not expressed in any ilc cells
+ilc3_loci_not_any_ilc_expressed <- setdiff(ilc3_loci_genes, all_ilcs)
+
+
+## sanity check
+all(ilc3_loci_not_ilc3_expressed %in% ilc3_loci_genes)
+# [1] TRUE
+any(ilc3_loci_not_ilc3_expressed %in% ilc3_expressed_genes)
+# [1] FALSE
+```
+
+
+## LTi
+
+### LTi Gene Summary
+
+```{r lti_gene_summary, eval = FALSE}
+
+# LTi eGenes but loci gene is not expresssed in ILC1
+lti <- vars %>% 
+  dplyr::count(lti_expressed, lti_eqtl_loci_genes_cv, lti_ciseqtl_assoc_cv) %>% 
+  dplyr::filter(lti_eqtl_loci_genes_cv == 1) %>%
+  dplyr::rename(intrinsic = lti_expressed,
+                eql_loci_gene = lti_eqtl_loci_genes_cv,
+                cis_effect = lti_ciseqtl_assoc_cv) %>%
+  dplyr::mutate(percent_intrinsic = n / sum(n))
+
+
+```
+
+### LTi QTL Summary
+
+```{r lti_qtl_summary, eval = FALSE}
+## LTi
+lti_eqtl <- fread("results/eqtl/qtl-plot-lods-NCR1+ ILC3-cv.csv.gz", data.table = FALSE)
+
+# Counting number of QTLs per eGene
+lti_eqtl_count <- lti_eqtl %>% 
+  mutate(xpos_floor = floor(xpos)) %>% 
+  group_by(gene, marker_chr, xpos_floor) %>% 
+  summarise(lod = max(value)) %>%
+  group_by(gene) %>%
+  summarise(qtl_count = sum(lod > lod_cutoff)) %>%
+  mutate(cell_type ="LTi-like",
+         trait = paste0("LTi-like eQTL: ", gene)) %>%
+  dplyr::rename(name = gene)
+
+
+lti_counts <- lti_eqtl %>% 
+  mutate(xpos_floor = floor(xpos)) %>% 
+  group_by(gene, marker_chr, xpos_floor) %>% 
+  summarise(lod = max(value)) %>%
+  mutate(LTi = as.numeric(lod > lod_cutoff)) %>% 
+  unite("loci", gene:xpos_floor) %>% 
+  dplyr::select(-lod) %>%
+  filter(LTi == 1)
+```
+
+
+
+```{r loci_lti_not_expressed}
+## genes in ilc3 eQTL loci
+lti_loci_genes <- unique(ccre$ensembl_gene[ccre$lti_eqtl_loci_cv==1])
+
+# lti expressed genes
+lti_expressed_genes <- unique(vars$gene[vars$lti_expressed==1])
+
+# genes in lti eQTL loci not expressed in lti cells
+lti_loci_not_lti_expressed <- setdiff(lti_loci_genes, lti_expressed_genes)
+
+# genes in lti eQTL loci not expressed in any ilc cells
+lti_loci_not_any_ilc_expressed <- setdiff(lti_loci_genes, all_ilcs)
+
+
+## sanity check
+all(lti_loci_not_lti_expressed %in% lti_loci_genes)
+# [1] TRUE
+any(lti_loci_not_lti_expressed %in% lti_expressed_genes)
+# [1] FALSE
+```
+
+
+## Code Expansion QTL Summary
+
+```{r}
+cat(paste0("\n```{r loci_", 
+           colnames(ccre)[53:108], 
+           "}\n ## genes in \n", 
+           colnames(ccre)[53:108], 
+           "_loci_genes <- unique(ccre$ensembl_gene[ccre$", 
+           colnames(ccre)[53:108],
+           "==1]) \n\n ## # genes in QTL loci not expressed in any ilc cells\n",
+           colnames(ccre)[53:108],
+           "_loci_not_any_ilc_expressed <- setdiff(",
+           colnames(ccre)[53:108],
+           "_loci_genes, all_ilcs) \n\n",
+           "## sanity check\nall(",
+           colnames(ccre)[53:108],
+           "_loci_not_any_ilc_expressed %in% ",
+          colnames(ccre)[53:108],
+           "_loci_genes)\n\nany(",
+           colnames(ccre)[53:108],
+           "_loci_not_any_ilc_expressed %in% all_ilcs)\n\n",
+           "``` \n\n"))
+```
+
+
+### All Other Traits 
+
+
+
+
+```{r loci_topic0_qtl}
+ ## genes in 
+topic0_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$topic0_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+topic0_qtl_loci_not_any_ilc_expressed <- setdiff(topic0_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(topic0_qtl_loci_not_any_ilc_expressed %in% topic0_qtl_loci_genes)
+
+any(topic0_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_topic1_qtl}
+ ## genes in 
+topic1_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$topic1_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+topic1_qtl_loci_not_any_ilc_expressed <- setdiff(topic1_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(topic1_qtl_loci_not_any_ilc_expressed %in% topic1_qtl_loci_genes)
+
+any(topic1_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_topic2_qtl}
+ ## genes in 
+topic2_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$topic2_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+topic2_qtl_loci_not_any_ilc_expressed <- setdiff(topic2_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(topic2_qtl_loci_not_any_ilc_expressed %in% topic2_qtl_loci_genes)
+
+any(topic2_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_topic3_qtl}
+ ## genes in 
+topic3_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$topic3_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+topic3_qtl_loci_not_any_ilc_expressed <- setdiff(topic3_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(topic3_qtl_loci_not_any_ilc_expressed %in% topic3_qtl_loci_genes)
+
+any(topic3_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_topic4_qtl}
+ ## genes in 
+topic4_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$topic4_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+topic4_qtl_loci_not_any_ilc_expressed <- setdiff(topic4_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(topic4_qtl_loci_not_any_ilc_expressed %in% topic4_qtl_loci_genes)
+
+any(topic4_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_topic5_qtl}
+ ## genes in 
+topic5_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$topic5_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+topic5_qtl_loci_not_any_ilc_expressed <- setdiff(topic5_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(topic5_qtl_loci_not_any_ilc_expressed %in% topic5_qtl_loci_genes)
+
+any(topic5_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_topic6_qtl}
+ ## genes in 
+topic6_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$topic6_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+topic6_qtl_loci_not_any_ilc_expressed <- setdiff(topic6_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(topic6_qtl_loci_not_any_ilc_expressed %in% topic6_qtl_loci_genes)
+
+any(topic6_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_topic7_qtl}
+ ## genes in 
+topic7_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$topic7_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+topic7_qtl_loci_not_any_ilc_expressed <- setdiff(topic7_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(topic7_qtl_loci_not_any_ilc_expressed %in% topic7_qtl_loci_genes)
+
+any(topic7_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_topic8_qtl}
+ ## genes in 
+topic8_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$topic8_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+topic8_qtl_loci_not_any_ilc_expressed <- setdiff(topic8_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(topic8_qtl_loci_not_any_ilc_expressed %in% topic8_qtl_loci_genes)
+
+any(topic8_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_topic9_qtl}
+ ## genes in 
+topic9_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$topic9_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+topic9_qtl_loci_not_any_ilc_expressed <- setdiff(topic9_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(topic9_qtl_loci_not_any_ilc_expressed %in% topic9_qtl_loci_genes)
+
+any(topic9_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_topic10_qtl}
+ ## genes in 
+topic10_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$topic10_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+topic10_qtl_loci_not_any_ilc_expressed <- setdiff(topic10_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(topic10_qtl_loci_not_any_ilc_expressed %in% topic10_qtl_loci_genes)
+
+any(topic10_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_topic11_qtl}
+ ## genes in 
+topic11_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$topic11_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+topic11_qtl_loci_not_any_ilc_expressed <- setdiff(topic11_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(topic11_qtl_loci_not_any_ilc_expressed %in% topic11_qtl_loci_genes)
+
+any(topic11_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_topic12_qtl}
+ ## genes in 
+topic12_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$topic12_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+topic12_qtl_loci_not_any_ilc_expressed <- setdiff(topic12_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(topic12_qtl_loci_not_any_ilc_expressed %in% topic12_qtl_loci_genes)
+
+any(topic12_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_topic13_qtl}
+ ## genes in 
+topic13_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$topic13_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+topic13_qtl_loci_not_any_ilc_expressed <- setdiff(topic13_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(topic13_qtl_loci_not_any_ilc_expressed %in% topic13_qtl_loci_genes)
+
+any(topic13_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_topic14_qtl}
+ ## genes in 
+topic14_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$topic14_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+topic14_qtl_loci_not_any_ilc_expressed <- setdiff(topic14_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(topic14_qtl_loci_not_any_ilc_expressed %in% topic14_qtl_loci_genes)
+
+any(topic14_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_topic15_qtl}
+ ## genes in 
+topic15_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$topic15_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+topic15_qtl_loci_not_any_ilc_expressed <- setdiff(topic15_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(topic15_qtl_loci_not_any_ilc_expressed %in% topic15_qtl_loci_genes)
+
+any(topic15_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_topic16_qtl}
+ ## genes in 
+topic16_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$topic16_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+topic16_qtl_loci_not_any_ilc_expressed <- setdiff(topic16_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(topic16_qtl_loci_not_any_ilc_expressed %in% topic16_qtl_loci_genes)
+
+any(topic16_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_topic17_qtl}
+ ## genes in 
+topic17_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$topic17_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+topic17_qtl_loci_not_any_ilc_expressed <- setdiff(topic17_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(topic17_qtl_loci_not_any_ilc_expressed %in% topic17_qtl_loci_genes)
+
+any(topic17_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_topic18_qtl}
+ ## genes in 
+topic18_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$topic18_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+topic18_qtl_loci_not_any_ilc_expressed <- setdiff(topic18_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(topic18_qtl_loci_not_any_ilc_expressed %in% topic18_qtl_loci_genes)
+
+any(topic18_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_topic19_qtl}
+ ## genes in 
+topic19_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$topic19_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+topic19_qtl_loci_not_any_ilc_expressed <- setdiff(topic19_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(topic19_qtl_loci_not_any_ilc_expressed %in% topic19_qtl_loci_genes)
+
+any(topic19_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_ilc3_activated_qtl}
+ ## genes in 
+ilc3_activated_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$ilc3_activated_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+ilc3_activated_qtl_loci_not_any_ilc_expressed <- setdiff(ilc3_activated_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(ilc3_activated_qtl_loci_not_any_ilc_expressed %in% ilc3_activated_qtl_loci_genes)
+
+any(ilc3_activated_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_lti_activated_qtl}
+ ## genes in 
+lti_activated_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$lti_activated_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+lti_activated_qtl_loci_not_any_ilc_expressed <- setdiff(lti_activated_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(lti_activated_qtl_loci_not_any_ilc_expressed %in% lti_activated_qtl_loci_genes)
+
+any(lti_activated_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_ilc1_ilc2_prop_qtl}
+ ## genes in 
+ilc1_ilc2_prop_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$ilc1_ilc2_prop_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+ilc1_ilc2_prop_qtl_loci_not_any_ilc_expressed <- setdiff(ilc1_ilc2_prop_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(ilc1_ilc2_prop_qtl_loci_not_any_ilc_expressed %in% ilc1_ilc2_prop_qtl_loci_genes)
+
+any(ilc1_ilc2_prop_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_ilc1_lic3_prop_qtl}
+ ## genes in 
+ilc1_lic3_prop_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$ilc1_lic3_prop_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+ilc1_lic3_prop_qtl_loci_not_any_ilc_expressed <- setdiff(ilc1_lic3_prop_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(ilc1_lic3_prop_qtl_loci_not_any_ilc_expressed %in% ilc1_lic3_prop_qtl_loci_genes)
+
+any(ilc1_lic3_prop_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_ilc2_ilc3_prop_qtl}
+ ## genes in 
+ilc2_ilc3_prop_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$ilc2_ilc3_prop_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+ilc2_ilc3_prop_qtl_loci_not_any_ilc_expressed <- setdiff(ilc2_ilc3_prop_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(ilc2_ilc3_prop_qtl_loci_not_any_ilc_expressed %in% ilc2_ilc3_prop_qtl_loci_genes)
+
+any(ilc2_ilc3_prop_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+
+```{r loci_ilc1_lti_prop_qtl}
+ ## genes in 
+ilc1_lti_prop_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$ilc1_lti_prop_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+ilc1_lti_prop_qtl_loci_not_any_ilc_expressed <- setdiff(ilc1_lti_prop_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(ilc1_lti_prop_qtl_loci_not_any_ilc_expressed %in% ilc1_lti_prop_qtl_loci_genes)
+
+any(ilc1_lti_prop_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+```
+
+
+
+```{r loci_ilc2_lti_prop_qtl}
+ ## genes in 
+ilc2_lti_prop_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$ilc2_lti_prop_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+ilc2_lti_prop_qtl_loci_not_any_ilc_expressed <- setdiff(ilc2_lti_prop_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(ilc2_lti_prop_qtl_loci_not_any_ilc_expressed %in% ilc2_lti_prop_qtl_loci_genes)
+
+any(ilc2_lti_prop_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+```
+
+ 
+```{r loci_ilc3_lti_prop_qtl}
+ ## genes in 
+ilc3_lti_prop_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$ilc3_lti_prop_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+ilc3_lti_prop_qtl_loci_not_any_ilc_expressed <- setdiff(ilc3_lti_prop_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(ilc3_lti_prop_qtl_loci_not_any_ilc_expressed %in% ilc3_lti_prop_qtl_loci_genes)
+
+any(ilc3_lti_prop_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_iga_qtl}
+ ## genes in 
+iga_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$iga_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+iga_qtl_loci_not_any_ilc_expressed <- setdiff(iga_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(iga_qtl_loci_not_any_ilc_expressed %in% iga_qtl_loci_genes)
+
+any(iga_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_ige_qtl}
+ ## genes in 
+ige_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$ige_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+ige_qtl_loci_not_any_ilc_expressed <- setdiff(ige_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(ige_qtl_loci_not_any_ilc_expressed %in% ige_qtl_loci_genes)
+
+any(ige_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_igg1_qtl}
+ ## genes in 
+igg1_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$igg1_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+igg1_qtl_loci_not_any_ilc_expressed <- setdiff(igg1_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(igg1_qtl_loci_not_any_ilc_expressed %in% igg1_qtl_loci_genes)
+
+any(igg1_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_igg2_qtl}
+ ## genes in 
+igg2_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$igg2_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+igg2_qtl_loci_not_any_ilc_expressed <- setdiff(igg2_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(igg2_qtl_loci_not_any_ilc_expressed %in% igg2_qtl_loci_genes)
+
+any(igg2_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_igm_qtl}
+ ## genes in 
+igm_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$igm_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+igm_qtl_loci_not_any_ilc_expressed <- setdiff(igm_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(igm_qtl_loci_not_any_ilc_expressed %in% igm_qtl_loci_genes)
+
+any(igm_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_mmcp1_qtl}
+ ## genes in 
+mmcp1_qtl_loci_genes <- unique(ccre$ensembl_gene[ccre$mmcp1_qtl==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+mmcp1_qtl_loci_not_any_ilc_expressed <- setdiff(mmcp1_qtl_loci_genes, all_ilcs) 
+
+## sanity check
+all(mmcp1_qtl_loci_not_any_ilc_expressed %in% mmcp1_qtl_loci_genes)
+
+any(mmcp1_qtl_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_ifng_qtl_steady}
+ ## genes in 
+ifng_qtl_steady_loci_genes <- unique(ccre$ensembl_gene[ccre$ifng_qtl_steady==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+ifng_qtl_steady_loci_not_any_ilc_expressed <- setdiff(ifng_qtl_steady_loci_genes, all_ilcs) 
+
+## sanity check
+all(ifng_qtl_steady_loci_not_any_ilc_expressed %in% ifng_qtl_steady_loci_genes)
+
+any(ifng_qtl_steady_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_il5_qtl_steady}
+ ## genes in 
+il5_qtl_steady_loci_genes <- unique(ccre$ensembl_gene[ccre$il5_qtl_steady==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+il5_qtl_steady_loci_not_any_ilc_expressed <- setdiff(il5_qtl_steady_loci_genes, all_ilcs) 
+
+## sanity check
+all(il5_qtl_steady_loci_not_any_ilc_expressed %in% il5_qtl_steady_loci_genes)
+
+any(il5_qtl_steady_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_tnf_qtl_steady}
+ ## genes in 
+tnf_qtl_steady_loci_genes <- unique(ccre$ensembl_gene[ccre$tnf_qtl_steady==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+tnf_qtl_steady_loci_not_any_ilc_expressed <- setdiff(tnf_qtl_steady_loci_genes, all_ilcs) 
+
+## sanity check
+all(tnf_qtl_steady_loci_not_any_ilc_expressed %in% tnf_qtl_steady_loci_genes)
+
+any(tnf_qtl_steady_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_il2_qtl_steady}
+ ## genes in 
+il2_qtl_steady_loci_genes <- unique(ccre$ensembl_gene[ccre$il2_qtl_steady==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+il2_qtl_steady_loci_not_any_ilc_expressed <- setdiff(il2_qtl_steady_loci_genes, all_ilcs) 
+
+## sanity check
+all(il2_qtl_steady_loci_not_any_ilc_expressed %in% il2_qtl_steady_loci_genes)
+
+any(il2_qtl_steady_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_il6_qtl_steady}
+ ## genes in 
+il6_qtl_steady_loci_genes <- unique(ccre$ensembl_gene[ccre$il6_qtl_steady==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+il6_qtl_steady_loci_not_any_ilc_expressed <- setdiff(il6_qtl_steady_loci_genes, all_ilcs) 
+
+## sanity check
+all(il6_qtl_steady_loci_not_any_ilc_expressed %in% il6_qtl_steady_loci_genes)
+
+any(il6_qtl_steady_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_il4_qtl_steady}
+ ## genes in 
+il4_qtl_steady_loci_genes <- unique(ccre$ensembl_gene[ccre$il4_qtl_steady==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+il4_qtl_steady_loci_not_any_ilc_expressed <- setdiff(il4_qtl_steady_loci_genes, all_ilcs) 
+
+## sanity check
+all(il4_qtl_steady_loci_not_any_ilc_expressed %in% il4_qtl_steady_loci_genes)
+
+any(il4_qtl_steady_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_il10_qtl_steady}
+ ## genes in 
+il10_qtl_steady_loci_genes <- unique(ccre$ensembl_gene[ccre$il10_qtl_steady==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+il10_qtl_steady_loci_not_any_ilc_expressed <- setdiff(il10_qtl_steady_loci_genes, all_ilcs) 
+
+## sanity check
+all(il10_qtl_steady_loci_not_any_ilc_expressed %in% il10_qtl_steady_loci_genes)
+
+any(il10_qtl_steady_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_il9_qtl_steady}
+ ## genes in 
+il9_qtl_steady_loci_genes <- unique(ccre$ensembl_gene[ccre$il9_qtl_steady==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+il9_qtl_steady_loci_not_any_ilc_expressed <- setdiff(il9_qtl_steady_loci_genes, all_ilcs) 
+
+## sanity check
+all(il9_qtl_steady_loci_not_any_ilc_expressed %in% il9_qtl_steady_loci_genes)
+
+any(il9_qtl_steady_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_il17a_qtl_steady}
+ ## genes in 
+il17a_qtl_steady_loci_genes <- unique(ccre$ensembl_gene[ccre$il17a_qtl_steady==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+il17a_qtl_steady_loci_not_any_ilc_expressed <- setdiff(il17a_qtl_steady_loci_genes, all_ilcs) 
+
+## sanity check
+all(il17a_qtl_steady_loci_not_any_ilc_expressed %in% il17a_qtl_steady_loci_genes)
+
+any(il17a_qtl_steady_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_il17f_qtl_steady}
+ ## genes in 
+il17f_qtl_steady_loci_genes <- unique(ccre$ensembl_gene[ccre$il17f_qtl_steady==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+il17f_qtl_steady_loci_not_any_ilc_expressed <- setdiff(il17f_qtl_steady_loci_genes, all_ilcs) 
+
+## sanity check
+all(il17f_qtl_steady_loci_not_any_ilc_expressed %in% il17f_qtl_steady_loci_genes)
+
+any(il17f_qtl_steady_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_il22_qtl_steady}
+ ## genes in 
+il22_qtl_steady_loci_genes <- unique(ccre$ensembl_gene[ccre$il22_qtl_steady==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+il22_qtl_steady_loci_not_any_ilc_expressed <- setdiff(il22_qtl_steady_loci_genes, all_ilcs) 
+
+## sanity check
+all(il22_qtl_steady_loci_not_any_ilc_expressed %in% il22_qtl_steady_loci_genes)
+
+any(il22_qtl_steady_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_il13_qtl_steady}
+ ## genes in 
+il13_qtl_steady_loci_genes <- unique(ccre$ensembl_gene[ccre$il13_qtl_steady==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+il13_qtl_steady_loci_not_any_ilc_expressed <- setdiff(il13_qtl_steady_loci_genes, all_ilcs) 
+
+## sanity check
+all(il13_qtl_steady_loci_not_any_ilc_expressed %in% il13_qtl_steady_loci_genes)
+
+any(il13_qtl_steady_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_ifng_qtl_allergy}
+ ## genes in 
+ifng_qtl_allergy_loci_genes <- unique(ccre$ensembl_gene[ccre$ifng_qtl_allergy==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+ifng_qtl_allergy_loci_not_any_ilc_expressed <- setdiff(ifng_qtl_allergy_loci_genes, all_ilcs) 
+
+## sanity check
+all(ifng_qtl_allergy_loci_not_any_ilc_expressed %in% ifng_qtl_allergy_loci_genes)
+
+any(ifng_qtl_allergy_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_il5_qtl_allergy}
+ ## genes in 
+il5_qtl_allergy_loci_genes <- unique(ccre$ensembl_gene[ccre$il5_qtl_allergy==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+il5_qtl_allergy_loci_not_any_ilc_expressed <- setdiff(il5_qtl_allergy_loci_genes, all_ilcs) 
+
+## sanity check
+all(il5_qtl_allergy_loci_not_any_ilc_expressed %in% il5_qtl_allergy_loci_genes)
+
+any(il5_qtl_allergy_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_tnf_qtl_allergy}
+ ## genes in 
+tnf_qtl_allergy_loci_genes <- unique(ccre$ensembl_gene[ccre$tnf_qtl_allergy==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+tnf_qtl_allergy_loci_not_any_ilc_expressed <- setdiff(tnf_qtl_allergy_loci_genes, all_ilcs) 
+
+## sanity check
+all(tnf_qtl_allergy_loci_not_any_ilc_expressed %in% tnf_qtl_allergy_loci_genes)
+
+any(tnf_qtl_allergy_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_il2_qtl_allergy}
+ ## genes in 
+il2_qtl_allergy_loci_genes <- unique(ccre$ensembl_gene[ccre$il2_qtl_allergy==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+il2_qtl_allergy_loci_not_any_ilc_expressed <- setdiff(il2_qtl_allergy_loci_genes, all_ilcs) 
+
+## sanity check
+all(il2_qtl_allergy_loci_not_any_ilc_expressed %in% il2_qtl_allergy_loci_genes)
+
+any(il2_qtl_allergy_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_il6_qtl_allergy}
+ ## genes in 
+il6_qtl_allergy_loci_genes <- unique(ccre$ensembl_gene[ccre$il6_qtl_allergy==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+il6_qtl_allergy_loci_not_any_ilc_expressed <- setdiff(il6_qtl_allergy_loci_genes, all_ilcs) 
+
+## sanity check
+all(il6_qtl_allergy_loci_not_any_ilc_expressed %in% il6_qtl_allergy_loci_genes)
+
+any(il6_qtl_allergy_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_il4_qtl_allergy}
+ ## genes in 
+il4_qtl_allergy_loci_genes <- unique(ccre$ensembl_gene[ccre$il4_qtl_allergy==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+il4_qtl_allergy_loci_not_any_ilc_expressed <- setdiff(il4_qtl_allergy_loci_genes, all_ilcs) 
+
+## sanity check
+all(il4_qtl_allergy_loci_not_any_ilc_expressed %in% il4_qtl_allergy_loci_genes)
+
+any(il4_qtl_allergy_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_il10_qtl_allergy}
+ ## genes in 
+il10_qtl_allergy_loci_genes <- unique(ccre$ensembl_gene[ccre$il10_qtl_allergy==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+il10_qtl_allergy_loci_not_any_ilc_expressed <- setdiff(il10_qtl_allergy_loci_genes, all_ilcs) 
+
+## sanity check
+all(il10_qtl_allergy_loci_not_any_ilc_expressed %in% il10_qtl_allergy_loci_genes)
+
+any(il10_qtl_allergy_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_il9_qtl_allergy}
+ ## genes in 
+il9_qtl_allergy_loci_genes <- unique(ccre$ensembl_gene[ccre$il9_qtl_allergy==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+il9_qtl_allergy_loci_not_any_ilc_expressed <- setdiff(il9_qtl_allergy_loci_genes, all_ilcs) 
+
+## sanity check
+all(il9_qtl_allergy_loci_not_any_ilc_expressed %in% il9_qtl_allergy_loci_genes)
+
+any(il9_qtl_allergy_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_il17a_qtl_allergy}
+ ## genes in 
+il17a_qtl_allergy_loci_genes <- unique(ccre$ensembl_gene[ccre$il17a_qtl_allergy==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+il17a_qtl_allergy_loci_not_any_ilc_expressed <- setdiff(il17a_qtl_allergy_loci_genes, all_ilcs) 
+
+## sanity check
+all(il17a_qtl_allergy_loci_not_any_ilc_expressed %in% il17a_qtl_allergy_loci_genes)
+
+any(il17a_qtl_allergy_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_il17f_qtl_allergy}
+ ## genes in 
+il17f_qtl_allergy_loci_genes <- unique(ccre$ensembl_gene[ccre$il17f_qtl_allergy==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+il17f_qtl_allergy_loci_not_any_ilc_expressed <- setdiff(il17f_qtl_allergy_loci_genes, all_ilcs) 
+
+## sanity check
+all(il17f_qtl_allergy_loci_not_any_ilc_expressed %in% il17f_qtl_allergy_loci_genes)
+
+any(il17f_qtl_allergy_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_il22_qtl_allergy}
+ ## genes in 
+il22_qtl_allergy_loci_genes <- unique(ccre$ensembl_gene[ccre$il22_qtl_allergy==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+il22_qtl_allergy_loci_not_any_ilc_expressed <- setdiff(il22_qtl_allergy_loci_genes, all_ilcs) 
+
+## sanity check
+all(il22_qtl_allergy_loci_not_any_ilc_expressed %in% il22_qtl_allergy_loci_genes)
+
+any(il22_qtl_allergy_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+ 
+```{r loci_il13_qtl_allergy}
+ ## genes in 
+il13_qtl_allergy_loci_genes <- unique(ccre$ensembl_gene[ccre$il13_qtl_allergy==1]) 
+
+ ## # genes in QTL loci not expressed in any ilc cells
+il13_qtl_allergy_loci_not_any_ilc_expressed <- setdiff(il13_qtl_allergy_loci_genes, all_ilcs) 
+
+## sanity check
+all(il13_qtl_allergy_loci_not_any_ilc_expressed %in% il13_qtl_allergy_loci_genes)
+
+any(il13_qtl_allergy_loci_not_any_ilc_expressed %in% all_ilcs)
+
+``` 
+
+
+
+
+
+
+
+
+
+
+```{r outputs_vectors}
+ilc1_output <- vars$index[vars$gene %in% ilc1_loci_not_ilc1_expressed]
+ilc1_any_ilc_output <- vars$index[vars$gene %in% ilc1_loci_not_any_ilc_expressed]
+
+
+ilc2_output <- vars$index[vars$gene %in% ilc2_loci_not_ilc2_expressed]
+ilc2_any_ilc_output <- vars$index[vars$gene %in% ilc2_loci_not_any_ilc_expressed]
+
+
+ilc3_output <- vars$index[vars$gene %in% ilc3_loci_not_ilc3_expressed]
+ilc3_any_ilc_output <- vars$index[vars$gene %in% ilc3_loci_not_any_ilc_expressed]
+
+
+lti_output <- vars$index[vars$gene %in% lti_loci_not_lti_expressed]
+lti_any_ilc_output <- vars$index[vars$gene %in% lti_loci_not_any_ilc_expressed]
+
+
+
+```
+
+
+
+```{r}
+cat(paste0("\n```{r output_vectors_", 
+           colnames(ccre)[53:108], 
+           "}\n ## genes in \n", 
+           colnames(ccre)[53:108], 
+           "_output <- vars$index[vars$gene %in% ", 
+           colnames(ccre)[53:108],
+           "_loci_not_any_ilc_expressed] \n\n",
+           "``` \n\n"))
+```
+
+
+
+```{r output_vectors_topic0_qtl}
+ ## genes in 
+topic0_qtl_output <- vars$index[vars$gene %in% topic0_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_topic1_qtl}
+ ## genes in 
+topic1_qtl_output <- vars$index[vars$gene %in% topic1_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_topic2_qtl}
+ ## genes in 
+topic2_qtl_output <- vars$index[vars$gene %in% topic2_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_topic3_qtl}
+ ## genes in 
+topic3_qtl_output <- vars$index[vars$gene %in% topic3_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_topic4_qtl}
+ ## genes in 
+topic4_qtl_output <- vars$index[vars$gene %in% topic4_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_topic5_qtl}
+ ## genes in 
+topic5_qtl_output <- vars$index[vars$gene %in% topic5_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_topic6_qtl}
+ ## genes in 
+topic6_qtl_output <- vars$index[vars$gene %in% topic6_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_topic7_qtl}
+ ## genes in 
+topic7_qtl_output <- vars$index[vars$gene %in% topic7_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_topic8_qtl}
+ ## genes in 
+topic8_qtl_output <- vars$index[vars$gene %in% topic8_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_topic9_qtl}
+ ## genes in 
+topic9_qtl_output <- vars$index[vars$gene %in% topic9_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_topic10_qtl}
+ ## genes in 
+topic10_qtl_output <- vars$index[vars$gene %in% topic10_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_topic11_qtl}
+ ## genes in 
+topic11_qtl_output <- vars$index[vars$gene %in% topic11_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_topic12_qtl}
+ ## genes in 
+topic12_qtl_output <- vars$index[vars$gene %in% topic12_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_topic13_qtl}
+ ## genes in 
+topic13_qtl_output <- vars$index[vars$gene %in% topic13_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_topic14_qtl}
+ ## genes in 
+topic14_qtl_output <- vars$index[vars$gene %in% topic14_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_topic15_qtl}
+ ## genes in 
+topic15_qtl_output <- vars$index[vars$gene %in% topic15_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_topic16_qtl}
+ ## genes in 
+topic16_qtl_output <- vars$index[vars$gene %in% topic16_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_topic17_qtl}
+ ## genes in 
+topic17_qtl_output <- vars$index[vars$gene %in% topic17_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_topic18_qtl}
+ ## genes in 
+topic18_qtl_output <- vars$index[vars$gene %in% topic18_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_topic19_qtl}
+ ## genes in 
+topic19_qtl_output <- vars$index[vars$gene %in% topic19_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_ilc3_activated_qtl}
+ ## genes in 
+ilc3_activated_qtl_output <- vars$index[vars$gene %in% ilc3_activated_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_lti_activated_qtl}
+ ## genes in 
+lti_activated_qtl_output <- vars$index[vars$gene %in% lti_activated_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_ilc1_ilc2_prop_qtl}
+ ## genes in 
+ilc1_ilc2_prop_qtl_output <- vars$index[vars$gene %in% ilc1_ilc2_prop_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_ilc1_lic3_prop_qtl}
+ ## genes in 
+ilc1_lic3_prop_qtl_output <- vars$index[vars$gene %in% ilc1_lic3_prop_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_ilc2_ilc3_prop_qtl}
+ ## genes in 
+ilc2_ilc3_prop_qtl_output <- vars$index[vars$gene %in% ilc2_ilc3_prop_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_ilc3_lti_prop_qtl}
+ ## genes in 
+ilc3_lti_prop_qtl_output <- vars$index[vars$gene %in% ilc3_lti_prop_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_iga_qtl}
+ ## genes in 
+iga_qtl_output <- vars$index[vars$gene %in% iga_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_ige_qtl}
+ ## genes in 
+ige_qtl_output <- vars$index[vars$gene %in% ige_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_igg1_qtl}
+ ## genes in 
+igg1_qtl_output <- vars$index[vars$gene %in% igg1_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_igg2_qtl}
+ ## genes in 
+igg2_qtl_output <- vars$index[vars$gene %in% igg2_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_igm_qtl}
+ ## genes in 
+igm_qtl_output <- vars$index[vars$gene %in% igm_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_mmcp1_qtl}
+ ## genes in 
+mmcp1_qtl_output <- vars$index[vars$gene %in% mmcp1_qtl_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_ifng_qtl_steady}
+ ## genes in 
+ifng_qtl_steady_output <- vars$index[vars$gene %in% ifng_qtl_steady_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_il5_qtl_steady}
+ ## genes in 
+il5_qtl_steady_output <- vars$index[vars$gene %in% il5_qtl_steady_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_tnf_qtl_steady}
+ ## genes in 
+tnf_qtl_steady_output <- vars$index[vars$gene %in% tnf_qtl_steady_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_il2_qtl_steady}
+ ## genes in 
+il2_qtl_steady_output <- vars$index[vars$gene %in% il2_qtl_steady_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_il6_qtl_steady}
+ ## genes in 
+il6_qtl_steady_output <- vars$index[vars$gene %in% il6_qtl_steady_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_il4_qtl_steady}
+ ## genes in 
+il4_qtl_steady_output <- vars$index[vars$gene %in% il4_qtl_steady_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_il10_qtl_steady}
+ ## genes in 
+il10_qtl_steady_output <- vars$index[vars$gene %in% il10_qtl_steady_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_il9_qtl_steady}
+ ## genes in 
+il9_qtl_steady_output <- vars$index[vars$gene %in% il9_qtl_steady_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_il17a_qtl_steady}
+ ## genes in 
+il17a_qtl_steady_output <- vars$index[vars$gene %in% il17a_qtl_steady_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_il17f_qtl_steady}
+ ## genes in 
+il17f_qtl_steady_output <- vars$index[vars$gene %in% il17f_qtl_steady_loci_not_any_ilc_expressed]
+
+``` 
+
+ 
+```{r output_vectors_il22_qtl_steady}
+ ## genes in 
+il22_qtl_steady_output <- vars$index[vars$gene %in% il22_qtl_steady_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_il13_qtl_steady}
+ ## genes in 
+il13_qtl_steady_output <- vars$index[vars$gene %in% il13_qtl_steady_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_ifng_qtl_allergy}
+ ## genes in 
+ifng_qtl_allergy_output <- vars$index[vars$gene %in% ifng_qtl_allergy_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_il5_qtl_allergy}
+ ## genes in 
+il5_qtl_allergy_output <- vars$index[vars$gene %in% il5_qtl_allergy_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_tnf_qtl_allergy}
+ ## genes in 
+tnf_qtl_allergy_output <- vars$index[vars$gene %in% tnf_qtl_allergy_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_il2_qtl_allergy}
+ ## genes in 
+il2_qtl_allergy_output <- vars$index[vars$gene %in% il2_qtl_allergy_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_il6_qtl_allergy}
+ ## genes in 
+il6_qtl_allergy_output <- vars$index[vars$gene %in% il6_qtl_allergy_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_il4_qtl_allergy}
+ ## genes in 
+il4_qtl_allergy_output <- vars$index[vars$gene %in% il4_qtl_allergy_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_il10_qtl_allergy}
+ ## genes in 
+il10_qtl_allergy_output <- vars$index[vars$gene %in% il10_qtl_allergy_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_il9_qtl_allergy}
+ ## genes in 
+il9_qtl_allergy_output <- vars$index[vars$gene %in% il9_qtl_allergy_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_il17a_qtl_allergy}
+ ## genes in 
+il17a_qtl_allergy_output <- vars$index[vars$gene %in% il17a_qtl_allergy_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_il17f_qtl_allergy}
+ ## genes in 
+il17f_qtl_allergy_output <- vars$index[vars$gene %in% il17f_qtl_allergy_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_il22_qtl_allergy}
+ ## genes in 
+il22_qtl_allergy_output <- vars$index[vars$gene %in% il22_qtl_allergy_loci_not_any_ilc_expressed] 
+
+``` 
+
+ 
+```{r output_vectors_il13_qtl_allergy}
+ ## genes in 
+il13_qtl_allergy_output <- vars$index[vars$gene %in% il13_qtl_allergy_loci_not_any_ilc_expressed] 
+
+``` 
+
+```{r}
+r <- as.list(grep("_output", ls(), value = T))
+names(r) <- grep("_output", ls(), value = T)
+```
+
+```{r}
+rout <- sapply(r, function(x) eval(parse(text = x)))
+names(rout) <- grep("_output", ls(), value = T)
+
+
+library(stringi)
+res <- as.data.frame(t(stri_list2matrix(rout)))
+colnames(res) <- unique(unlist(sapply(r, names)))
+resdf <- data.frame(t(res))
+colnames(resdf) <- names(r)
+```
+
+
+
+```{r, echo = F, eval = F}
+df <- list(ilc1 = ilc1, ilc2= ilc2, il3 = ilc3, lti = lti) %>% 
+  bind_rows(., .id = "cell_type") %>%
+  dplyr::mutate(intrinsic = ifelse(intrinsic == 1, "intrinsic", "extrinsic")) %>%
+  dplyr::mutate(intrinsic = factor(intrinsic, levels = c("intrinsic", "extrinsic")))
+```
+
+
+
+```{r}
+r <- list(ILC1_not_in_ILC1 = ilc1_output,
+          ILC1_not_in_any_ILC = ilc1_any_ilc_output,
+          ILC2_not_in_ILC2 = ilc2_output,
+          ILC2_not_in_any_ILC = ilc2_any_ilc_output,
+          ILC3_not_in_ILC3 = ilc3_output,
+          ILC3_not_in_any_ILC = ilc3_any_ilc_output,
+          LTi_not_in_LTi = lti_output,
+          LTi_not_in_any_ILC = lti_any_ilc_output)
+
+
+library(stringi)
+res <- as.data.frame(t(stri_list2matrix(r)))
+colnames(res) <- unique(unlist(sapply(r, names)))
+resdf <- data.frame(t(res))
+colnames(resdf) <- names(r)
+
+write.csv(resdf, "ilcs-loci-genes-not-expressed-ilc.csv")
+
+```
+
+
+
+## 
+
+TODO: add snp locations
+```{r}
+
+outdf <- sapply(loci_gene_list, function(t) { 
+  data.frame(loci_genes = eval(parse(text = t)))}, simplify = F, USE.NAMES = T) %>% 
+  bind_rows(.,.id="trait")
+
+
+outdf <- outdf %>% 
+  dplyr::rename(gene_id = loci_genes) %>% 
+  left_join(dplyr::select(ensembl, seqid, start, end, strand, gene_id, gene_name)) %>%
+  filter(!is.na(gene_name))
+
+
+outdf <- rbind(outdf,
+               data.frame(trait = "topic11_qtl_loci_genes",
+                          gene_id = "ENSMUSG00000106126",
+                          seqid = "5",
+                          start = "54807334",
+                          end="54810014",
+                          strand="+",
+                          gene_name ="Gm43781"))
+
+```
+
+
+
+## Cell Type Specific Topics
+
+```{r}
+
+ilc1_topic_qtl <- read_csv("results/topics/cell-type-specific-topics-ilc1-lods.csv") %>%
+  rownames_to_column("marker") %>%
+  pivot_longer(-marker) %>% 
+  mutate(name = paste0("ilc1_", name),
+         indicator = as.numeric(value > 6)) %>%
+  pivot_wider(id_cols = marker, 
+              names_from = name,
+              values_from = indicator,
+              values_fill = 0)
+  
+
+ilc2_topic_qtl <- read_csv("results/topics/cell-type-specific-topics-ilc2-lods.csv") %>%
+  rownames_to_column("marker") %>%
+  pivot_longer(-marker) %>% 
+  mutate(name = paste0("ilc2_", name),
+         indicator = as.numeric(value > 6)) %>%
+  pivot_wider(id_cols = marker, 
+              names_from = name,
+              values_from = indicator,
+              values_fill = 0)
+
+ilc3_topic_qtl <- read_csv("results/topics/cell-type-specific-topics-ilc3-lods.csv") %>%
+  rownames_to_column("marker") %>%
+  pivot_longer(-marker) %>% 
+  mutate(name = paste0("ilc3_", name),
+         indicator = as.numeric(value > 6)) %>%
+  pivot_wider(id_cols = marker, 
+              names_from = name,
+              values_from = indicator,
+              values_fill = 0)
+
+lti_topic_qtl <- read_csv("results/topics/cell-type-specific-topics-lti-lods.csv") %>%
+  rownames_to_column("marker") %>%
+  pivot_longer(-marker) %>% 
+  mutate(name = paste0("lti_", name),
+         indicator = as.numeric(value > 6)) %>%
+  pivot_wider(id_cols = marker, 
+              names_from = name,
+              values_from = indicator,
+              values_fill = 0)
+
+
+ccre <- ccre %>%
+  left_join(ilc1_topic_qtl) %>%
+  left_join(ilc2_topic_qtl) %>%
+  left_join(ilc3_topic_qtl) %>%
+  left_join(lti_topic_qtl)
+
+
+
+ilc1_topic_qtl <- read_csv("results/topics/cell-type-specific-topics-ilc1-lods.csv") %>%
+  rownames_to_column("marker") %>% 
+  pivot_longer(-marker) %>% 
+  filter(value > 6)
+
+
+
+```
+
+
+
+```{r}
+
+## ILC1
+ilc1_ciseqtl_top_markers <- ilc1_eqtl %>% 
+  group_by(id, gene) %>% 
+  slice_max(order_by = value) %>% 
+  group_by(id) %>% 
+  slice_max(order_by = value) %>% 
+  filter(value > 6) %>% 
+  ungroup() %>% 
+  dplyr::select(marker) %>% 
+  mutate(name = "ilc1_ciseqtl_assoc_cv",
+         ilc1_ciseqtl_indicator=1)
+
+ilc1_transeqtl_top_markers <- ilc1_eqtl %>% 
+  group_by(id, gene) %>% 
+  slice_max(order_by = value) %>% 
+  group_by(id) %>% 
+  slice_max(order_by = value) %>% 
+  filter(value > 6) %>% 
+  ungroup() %>% 
+  dplyr::select(marker) %>% 
+  mutate(name = "ilc1_transeqtl_assoc_cv",
+         ilc1_transeqtl_indicator=1)
+
+
+## ILC2
+ilc2_ciseqtl_top_markers <- ilc2_eqtl %>% 
+  group_by(id, gene) %>% 
+  slice_max(order_by = value) %>% 
+  group_by(id) %>% 
+  slice_max(order_by = value) %>% 
+  filter(value > 6) %>% 
+  ungroup() %>% 
+  dplyr::select(marker) %>% 
+  mutate(name = "ilc2_ciseqtl_assoc_cv",
+         ilc2_ciseqtl_indicator=1)
+
+ilc2_transeqtl_top_markers <- ilc2_eqtl %>% 
+  group_by(id, gene) %>% 
+  slice_max(order_by = value) %>% 
+  group_by(id) %>% 
+  slice_max(order_by = value) %>% 
+  filter(value > 6) %>% 
+  ungroup() %>% 
+  dplyr::select(marker) %>% 
+  mutate(name = "ilc2_transeqtl_assoc_cv",
+         ilc2_transeqtl_indicator=1)
+
+## ILC3
+ilc3_ciseqtl_top_markers <- ilc3_eqtl %>% 
+  group_by(id, gene) %>% 
+  slice_max(order_by = value) %>% 
+  group_by(id) %>% 
+  slice_max(order_by = value) %>% 
+  filter(value > 6) %>% 
+  ungroup() %>% 
+  dplyr::select(marker) %>% 
+  mutate(name = "ilc3_ciseqtl_assoc_cv",
+         ilc3_ciseqtl_indicator=1)
+
+ilc3_transeqtl_top_markers <- ilc3_eqtl %>% 
+  group_by(id, gene) %>% 
+  slice_max(order_by = value) %>% 
+  group_by(id) %>% 
+  slice_max(order_by = value) %>% 
+  filter(value > 6) %>% 
+  ungroup() %>% 
+  dplyr::select(marker) %>% 
+  mutate(name = "ilc3_transeqtl_assoc_cv",
+         ilc3_transeqtl_indicator=1)
+
+# LTi
+lti_ciseqtl_top_markers <- lti_eqtl %>% 
+  group_by(id, gene) %>% 
+  slice_max(order_by = value) %>% 
+  group_by(id) %>% 
+  slice_max(order_by = value) %>% 
+  filter(value > 6) %>% 
+  ungroup() %>% 
+  dplyr::select(marker) %>% 
+  mutate(name = "lti_ciseqtl_assoc_cv",
+         lti_ciseqtl_indicator=1)
+
+lti_transeqtl_top_markers <- lti_eqtl %>% 
+  group_by(id, gene) %>% 
+  slice_max(order_by = value) %>% 
+  group_by(id) %>% 
+  slice_max(order_by = value) %>% 
+  filter(value > 6) %>% 
+  ungroup() %>% 
+  dplyr::select(marker) %>% 
+  mutate(name = "lti_transeqtl_assoc_cv",
+         lti_transeqtl_indicator=1)
+```
+
+
+```{r}
+outdf <-  ccre %>% 
+  dplyr::mutate(ilc1_transeqtl_assoc_cv = as.numeric(ilc1_eqtl_loci_cv+ilc1_ciseqtl_assoc_cv==1),
+                ilc2_transeqtl_assoc_cv = as.numeric(ilc2_eqtl_loci_cv+ilc2_ciseqtl_assoc_cv==1),
+                ilc3_transeqtl_assoc_cv = as.numeric(ilc3_eqtl_loci_cv+ilc3_ciseqtl_assoc_cv==1),
+                lti_transeqtl_assoc_cv = as.numeric(lti_eqtl_loci_cv+lti_ciseqtl_assoc_cv==1)) %>%
+  dplyr::select(marker,chr,pos, ensembl_gene, ilc1_eqtl_loci_cv:lti_transeqtl_assoc_cv) %>% 
+  pivot_longer(-c(marker,chr,pos,ensembl_gene)) %>% 
+  filter(value == 1) %>%
+  dplyr::rename(gene_id = ensembl_gene) %>% 
+  left_join(dplyr::select(ensembl, start, end, strand, gene_id, gene_name)) %>%
+  filter(!is.na(gene_name),
+         !{name %in% c("ilc1_eqtl_loci_cv", "ilc2_eqtl_loci_cv",
+                       "ilc3_eqtl_loci_cv", "lti_eqtl_loci_cv")},
+         str_detect(name, "_mean", negate = TRUE))
+
+
+```
+
+
+```{r}
+outdf2 <- outdf %>%
+  left_join(ilc1_ciseqtl_top_markers) %>%
+  left_join(ilc1_transeqtl_top_markers) %>%
+  left_join(ilc2_ciseqtl_top_markers) %>%
+  left_join(ilc2_transeqtl_top_markers) %>%
+  left_join(ilc3_ciseqtl_top_markers) %>%
+  left_join(ilc3_transeqtl_top_markers) %>%
+  left_join(lti_ciseqtl_top_markers) %>%
+  left_join(lti_transeqtl_top_markers) %>%
+  mutate(keep = coalesce(ilc1_ciseqtl_indicator,
+                         ilc1_transeqtl_indicator,
+                         ilc2_ciseqtl_indicator,
+                         ilc2_transeqtl_indicator,
+                         ilc3_ciseqtl_indicator,
+                         ilc3_transeqtl_indicator,
+                         lti_ciseqtl_indicator,
+                         lti_transeqtl_indicator)) %>%
+  filter(keep==1 | str_detect(name, "eqtl", negate = TRUE)) %>%
+  dplyr::select(marker, chr, pos, gene_id, name, start,end,strand, gene_name) %>%
+  rbind(.,
+        data.frame(marker = "UNCHS014430",
+                   chr = 5,
+                   pos = 54808126,
+                   name = "topic11_qtl_loci_genes",
+                   gene_id = "ENSMUSG00000106126",
+                   start = "54807334",
+                   end="54810014",
+                   strand="+",
+                   gene_name ="Gm43781")) %>%
+  filter(str_detect(name, "allergy", negate = TRUE))
+
+```
+
+```{r}
+
+write.csv(outdf2, "qtl-loci-genes-by-trait.csv", row.names = FALSE)
+
+```
+
+
+
+## trans-eQTL not expressed in ILCs
+
+```{r}
+qtl_list <- read_csv(paste0(data_path, "qtl-loci-genes-by-trait.csv"))
+```
+
+
+
+```{r}
+qtl_group_list <- qtl_list %>%
+  mutate(group = case_when(str_detect(name, "eqtl") ~ "eqtl",
+                           str_detect(name, "prop") ~ "proportion",
+                           str_detect(name, "^topic") ~ "all_cells_topics",
+                           str_detect(name, "ilc1_topic") ~ "ILC1_topics",
+                           str_detect(name, "ilc2_topic") ~ "ILC2_topics",
+                           str_detect(name, "ilc3_topic") ~ "ILC3_topics",
+                           str_detect(name, "lti_topic") ~ "LTi_topics",
+                           str_detect(name, "_steady") ~ "cytokine",
+                           TRUE ~ "other")) %>%
+  split(.,.$group)
+```
+
+```{r}
+map(names(qtl_group_list), function(n) {
+  write.csv(x = qtl_group_list[[n]], 
+            file = paste0(results_path, n, "-qtl-loci-genes-by-trait.csv"),
+            row.names = FALSE)
+})
+```
+
+
+### ILC1 trans-eQTL Not expressed in ILC1
+
+```{r}
+ilc1_expressed_genes <- vars %>% filter(ilc1_expressed==1) %>% pull(index)
+ilc1_transeqtl <-  qtl_list %>% filter(str_detect(name, "ilc1_trans"))
+```
+
+```{r}
+
+
+ilc1_transeqtl_not_expressed <- ilc1_transeqtl %>% 
+  filter(!{gene_name %in% ilc1_expressed_genes}) %>%
+  distinct(gene_name) %>%
+  pull(gene_name)
+```
+
+
+
+### ILC2 trans-eQTL Not expressed in ILC2
+
+```{r}
+ilc2_expressed_genes <- vars %>% filter(ilc2_expressed==1) %>% pull(index)
+ilc2_transeqtl <-  qtl_list %>% filter(str_detect(name, "ilc2_trans"))
+```
+
+```{r}
+ilc2_transeqtl_not_expressed <- ilc2_transeqtl %>% 
+  filter(!{gene_name %in% ilc2_expressed_genes}) %>%
+  distinct(gene_name) %>%
+  pull(gene_name)
+```
+
+
+### ILC3 trans-eQTL Not expressed in ILC3
+
+```{r}
+ilc3_expressed_genes <- vars %>% filter(ilc3_expressed==1) %>% pull(index)
+ilc3_transeqtl <-  qtl_list %>% filter(str_detect(name, "ilc3_trans"))
+```
+
+```{r}
+ilc3_transeqtl_not_expressed <- ilc3_transeqtl %>% 
+  filter(!{gene_name %in% ilc3_expressed_genes}) %>%
+  distinct(gene_name) %>%
+  pull(gene_name)
+```
+
+
+### LTi trans-eQTL Not expressed in LTi
+
+```{r}
+lti_expressed_genes <- vars %>% filter(lti_expressed==1) %>% pull(index)
+lti_transeqtl <-  qtl_list %>% filter(str_detect(name, "lti_trans"))
+```
+
+```{r}
+lti_transeqtl_not_expressed <- lti_transeqtl %>% 
+  filter(!{gene_name %in% lti_expressed_genes}) %>%
+  distinct(gene_name) %>%
+  pull(gene_name)
+```
+
+
+```{r}
+transeqt_not_expresseddf <- list(
+  "ILC1" = data.frame(genes=ilc1_transeqtl_not_expressed),
+  "ILC2" = data.frame(genes=ilc2_transeqtl_not_expressed),
+  "ILC3" = data.frame(genes=ilc3_transeqtl_not_expressed),
+  "LTi-like" = data.frame(genes=lti_transeqtl_not_expressed)
+) %>%
+  bind_rows(.,.id = "cell_type")
+```
+
+```{r}
+write.csv(transeqt_not_expresseddf, 
+          paste0(results_path, "trans-eqtl-loci-genes-not-expressed-ilc.csv"),
+          row.names = FALSE)
+```
+
+### Proportion Not Expressed in ILC
+
+```{r}
+ilc_expressed_genes <- unique(c(ilc1_expressed_genes,
+                                ilc2_expressed_genes,
+                                ilc3_expressed_genes,
+                                lti_expressed_genes))
+```
+
+```{r}
+ilc1_ilc2_prop_loci_not_ilc_expressed <- qtl_list %>%
+  filter(name == "ilc1_ilc2_prop_qtl",
+         !{gene_name %in% ilc_expressed_genes}) %>%
+  distinct(gene_name) %>%
+  pull(gene_name)
+
+ilc1_ilc3_prop_loci_not_ilc_expressed <- qtl_list %>%
+  filter(name == "ilc1_ilc3_prop_qtl",
+         !{gene_name %in% ilc_expressed_genes}) %>%
+  distinct(gene_name) %>%
+  pull(gene_name)
+
+ilc1_lti_prop_loci_not_ilc_expressed <- qtl_list %>%
+  filter(name == "ilc1_lti_prop_qtl",
+         !{gene_name %in% ilc_expressed_genes}) %>%
+  distinct(gene_name) %>%
+  pull(gene_name)
+
+ilc2_ilc3_prop_loci_not_ilc_expressed <- qtl_list %>%
+  filter(name == "ilc2_ilc3_prop_qtl",
+         !{gene_name %in% ilc_expressed_genes}) %>%
+  distinct(gene_name) %>%
+  pull(gene_name)
+
+ilc2_lti_prop_loci_not_ilc_expressed <- qtl_list %>%
+  filter(name == "ilc2_lti_prop_qtl",
+         !{gene_name %in% ilc_expressed_genes}) %>%
+  distinct(gene_name) %>%
+  pull(gene_name)
+
+ilc3_lti_prop_loci_not_ilc_expressed <- qtl_list %>%
+  filter(name == "ilc3_lti_prop_qtl",
+         !{gene_name %in% ilc_expressed_genes}) %>%
+  distinct(gene_name) %>%
+  pull(gene_name)
+```
+
+
+```{r}
+prop_qtl_not_expresseddf <- list(
+  "ILC1 vs ILC2" = data.frame(genes=ilc1_ilc2_prop_loci_not_ilc_expressed),
+  "ILC1 vs ILC3" = data.frame(genes=ilc1_ilc3_prop_loci_not_ilc_expressed),
+  "ILC1 vs LTi-like" = data.frame(genes=ilc1_lti_prop_loci_not_ilc_expressed),
+  "ILC2 vs ILC3" = data.frame(genes=ilc2_ilc3_prop_loci_not_ilc_expressed),
+  "ILC2 vs LTi-like" = data.frame(genes=ilc2_lti_prop_loci_not_ilc_expressed),
+  "ILC3 vs LTi-like" = data.frame(genes=ilc3_lti_prop_loci_not_ilc_expressed)) %>%
+  bind_rows(.,.id = "cell_type")
+
+write.csv(prop_qtl_not_expresseddf, 
+          paste0(results_path, "proportion-qtl-loci-genes-not-expressed-ilc.csv"),
+          row.names = FALSE)
+```
+
+### Topic
+
+```{r}
+
+topic_loci_not_ilc_expressed <- lapply(0:19, function(i) {
+  
+  out <- qtl_list %>%
+      filter(str_detect(name, paste0("^topic",i)),
+             !{gene_name %in% ilc_expressed_genes})  %>%
+      distinct(gene_name) %>%
+      pull(gene_name)
+  
+  if(length(out) == 0) out <- NA
+  data.frame(genes = out, trait = paste0("topic", i))
+  
+}) %>% bind_rows() 
+
+write.csv(topic_loci_not_ilc_expressed, 
+          paste0(results_path, "topic-qtl-loci-genes-not-expressed-ilc.csv"),
+          row.names = FALSE)
+
+
+ilc1_topic_loci_not_ilc_expressed <- lapply(0:9, function(i) {
+  
+  out <- qtl_list %>%
+      filter(str_detect(name, paste0("^ilc1_topic",i)),
+             !{gene_name %in% ilc_expressed_genes})  %>%
+      distinct(gene_name) %>%
+      pull(gene_name)
+  
+  if(length(out) == 0) out <- NA
+  data.frame(genes = out, trait = paste0("ilc1_topic", i))
+  
+}) %>% bind_rows() 
+
+write.csv(ilc1_topic_loci_not_ilc_expressed, 
+          paste0(results_path, "ilc1-topic-qtl-loci-genes-not-expressed-ilc.csv"),
+          row.names = FALSE)
+
+
+ilc2_topic_loci_not_ilc_expressed <- lapply(0:9, function(i) {
+  
+  out <- qtl_list %>%
+      filter(str_detect(name, paste0("^ilc2_topic",i)),
+             !{gene_name %in% ilc_expressed_genes})  %>%
+      distinct(gene_name) %>%
+      pull(gene_name)
+  
+  if(length(out) == 0) out <- NA
+  data.frame(genes = out, trait = paste0("ilc2_topic", i))
+  
+}) %>% bind_rows()
+
+write.csv(ilc2_topic_loci_not_ilc_expressed, 
+          paste0(results_path, "ilc2-topic-qtl-loci-genes-not-expressed-ilc.csv"),
+          row.names = FALSE)
+
+
+
+ilc3_topic_loci_not_ilc_expressed <- lapply(0:9, function(i) {
+  
+  out <- qtl_list %>%
+      filter(str_detect(name, paste0("^ilc3_topic",i)),
+             !{gene_name %in% ilc_expressed_genes})  %>%
+      distinct(gene_name) %>%
+      pull(gene_name)
+  
+  if(length(out) == 0) out <- NA
+  data.frame(genes = out, trait = paste0("ilc3_topic", i))
+  
+}) %>% bind_rows() 
+
+write.csv(ilc3_topic_loci_not_ilc_expressed, 
+          paste0(results_path, "ilc3-topic-qtl-loci-genes-not-expressed-ilc.csv"),
+          row.names = FALSE)
+
+
+
+lti_topic_loci_not_ilc_expressed <- lapply(0:9, function(i) {
+  
+  out <- qtl_list %>%
+      filter(str_detect(name, paste0("^lti_topic",i)),
+             !{gene_name %in% ilc_expressed_genes})  %>%
+      distinct(gene_name) %>%
+      pull(gene_name)
+  
+  if(length(out) == 0) out <- NA
+  data.frame(genes = out, trait = paste0("lti_topic", i))
+  
+}) %>% bind_rows() 
+
+write.csv(lti_topic_loci_not_ilc_expressed, 
+          paste0(results_path, "lti-topic-qtl-loci-genes-not-expressed-ilc.csv"),
+          row.names = FALSE)
+
+```
+
+
+
+
+### Cytokines
+
+```{r}
+
+cytokine_list <- unique(grep("_steady", qtl_list$name, value = T))
+
+cytokine_loci_not_ilc_expressed <- lapply(cytokine_list, function(i) {
+  
+  out <- qtl_list %>%
+      filter(str_detect(name, i),
+             !{gene_name %in% ilc_expressed_genes})  %>%
+      distinct(gene_name) %>%
+      pull(gene_name)
+  
+  if(length(out) == 0) out <- NA
+  data.frame(genes = out, trait =i)
+  
+}) %>% bind_rows() 
+
+write.csv(cytokine_loci_not_ilc_expressed, 
+          paste0(results_path, "cytokine-qtl-loci-genes-not-expressed-ilc.csv"),
+          row.names = FALSE)
+```
+
