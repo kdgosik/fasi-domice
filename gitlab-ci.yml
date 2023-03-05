@@ -1,0 +1,97 @@
+stages:
+  - main
+  - secondary
+  - ecr
+
+before_script:
+  - export DATE=$(date +'%Y-%m-%d')
+  # Login to the Gitlab Registry for pulling cache and pushing to Gitlab
+  - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  # Download the AWS CLI
+  - apk add --no-cache python3 py3-pip
+  - pip3 install --no-cache-dir awscli
+  # These are Gitlab secrets. Check Settings --> CI/CD --> Variables to configure these
+  - aws configure set region $AWS_DEFAULT_REGION
+  - aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+  - aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+  # Login to the AWS Elastic Container Registry (ECR)
+  - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ELASTIC_CONTAINER_REGISTRY
+
+######################
+### PUSH TO GITLAB ### 
+######################
+
+### MAIN --> Default comp-bio working environment
+main:
+  image: docker:20.10.16
+  stage: main
+  services:
+    - docker:20.10.16-dind
+  script:
+    # Starting the first build by pulling the main env from cache
+    - docker pull $CI_REGISTRY_IMAGE:main || true
+    - >
+      docker build -f env/main.Dockerfile . \
+        --cache-from $CI_REGISTRY_IMAGE:main \
+        -t $CI_REGISTRY_IMAGE:main-$DATE \
+        -t $CI_REGISTRY_IMAGE:main
+    - docker push $CI_REGISTRY_IMAGE --all-tags
+  only:
+    refs:
+      - main
+    changes:
+      - env/main.Dockerfile
+      - .gitlab-ci.yml
+
+### TRAIN --> Environment for training TBR model with ordingal regression and mord
+### DELFT --> Environment for image processing
+### BIOC  --> Environment for BioConductor-based analyses
+### SHINY --> Environment for the R Shiny app deployment
+build:
+  image: docker:20.10.16
+  stage: secondary
+  services:
+    - docker:20.10.16-dind
+  parallel:
+    matrix:
+      - TAG: [train, delft, bioc, shiny]
+  script:
+    - >
+      docker build -f env/$TAG.Dockerfile . \
+        -t $CI_REGISTRY_IMAGE:$TAG-$DATE \
+        -t $CI_REGISTRY_IMAGE:$TAG
+    - docker push $CI_REGISTRY_IMAGE --all-tags
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - env/main.Dockerfile
+        - env/$TAG.Dockerfile
+        - .gitlab-ci.yml
+      when: always
+
+###################
+### PUSH TO ECR ###
+###################
+
+ecr:
+  image: docker:20.10.16
+  stage: ecr
+  services:
+    - docker:20.10.16-dind
+  parallel:
+    matrix:
+      - TAG: [main, train, delft, bioc, shiny]
+  script:
+    - >
+      docker build --build-arg TAG=$TAG \
+        -f env/ecr.Dockerfile . \
+        -t $ELASTIC_CONTAINER_REGISTRY/comp-bio:$TAG-$DATE \
+        -t $ELASTIC_CONTAINER_REGISTRY/comp-bio:$TAG 
+    - docker push $ELASTIC_CONTAINER_REGISTRY/comp-bio --all-tags
+  only:
+    refs:
+      - main
+    changes:
+      - env/$TAG.Dockerfile
+      - env/ecr.Dockerfile
+      - .gitlab-ci.yml
