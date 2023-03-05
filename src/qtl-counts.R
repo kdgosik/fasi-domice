@@ -72,7 +72,7 @@ ilc1_counts <- ilc1_eqtl %>%
 
 
 
-## ILC2
+## ILC2 ####
 ilc2_eqtl <- fread("results/eqtl/qtl-plot-lods-ILC2-cv.csv.gz", data.table = FALSE)
 
 ## creating loci by gene long table
@@ -123,7 +123,7 @@ ilc2_counts <- ilc2_eqtl %>%
 
 
 
-## ILC3
+## ILC3 ####
 ilc3_eqtl <- fread("results/eqtl/qtl-plot-lods-NCR1+ ILC3-cv.csv.gz", data.table = FALSE)
 
 ## creating loci by gene long table
