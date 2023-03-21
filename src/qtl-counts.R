@@ -4,11 +4,18 @@ library(ggvenn)
 library(igraph)
 library(ggforce)
 
-project_path <- my_path <-"./"
+# BiocManager::install(c("GenomicAlignments", "GenomicRanges"))
+
+project_dir <- "/Users/kirkgosik/Google Drive/My Drive/projects/"
+domice_dir <- paste0(project_dir, "domice/paper of QTL study/Revised materials of ILC-QTL paper cell Science format/")
+data_dir <- paste0(domice_dir, "data/")
+results_dir <- paste0(data_dir, "results/")
 
 figure_path <- paste0(project_path, "results/figures/")
 data_path <- paste0(project_path, "data/")
 source(paste0(figure_path, "helpers.R"))
+
+
 
 # GM_Snps meta data
 ccre <- fread(paste0(data_path, "references/GM_SNPS_Consequence_cCRE.csv"), data.table = FALSE)
