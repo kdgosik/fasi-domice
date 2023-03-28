@@ -2,6 +2,9 @@ library(tidyverse)
 library(UpSetR)
 library(ComplexUpset)
 
+library(readr)
+library(dplyr)
+library(tidyr)
 
 
 project_dir <- "/Users/kirkgosik/Google Drive/My Drive/projects/"
