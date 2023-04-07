@@ -18,11 +18,11 @@ source(paste0(figure_path, "helpers.R"))
 
 
 # GM_Snps meta data
-ccre <- fread(paste0(data_path, "references/GM_SNPS_Consequence_cCRE.csv"), data.table = FALSE)
+ccre <- fread(paste0(data_dir, "references/GM_SNPS_Consequence_cCRE.csv"), data.table = FALSE)
 
 
 ## Gene Data
-ensembl <- as.data.frame(readGFF(paste0(data_path, "references/Mus_musculus.GRCm38.102.gtf"))) %>%
+ensembl <- as.data.frame(readGFF(paste0(data_dir, "references/Mus_musculus.GRCm38.102.gtf"))) %>%
   filter(seqid %in% c(as.character(1:19), "X"), gene_biotype == "protein_coding", type == "gene") %>%
   mutate(chr = paste0("chr", seqid))
 
@@ -32,12 +32,12 @@ lod_cutoff <- 6
 
 
 ## ILC1 ####
-ilc1_eqtl <- fread("results/eqtl/qtl-plot-lods-ILC1-cv.csv.gz", data.table = FALSE)
+ilc1_eqtl <- fread(paste0(results_dir, "eqtl/qtl-plot-lods-ILC1-cv.csv.gz"), data.table = FALSE)
 
 
 ## creating loci by gene long table
 ilc1_eqtl_loci_by_gene <- ilc1_eqtl %>%
-  left_join(select(ccre, marker,pos)) %>%
+  left_join(select(ccre, marker, pos)) %>%
   mutate(marker_pos_floor = floor(pos/1e6)) %>% 
   group_by(gene, marker_chr, marker_pos_floor) %>% 
   summarise(lod = max(value),
@@ -51,6 +51,7 @@ ilc1_eqtl_loci_by_gene <- ilc1_eqtl %>%
   mutate(value_adj = ifelse(cis_effect==1, lod + 6, lod)) %>%
   filter(value_adj > 10) %>%
   unite("loci", c(marker_chr, marker_pos), remove = FALSE)
+
 
 write.csv(ilc1_eqtl_loci_by_gene,"results/eqtl/qtl-loci-by-gene-lods-ILC1.csv")
 ilc1_eqtl_loci_by_gene %>% 
