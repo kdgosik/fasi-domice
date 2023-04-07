@@ -50,3 +50,6 @@ reduce(resize(sort(ilc3eqtlgrl[[1]]),10000))
 
 ## find overlap
 GenomicRanges::intersect(reduce(resize(ccregr,10000)), reduce(resize(sort(ilc3eqtlgrl[[1]]),10000)) )
+
+## length of all genes in grl
+lapply(reduce(resize(sort(ilc3eqtlgrl),10000)), length)
