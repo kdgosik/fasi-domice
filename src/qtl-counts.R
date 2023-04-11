@@ -1,5 +1,8 @@
 library(data.table)
-library(tidyverse)
+library(rtracklayer)
+# library(tidyverse)
+library(dplyr)
+library(readr)
 library(ggvenn)
 library(igraph)
 library(ggforce)
@@ -32,25 +35,43 @@ lod_cutoff <- 6
 
 
 ## ILC1 ####
-ilc1_eqtl <- fread(paste0(results_dir, "eqtl/qtl-plot-lods-ILC1-cv.csv.gz"), data.table = FALSE)
-
+ilc1_eqtl <- fread(paste0(results_dir, "eqtl/qtl-plot-lods-ILC1-cv.csv.gz"), 
+                   data.table = FALSE)
 
 ## creating loci by gene long table
 ilc1_eqtl_loci_by_gene <- ilc1_eqtl %>%
   left_join(select(ccre, marker, pos)) %>%
-  mutate(marker_pos_floor = floor(pos/1e6)) %>% 
-  group_by(gene, marker_chr, marker_pos_floor) %>% 
-  summarise(lod = max(value),
-            marker_pos = median(pos)) %>%
+  mutate(gene_chr = as.character(gene_chr),
+         marker_pos = pos) %>%
+  # mutate(marker_pos_floor = floor(pos/1e6)) %>% 
+  # group_by(gene, marker_chr, marker_pos_floor) %>% 
+  # summarise(lod = max(value),
+  #           marker_pos = median(pos)) %>%
   left_join(
-    {ensembl %>% dplyr::select(gene_start = start, gene_end = end, gene = gene_name, gene_chr = seqid)}
+    {ensembl %>% dplyr::select(gene_start = start, 
+                               gene_end = end, 
+                               gene = gene_name, 
+                               gene_chr = seqid) %>%
+        mutate(gene_chr = as.character(gene_chr))}
   ) %>%
   ungroup() %>%
   mutate(cis_effect = as.numeric(marker_chr == gene_chr & 
                                    {marker_pos > (gene_start - 1e6) & marker_pos < (gene_end + 1e6)})) %>%
-  mutate(value_adj = ifelse(cis_effect==1, lod + 6, lod)) %>%
+  mutate(value_adj = ifelse(cis_effect==1, value + 6, value)) %>%
   filter(value_adj > 10) %>%
   unite("loci", c(marker_chr, marker_pos), remove = FALSE)
+
+ilc1eqtlgrl <- makeGRangesListFromDataFrame(ilc1_eqtl_loci_by_gene,
+                                            split.field = "gene",
+                                            names.field = "marker",
+                                            seqnames="marker_chr",
+                                            start.field="pos",
+                                            end.field="pos",
+                                            strand = "strand")
+
+## length of all genes in grl
+ilc1_eqtl_list <- lapply(reduce(resize(sort(ilc1eqtlgrl),10000)), length)
+
 
 
 write.csv(ilc1_eqtl_loci_by_gene,"results/eqtl/qtl-loci-by-gene-lods-ILC1.csv")
