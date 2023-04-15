@@ -16,8 +16,8 @@ drive_download(as_id("1h6IShEYfcKSy3boXd-eSyLlf9Lj0XEmI"),
 drive_download(as_id("1B7DT53luVwd2wJXxJqnKPVD7go8gn1RZ"), 
                path=paste0(data_dir, "manuscript-plot-data.csv.gz"))
 
-
-#
+## eQTL #####
+# drivedf <- drive_find()
 # name                                 id                               
 # 1 qtl-plot-lods-ILC2-cv.csv.gz         1jwea1SSyrrl3bj2CzfUSwWny87pFY3oH
 # 2 qtl-plot-lods-NCR1+ ILC3-mean.csv.gz 1DXAhEmem-f-eSsp-3xoXsbiojIJ08ex7
@@ -50,5 +50,65 @@ drive_download(as_id("1muSHQ_5UlHz6KexUR4ZL-Zaup6tjUrNh"),
                overwrite = TRUE)
 
 
+## Proportion #########
+# name                          id                               
+# <chr>                         <drv_id>                         
+# 1 gwas-ilc1-ilc3-results.csv.gz 18SPTbXiqx_j-O3pDP84qu-rQVsyYuZjS
+# 2 gwas-ilc3-lti-results.csv.gz  1mBLJtausS8iz4gEQF1K-dJ5ToPT5TuLX
+# 3 gwas-ilc1-ilc2-results.csv.gz 1zYmd5PYT2jXoRqgJdwRXuj1wE1LuTuMN
+# 4 gwas-ilc2-lti-results.csv.gz  1kNnX0hw_Te_inGfCE5IUpu324fPhvk60
+# 5 gwas-ilc1-lti-results.csv.gz  1zu5EF_4i2B1LNYaI9tE8Wvrpu29csgzM
+# 6 gwas-ilc2-ilc3-results.csv.gz 16xyStzpJ1GAoHn1kvcomV_yTpLoQLoWe
 
 
+
+drive_download(as_id("1zYmd5PYT2jXoRqgJdwRXuj1wE1LuTuMN"), 
+               path=paste0(results_dir, "proportions/gwas-ilc1-ilc2-results.csv.gz"),
+               overwrite = TRUE)
+
+
+drive_download(as_id("18SPTbXiqx_j-O3pDP84qu-rQVsyYuZjS"), 
+               path=paste0(results_dir, "proportions/gwas-ilc1-ilc3-results.csv.gz"),
+               overwrite = TRUE)
+
+
+drive_download(as_id("1zu5EF_4i2B1LNYaI9tE8Wvrpu29csgzM"), 
+               path=paste0(results_dir, "proportions/gwas-ilc1-lti-results.csv.gz"),
+               overwrite = TRUE)
+
+
+drive_download(as_id("16xyStzpJ1GAoHn1kvcomV_yTpLoQLoWe"), 
+               path=paste0(results_dir, "proportions/gwas-ilc2-ilc3-results.csv.gz"),
+               overwrite = TRUE)
+
+
+drive_download(as_id("1kNnX0hw_Te_inGfCE5IUpu324fPhvk60"), 
+               path=paste0(results_dir, "proportions/gwas-ilc2-lti-results.csv.gz"),
+               overwrite = TRUE)
+
+
+drive_download(as_id("1mBLJtausS8iz4gEQF1K-dJ5ToPT5TuLX"), 
+               path=paste0(results_dir, "proportions/gwas-ilc3-lti-results.csv.gz"),
+               overwrite = TRUE)
+
+
+
+## Topic #########
+# name                              id                               
+# <chr>                             <drv_id>                         
+#   1 qtl-topic-lods.csv.gz             1u5ZuaI6YDRFxoWeYF252jTTL7fgRhwYn
+
+drive_download(as_id("1u5ZuaI6YDRFxoWeYF252jTTL7fgRhwYn"), 
+               path=paste0(results_dir, "topics/qtl-topic-lods.csv.gz"),
+               overwrite = TRUE)
+
+
+
+## Cytokines ###########
+# name                             id                               
+# <chr>                            <drv_id>                         
+#   1 qtl-cytokines-steady-lods.csv.gz 1T2GDRh9cTyG_DX3C8mVj-Bzfxm9aNRcf
+
+drive_download(as_id("1T2GDRh9cTyG_DX3C8mVj-Bzfxm9aNRcf"), 
+               path=paste0(results_dir, "cytokines/qtl-cytokines-steady-lods.csv.gz"),
+               overwrite = TRUE)
