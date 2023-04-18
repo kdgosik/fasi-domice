@@ -54,46 +54,51 @@ ilc1_eqtl_loci_by_gene <- ilc1_eqtl %>%
   ungroup() %>%
   mutate(cis_effect = as.numeric(marker_chr == gene_chr & 
                                    {marker_pos > (gene_start - 1e6) & marker_pos < (gene_end + 1e6)})) %>%
-  mutate(value_adj = ifelse(cis_effect==1, value + 6, value)) %>%
-  filter(value_adj > 10)
+  mutate(value_adj = ifelse(cis_effect==1, value + 6, value),
+         strand = "+") %>%
+  filter(value_adj > 10) %>%
+  dplyr::select(marker, gene, value, marker_chr, pos, strand,
+                id, gene_chr, gene_start, gene_end, 
+                cis_effect, value_adj)
 
 ilc1eqtlgrl <- makeGRangesListFromDataFrame(ilc1_eqtl_loci_by_gene,
                                             split.field = "gene",
                                             names.field = "marker",
-                                            seqnames="marker_chr",
-                                            start.field="pos",
-                                            end.field="pos",
-                                            strand = "strand")
+                                            seqnames = "marker_chr",
+                                            start.field = "pos",
+                                            end.field = "pos",
+                                            strand = "strand",
+                                            keep.extra.columns = TRUE)
 
 ## length of all genes in grl
 ilc1_eqtl_list <- lapply(reduce(resize(sort(ilc1eqtlgrl),10000)), length)
 
 
 
-write.csv(ilc1_eqtl_loci_by_gene,"results/eqtl/qtl-loci-by-gene-lods-ILC1.csv")
-ilc1_eqtl_loci_by_gene %>% 
-  dplyr::select(gene, gene_chr, gene_start, gene_end, 
-                loci, loci_chr = marker_chr, loci_pos = marker_pos, cis_effect) %>%
-  write.csv("results/eqtl/qtl-loci-by-genes-ILC1.csv")
-
-
-# Counting number of QTLs per eGene
-ilc1_eqtl_count <- ilc1_eqtl_loci_by_gene %>%
-  group_by(gene) %>%
-  summarise(qtl_count = sum(lod > lod_cutoff)) %>%
-  mutate(cell_type ="ILC1",
-         trait = paste0("ILC1 eQTL: ", gene)) %>%
-  dplyr::rename(name = gene)
-
-
-ilc1_counts <- ilc1_eqtl %>% 
-  mutate(xpos_floor = floor(xpos)) %>% 
-  group_by(gene, marker_chr, xpos_floor) %>% 
-  summarise(lod = max(value)) %>%
-  mutate(ILC1 = as.numeric(lod > lod_cutoff)) %>% 
-  unite("loci", gene:xpos_floor) %>% 
-  dplyr::select(-lod) %>%
-  filter(ILC1 == 1)
+# write.csv(ilc1_eqtl_loci_by_gene,"results/eqtl/qtl-loci-by-gene-lods-ILC1.csv")
+# ilc1_eqtl_loci_by_gene %>% 
+#   dplyr::select(gene, gene_chr, gene_start, gene_end, 
+#                 loci, loci_chr = marker_chr, loci_pos = marker_pos, cis_effect) %>%
+#   write.csv("results/eqtl/qtl-loci-by-genes-ILC1.csv")
+# 
+# 
+# # Counting number of QTLs per eGene
+# ilc1_eqtl_count <- ilc1_eqtl_loci_by_gene %>%
+#   group_by(gene) %>%
+#   summarise(qtl_count = sum(lod > lod_cutoff)) %>%
+#   mutate(cell_type ="ILC1",
+#          trait = paste0("ILC1 eQTL: ", gene)) %>%
+#   dplyr::rename(name = gene)
+# 
+# 
+# ilc1_counts <- ilc1_eqtl %>% 
+#   mutate(xpos_floor = floor(xpos)) %>% 
+#   group_by(gene, marker_chr, xpos_floor) %>% 
+#   summarise(lod = max(value)) %>%
+#   mutate(ILC1 = as.numeric(lod > lod_cutoff)) %>% 
+#   unite("loci", gene:xpos_floor) %>% 
+#   dplyr::select(-lod) %>%
+#   filter(ILC1 == 1)
 
 
 
@@ -117,7 +122,9 @@ ilc2_eqtl_loci_by_gene <- ilc2_eqtl %>%
   mutate(cis_effect = as.numeric(marker_chr == gene_chr & 
                                    {marker_pos > (gene_start - 1e6) & marker_pos < (gene_end + 1e6)})) %>%
   mutate(value_adj = ifelse(cis_effect==1, value + 6, value)) %>%
-  filter(value_adj > 10)
+  filter(value_adj > 10) %>%
+  dplyr::select(marker, gene, value, marker_chr, pos, 
+                id, gene_chr, gene_start, gene_end, cis_effect, value_adj)
 
 ilc2eqtlgrl <- makeGRangesListFromDataFrame(ilc2_eqtl_loci_by_gene,
                                             split.field = "gene",
@@ -125,44 +132,45 @@ ilc2eqtlgrl <- makeGRangesListFromDataFrame(ilc2_eqtl_loci_by_gene,
                                             seqnames="marker_chr",
                                             start.field="pos",
                                             end.field="pos",
-                                            strand = "strand")
+                                            strand = "strand",
+                                            keep.extra.columns = TRUE)
 
 ## length of all genes in grl
 ilc2_eqtl_list <- lapply(reduce(resize(sort(ilc2eqtlgrl),10000)), length)
 
-write.csv(ilc2_eqtl_loci_by_gene,"results/eqtl/qtl-loci-by-gene-lods-ILC2.csv")
-ilc2_eqtl_loci_by_gene %>% 
-  dplyr::select(gene, gene_chr, gene_start, gene_end, 
-                loci, loci_chr = marker_chr, loci_pos = marker_pos, cis_effect) %>%
-  write.csv("results/eqtl/qtl-loci-by-genes-ILC2.csv")
-
-
-
-# Counting number of QTLs per eGene
-ilc2_eqtl_count <- ilc2_eqtl %>% 
-  mutate(xpos_floor = floor(xpos)) %>% 
-  group_by(gene, marker_chr, xpos_floor) %>% 
-  summarise(lod = max(value)) %>%
-  group_by(gene) %>%
-  summarise(qtl_count = sum(lod > lod_cutoff)) %>%
-  mutate(cell_type ="ILC2",
-         trait = paste0("ILC2 eQTL: ", gene)) %>%
-  dplyr::rename(name = gene)
-
-
-ilc2_counts <- ilc2_eqtl %>% 
-  mutate(xpos_floor = floor(xpos)) %>% 
-  group_by(gene, marker_chr, xpos_floor) %>% 
-  summarise(lod = max(value)) %>%
-  mutate(ILC2 = as.numeric(lod > lod_cutoff)) %>% 
-  unite("loci", gene:xpos_floor) %>% 
-  dplyr::select(-lod) %>%
-  filter(ILC2 == 1)
+# write.csv(ilc2_eqtl_loci_by_gene,"results/eqtl/qtl-loci-by-gene-lods-ILC2.csv")
+# ilc2_eqtl_loci_by_gene %>% 
+#   dplyr::select(gene, gene_chr, gene_start, gene_end, 
+#                 loci, loci_chr = marker_chr, loci_pos = marker_pos, cis_effect) %>%
+#   write.csv("results/eqtl/qtl-loci-by-genes-ILC2.csv")
+# 
+# 
+# 
+# # Counting number of QTLs per eGene
+# ilc2_eqtl_count <- ilc2_eqtl %>% 
+#   mutate(xpos_floor = floor(xpos)) %>% 
+#   group_by(gene, marker_chr, xpos_floor) %>% 
+#   summarise(lod = max(value)) %>%
+#   group_by(gene) %>%
+#   summarise(qtl_count = sum(lod > lod_cutoff)) %>%
+#   mutate(cell_type ="ILC2",
+#          trait = paste0("ILC2 eQTL: ", gene)) %>%
+#   dplyr::rename(name = gene)
+# 
+# 
+# ilc2_counts <- ilc2_eqtl %>% 
+#   mutate(xpos_floor = floor(xpos)) %>% 
+#   group_by(gene, marker_chr, xpos_floor) %>% 
+#   summarise(lod = max(value)) %>%
+#   mutate(ILC2 = as.numeric(lod > lod_cutoff)) %>% 
+#   unite("loci", gene:xpos_floor) %>% 
+#   dplyr::select(-lod) %>%
+#   filter(ILC2 == 1)
 
 
 
 ## ILC3 ####
-ilc3_eqtl <- fread(paste0(results_dir, "eqtl/qtl-plot-lods-NCR1+ ILC3-cv.csv.gz"), 
+ilc3_eqtl <- fread(paste0(results_dir, "eqtl/qtl-plot-lods-NCR1\\+\\ ILC3-cv.csv.gz"), 
                    data.table = FALSE)
 
 ## creating loci by gene long table
@@ -181,7 +189,9 @@ ilc3_eqtl_loci_by_gene <- ilc3_eqtl %>%
   mutate(cis_effect = as.numeric(marker_chr == gene_chr & 
                                    {marker_pos > (gene_start - 1e6) & marker_pos < (gene_end + 1e6)})) %>%
   mutate(value_adj = ifelse(cis_effect==1, value + 6, value)) %>%
-  filter(value_adj > 10)
+  filter(value_adj > 10) %>%
+  dplyr::select(marker, gene, value, marker_chr, pos, 
+                id, gene_chr, gene_start, gene_end, cis_effect, value_adj)
 
 ilc3eqtlgrl <- makeGRangesListFromDataFrame(ilc3_eqtl_loci_by_gene,
                                             split.field = "gene",
@@ -189,37 +199,38 @@ ilc3eqtlgrl <- makeGRangesListFromDataFrame(ilc3_eqtl_loci_by_gene,
                                             seqnames="marker_chr",
                                             start.field="pos",
                                             end.field="pos",
-                                            strand = "strand")
+                                            strand = "strand",
+                                            keep.extra.columns = TRUE)
 
 ## length of all genes in grl
 ilc3_eqtl_list <- lapply(reduce(resize(sort(ilc3eqtlgrl),10000)), length)
 
-write.csv(ilc3_eqtl_loci_by_gene,"results/eqtl/qtl-loci-by-gene-lods-ILC3.csv")
-ilc3_eqtl_loci_by_gene %>% 
-  dplyr::select(gene, gene_chr, gene_start, gene_end, 
-                loci, loci_chr = marker_chr, loci_pos = marker_pos, cis_effect) %>%
-  write.csv("results/eqtl/qtl-loci-by-genes-ILC3.csv")
-
-# Counting number of QTLs per eGene
-ilc3_eqtl_count <- ilc3_eqtl %>% 
-  mutate(xpos_floor = floor(xpos)) %>% 
-  group_by(gene, marker_chr, xpos_floor) %>% 
-  summarise(lod = max(value)) %>%
-  group_by(gene) %>%
-  summarise(qtl_count = sum(lod > lod_cutoff)) %>%
-  mutate(cell_type ="ILC3",
-         trait = paste0("ILC3 eQTL: ", gene)) %>%
-  dplyr::rename(name = gene)
-
-
-ilc3_counts <- ilc3_eqtl %>% 
-  mutate(xpos_floor = floor(xpos)) %>% 
-  group_by(gene, marker_chr, xpos_floor) %>% 
-  summarise(lod = max(value)) %>%
-  mutate(ILC3 = as.numeric(lod > lod_cutoff)) %>% 
-  unite("loci", gene:xpos_floor) %>% 
-  dplyr::select(-lod) %>%
-  filter(ILC3 == 1)
+# write.csv(ilc3_eqtl_loci_by_gene,"results/eqtl/qtl-loci-by-gene-lods-ILC3.csv")
+# ilc3_eqtl_loci_by_gene %>% 
+#   dplyr::select(gene, gene_chr, gene_start, gene_end, 
+#                 loci, loci_chr = marker_chr, loci_pos = marker_pos, cis_effect) %>%
+#   write.csv("results/eqtl/qtl-loci-by-genes-ILC3.csv")
+# 
+# # Counting number of QTLs per eGene
+# ilc3_eqtl_count <- ilc3_eqtl %>% 
+#   mutate(xpos_floor = floor(xpos)) %>% 
+#   group_by(gene, marker_chr, xpos_floor) %>% 
+#   summarise(lod = max(value)) %>%
+#   group_by(gene) %>%
+#   summarise(qtl_count = sum(lod > lod_cutoff)) %>%
+#   mutate(cell_type ="ILC3",
+#          trait = paste0("ILC3 eQTL: ", gene)) %>%
+#   dplyr::rename(name = gene)
+# 
+# 
+# ilc3_counts <- ilc3_eqtl %>% 
+#   mutate(xpos_floor = floor(xpos)) %>% 
+#   group_by(gene, marker_chr, xpos_floor) %>% 
+#   summarise(lod = max(value)) %>%
+#   mutate(ILC3 = as.numeric(lod > lod_cutoff)) %>% 
+#   unite("loci", gene:xpos_floor) %>% 
+#   dplyr::select(-lod) %>%
+#   filter(ILC3 == 1)
 
 
 
@@ -243,45 +254,48 @@ lti_eqtl_loci_by_gene <- lti_eqtl %>%
   mutate(cis_effect = as.numeric(marker_chr == gene_chr & 
                                    {marker_pos > (gene_start - 1e6) & marker_pos < (gene_end + 1e6)})) %>%
   mutate(value_adj = ifelse(cis_effect==1, value + 6, value)) %>%
-  filter(value_adj > 10)
+  filter(value_adj > 10) %>%
+  dplyr::select(marker, gene, value, marker_chr, pos, 
+                id, gene_chr, gene_start, gene_end, cis_effect, value_adj)
 
 ltieqtlgrl <- makeGRangesListFromDataFrame(lti_eqtl_loci_by_gene,
-                                            split.field = "gene",
-                                            names.field = "marker",
-                                            seqnames="marker_chr",
-                                            start.field="pos",
-                                            end.field="pos",
-                                            strand = "strand")
+                                           split.field = "gene",
+                                           names.field = "marker",
+                                           seqnames="marker_chr",
+                                           start.field="pos",
+                                           end.field="pos",
+                                           strand = "strand",
+                                           keep.extra.columns = TRUE)
 
 ## length of all genes in grl
 lti_eqtl_list <- lapply(reduce(resize(sort(ltieqtlgrl),10000)), length)
 
 
-write.csv(lti_eqtl_loci_by_gene,"results/eqtl/qtl-loci-by-gene-lods-LTi.csv")
-lti_eqtl_loci_by_gene %>% 
-  dplyr::select(gene, gene_chr, gene_start, gene_end, 
-                loci, loci_chr = marker_chr, loci_pos = marker_pos, cis_effect) %>%
-  write.csv("results/eqtl/qtl-loci-by-genes-LTi.csv")
-# Counting number of QTLs per eGene
-lti_eqtl_count <- lti_eqtl %>% 
-  mutate(xpos_floor = floor(xpos)) %>% 
-  group_by(gene, marker_chr, xpos_floor) %>% 
-  summarise(lod = max(value)) %>%
-  group_by(gene) %>%
-  summarise(qtl_count = sum(lod > lod_cutoff)) %>%
-  mutate(cell_type ="LTi-like",
-         trait = paste0("LTi-like eQTL: ", gene)) %>%
-  dplyr::rename(name = gene)
-
-
-lti_counts <- lti_eqtl %>% 
-  mutate(xpos_floor = floor(xpos)) %>% 
-  group_by(gene, marker_chr, xpos_floor) %>% 
-  summarise(lod = max(value)) %>%
-  mutate(LTi = as.numeric(lod > lod_cutoff)) %>% 
-  unite("loci", gene:xpos_floor) %>% 
-  dplyr::select(-lod) %>%
-  filter(LTi == 1)
+# write.csv(lti_eqtl_loci_by_gene,"results/eqtl/qtl-loci-by-gene-lods-LTi.csv")
+# lti_eqtl_loci_by_gene %>% 
+#   dplyr::select(gene, gene_chr, gene_start, gene_end, 
+#                 loci, loci_chr = marker_chr, loci_pos = marker_pos, cis_effect) %>%
+#   write.csv("results/eqtl/qtl-loci-by-genes-LTi.csv")
+# # Counting number of QTLs per eGene
+# lti_eqtl_count <- lti_eqtl %>% 
+#   mutate(xpos_floor = floor(xpos)) %>% 
+#   group_by(gene, marker_chr, xpos_floor) %>% 
+#   summarise(lod = max(value)) %>%
+#   group_by(gene) %>%
+#   summarise(qtl_count = sum(lod > lod_cutoff)) %>%
+#   mutate(cell_type ="LTi-like",
+#          trait = paste0("LTi-like eQTL: ", gene)) %>%
+#   dplyr::rename(name = gene)
+# 
+# 
+# lti_counts <- lti_eqtl %>% 
+#   mutate(xpos_floor = floor(xpos)) %>% 
+#   group_by(gene, marker_chr, xpos_floor) %>% 
+#   summarise(lod = max(value)) %>%
+#   mutate(LTi = as.numeric(lod > lod_cutoff)) %>% 
+#   unite("loci", gene:xpos_floor) %>% 
+#   dplyr::select(-lod) %>%
+#   filter(LTi == 1)
 
 
 
@@ -309,14 +323,17 @@ ggplot(bar_plot_df, aes(cell_type, n, group = cis_effect, fill = cis_effect)) +
 ilc1_ilc2 <- fread(paste0(results_dir,"proportions/gwas-ilc1-ilc2-results.csv.gz"), 
                    data.table = FALSE) %>% 
   mutate(strand = "+") %>% 
-  dplyr::filter(lod > 100)
+  dplyr::filter(lods > 100) %>%
+  dplyr::select(marker, chr, betas, se, p_values, 
+                lods, chr, pos, cM, ensembl_gene, 
+                consequence, strand)
 
 ilc1_ilc2gr <- makeGRangesFromDataFrame(ilc1_ilc2,
-                                        names.field = "marker",
-                                        seqnames="chr",
-                                        start.field="pos",
-                                        end.field="pos",
-                                        strand = "strand")
+                                        seqnames = "chr",
+                                        start.field = "pos",
+                                        end.field = "pos",
+                                        strand = "strand",
+                                        keep.extra.columns = TRUE)
 
 ## length of all genes in grl
 ilc1_ilc2_count <- length(reduce(resize(sort(ilc1_ilc2gr), 10000)))
@@ -326,14 +343,18 @@ ilc1_ilc2_count <- length(reduce(resize(sort(ilc1_ilc2gr), 10000)))
 ilc1_ilc3 <- fread(paste0(results_dir,"proportions/gwas-ilc1-ilc3-results.csv.gz"), 
                    data.table = FALSE) %>% 
   mutate(strand = "+") %>% 
-  dplyr::filter(lod > 100)
+  dplyr::filter(lods > 100) %>%
+  dplyr::select(marker, chr, betas, se, p_values, 
+                lods, chr, pos, cM, ensembl_gene, 
+                consequence, strand)
 
 ilc1_ilc3gr <- makeGRangesFromDataFrame(ilc1_ilc3,
-                                        names.field = "marker",
                                         seqnames="chr",
                                         start.field="pos",
                                         end.field="pos",
-                                        strand = "strand")
+                                        strand = "strand",
+                                        keep.extra.columns = TRUE,
+                                        na.rm = TRUE)
 
 ## length of all genes in grl
 ilc1_ilc3_count <- length(reduce(resize(sort(ilc1_ilc3gr), 10000)))
@@ -344,14 +365,18 @@ ilc1_ilc3_count <- length(reduce(resize(sort(ilc1_ilc3gr), 10000)))
 ilc1_lti <- fread(paste0(results_dir,"proportions/gwas-ilc1-lti-results.csv.gz"), 
                    data.table = FALSE) %>% 
   mutate(strand = "+") %>% 
-  dplyr::filter(lod > 100)
+  dplyr::filter(lods > 100) %>%
+  dplyr::select(marker, chr, betas, se, p_values, 
+                lods, chr, pos, cM, ensembl_gene, 
+                consequence, strand)
 
 ilc1_ltigr <- makeGRangesFromDataFrame(ilc1_lti,
-                                        names.field = "marker",
-                                        seqnames="chr",
-                                        start.field="pos",
-                                        end.field="pos",
-                                        strand = "strand")
+                                       seqnames="chr",
+                                       start.field="pos",
+                                       end.field="pos",
+                                       strand = "strand",
+                                       keep.extra.columns = TRUE,
+                                       na.rm = TRUE)
 
 ## length of all genes in grl
 ilc1_lti_count <- length(reduce(resize(sort(ilc1_ltigr), 10000)))
@@ -359,17 +384,21 @@ ilc1_lti_count <- length(reduce(resize(sort(ilc1_ltigr), 10000)))
 
 
 
-ilc2_ilc3 <- fread(paste0(results_dir,"proportions/gwas-ilc2_ilc3-results.csv.gz"), 
+ilc2_ilc3 <- fread(paste0(results_dir,"proportions/gwas-ilc2-ilc3-results.csv.gz"), 
                   data.table = FALSE) %>% 
   mutate(strand = "+") %>% 
-  dplyr::filter(lod > 100)
+  dplyr::filter(lods > 100) %>%
+  dplyr::select(marker, chr, betas, se, p_values, 
+                lods, chr, pos, cM, ensembl_gene, 
+                consequence, strand)
 
 ilc2_ilc3gr <- makeGRangesFromDataFrame(ilc2_ilc3,
-                                       names.field = "marker",
                                        seqnames="chr",
                                        start.field="pos",
                                        end.field="pos",
-                                       strand = "strand")
+                                       strand = "strand",
+                                       keep.extra.columns = TRUE,
+                                       na.rm = TRUE)
 
 ## length of all genes in grl
 ilc2_ilc3_count <- length(reduce(resize(sort(ilc2_ilc3gr), 10000)))
@@ -380,14 +409,19 @@ ilc2_ilc3_count <- length(reduce(resize(sort(ilc2_ilc3gr), 10000)))
 ilc2_lti <- fread(paste0(results_dir,"proportions/gwas-ilc2-lti-results.csv.gz"), 
                   data.table = FALSE) %>% 
   mutate(strand = "+") %>% 
-  dplyr::filter(lod > 100)
+  dplyr::filter(lods > 100) %>%
+  dplyr::select(marker, chr, betas, se, p_values, 
+                lods, chr, pos, cM, ensembl_gene, 
+                consequence, strand)
 
 ilc2_ltigr <- makeGRangesFromDataFrame(ilc2_lti,
                                        names.field = "marker",
                                        seqnames="chr",
                                        start.field="pos",
                                        end.field="pos",
-                                       strand = "strand")
+                                       strand = "strand",
+                                       keep.extra.columns = TRUE,
+                                       na.rm = TRUE)
 
 ## length of all genes in grl
 ilc2_lti_count <- length(reduce(resize(sort(ilc2_ltigr), 10000)))
@@ -397,20 +431,27 @@ ilc2_lti_count <- length(reduce(resize(sort(ilc2_ltigr), 10000)))
 ilc3_lti <- fread(paste0(results_dir,"proportions/gwas-ilc3-lti-results.csv.gz"), 
                   data.table = FALSE) %>% 
   mutate(strand = "+") %>% 
-  dplyr::filter(lod > 100)
+  dplyr::filter(lods > 100) %>%
+  dplyr::select(marker, chr, betas, se, p_values, 
+                lods, chr, pos, cM, ensembl_gene, 
+                consequence, strand)
 
 ilc3_ltigr <- makeGRangesFromDataFrame(ilc3_lti,
                                        names.field = "marker",
                                        seqnames="chr",
                                        start.field="pos",
                                        end.field="pos",
-                                       strand = "strand")
+                                       strand = "strand",
+                                       keep.extra.columns = TRUE,
+                                       na.rm = TRUE)
 
 ## length of all genes in grl
 ilc3_lti_count <- length(reduce(resize(sort(ilc3_ltigr), 10000)))
 
 
-## TODO: update beyond this point
+
+
+## TODO: update beyond this point ####
 ilc3_stressed <- fread("results/proportion/ILC3_stressed_vs_non_qtl.csv.gz", data.table = FALSE)
 
 # Counting number of QTL
@@ -447,7 +488,8 @@ ilc3_stressed_count + lti_stressed_count
 
 ## topic qtl counts ####
 
-topics <- fread("results/topics/qtl-topic-lods.csv.gz", data.table = FALSE) %>%
+topics <- fread(paste0(results_dir,"results/topics/qtl-topic-lods.csv.gz"), 
+                data.table = FALSE) %>%
   dplyr::select(-V1) %>%
   left_join(ccre) %>%
   dplyr::select(-ends_with("_qtl")) %>%
@@ -465,7 +507,8 @@ topics <- fread("results/topics/qtl-topic-lods.csv.gz", data.table = FALSE) %>%
 
 ## cytokine qtl counts
 
-cytokines <- fread("results/cytokines/qtl-steady-cytokines-lods.csv.gz", data.table = FALSE) %>%
+cytokines <- fread(paste0(results_dir,"results/cytokines/qtl-steady-cytokines-lods.csv.gz"), 
+                   data.table = FALSE) %>%
   dplyr::select(-V1) %>%
   left_join(ccre) %>%
   dplyr::select(1:15) %>%
@@ -504,11 +547,22 @@ ilc3_eqtl_list <- lapply(reduce(resize(sort(ilc3eqtlgrl),10000)), length)
 lti_eqtl_list <- lapply(reduce(resize(sort(ltieqtlgrl),10000)), length)
 
 ## ILC1 vs ILC2
+ilc1_ilc2_count <- length(reduce(resize(sort(ilc1_ilc2gr), 10000)))
+
 ## ILC1 vs ILC3
+ilc1_ilc3_count <- length(reduce(resize(sort(ilc1_ilc3gr), 10000)))
+
 ## ILC1 vs LTi
+ilc1_ilc3_count <- length(reduce(resize(sort(ilc1_ilc3gr), 10000)))
+
 ## ILC2 vs ILC3
+ilc2_ilc3_count <- length(reduce(resize(sort(ilc2_ilc3gr), 10000)))
+
 ## ILC2 vs LTi
+ilc2_lti_count <- length(reduce(resize(sort(ilc2_ltigr), 10000)))
+
 ## ILC3 vs LTi
+ilc3_lti_count <- length(reduce(resize(sort(ilc3_ltigr), 10000)))
 
 ## topic
 
