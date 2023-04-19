@@ -91,12 +91,25 @@ drive_download(as_id("1mBLJtausS8iz4gEQF1K-dJ5ToPT5TuLX"),
                path=paste0(results_dir, "proportions/gwas-ilc3-lti-results.csv.gz"),
                overwrite = TRUE)
 
+# name                            id                               
+# <chr>                           <drv_id>                         
+# 1 ILC3_stressed_vs_non_qtl.csv.gz 1onABMrSmcUKLEn3-1TMvJuqqV3_AU_Jf
+# 2 LTi_stressed_vs_non_qtl.csv.gz  16CyTv0EwsNIXuAhsoXW4LRQtZzvWRQ3S
+
+drive_download(as_id("1onABMrSmcUKLEn3-1TMvJuqqV3_AU_Jf"), 
+               path=paste0(results_dir, "proportions/ILC3_stressed_vs_non_qtl.csv.gz"),
+               overwrite = TRUE)
+
+
+drive_download(as_id("16CyTv0EwsNIXuAhsoXW4LRQtZzvWRQ3S"), 
+               path=paste0(results_dir, "proportions/LTi_stressed_vs_non_qtl.csv.gz"),
+               overwrite = TRUE)
 
 
 ## Topic #########
 # name                              id                               
 # <chr>                             <drv_id>                         
-#   1 qtl-topic-lods.csv.gz             1u5ZuaI6YDRFxoWeYF252jTTL7fgRhwYn
+#   1 qtl-topic-lods.csv.gz         1u5ZuaI6YDRFxoWeYF252jTTL7fgRhwYn
 
 drive_download(as_id("1u5ZuaI6YDRFxoWeYF252jTTL7fgRhwYn"), 
                path=paste0(results_dir, "topics/qtl-topic-lods.csv.gz"),

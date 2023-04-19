@@ -10,14 +10,14 @@ library(ggforce)
 
 # BiocManager::install(c("GenomicAlignments", "GenomicRanges"))
 
-project_dir <- "/Users/kirkgosik/Google Drive/My Drive/projects/"
-domice_dir <- paste0(project_dir, "domice/paper of QTL study/Revised materials of ILC-QTL paper cell Science format/")
-data_dir <- paste0(domice_dir, "data/")
-results_dir <- paste0(data_dir, "results/")
-
-figure_path <- paste0(project_path, "results/figures/")
-data_path <- paste0(project_path, "data/")
-source(paste0(figure_path, "helpers.R"))
+# project_dir <- "/Users/kirkgosik/Google Drive/My Drive/projects/"
+# domice_dir <- paste0(project_dir, "domice/paper of QTL study/Revised materials of ILC-QTL paper cell Science format/")
+# data_dir <- paste0(domice_dir, "data/")
+# results_dir <- paste0(data_dir, "results/")
+# 
+# figure_path <- paste0(project_path, "results/figures/")
+# data_path <- paste0(project_path, "data/")
+# source(paste0(figure_path, "helpers.R"))
 
 
 
@@ -415,7 +415,6 @@ ilc2_lti <- fread(paste0(results_dir,"proportions/gwas-ilc2-lti-results.csv.gz")
                 consequence, strand)
 
 ilc2_ltigr <- makeGRangesFromDataFrame(ilc2_lti,
-                                       names.field = "marker",
                                        seqnames="chr",
                                        start.field="pos",
                                        end.field="pos",
@@ -437,7 +436,6 @@ ilc3_lti <- fread(paste0(results_dir,"proportions/gwas-ilc3-lti-results.csv.gz")
                 consequence, strand)
 
 ilc3_ltigr <- makeGRangesFromDataFrame(ilc3_lti,
-                                       names.field = "marker",
                                        seqnames="chr",
                                        start.field="pos",
                                        end.field="pos",
@@ -451,41 +449,54 @@ ilc3_lti_count <- length(reduce(resize(sort(ilc3_ltigr), 10000)))
 
 
 
+
+ilc3_stressed <- fread(paste0(results_dir,"proportions/ILC3_stressed_vs_non_qtl.csv.gz"), 
+                       data.table = FALSE) %>% 
+  mutate(strand = "+") %>% 
+  dplyr::filter(lods > 200) %>%
+  dplyr::select(marker, chr, betas, p_values, 
+                lods, chr, pos, cM, ensembl_gene, 
+                consequence, strand)
+
+ilc3_stressedgr <- makeGRangesFromDataFrame(ilc3_stressed,
+                                            seqnames="chr",
+                                            start.field="pos",
+                                            end.field="pos",
+                                            strand = "strand",
+                                            keep.extra.columns = TRUE,
+                                            na.rm = TRUE)
+
+# Counting number of QTL
+## length of all genes in grl
+ilc3_stressed_count <- length(reduce(resize(sort(ilc3_stressedgr), 10000)))
+
+
+
+
+lti_stressed <- fread(paste0(results_dir,"proportions/LTi_stressed_vs_non_qtl.csv.gz"), 
+                      data.table = FALSE) %>% 
+  mutate(strand = "+") %>% 
+  dplyr::filter(lods > 200) %>%
+  dplyr::select(marker, chr, betas, p_values, 
+                lods, chr, pos, cM, ensembl_gene, 
+                consequence, strand)
+
+lti_stressedgr <- makeGRangesFromDataFrame(lti_stressed,
+                                           seqnames="chr",
+                                           start.field="pos",
+                                           end.field="pos",
+                                           strand = "strand",
+                                           keep.extra.columns = TRUE,
+                                           na.rm = TRUE)
+
+# Counting number of QTL
+## length of all genes in grl
+lti_stressed_count <- length(reduce(resize(sort(lti_stressedgr), 10000)))
+
+
+
+
 ## TODO: update beyond this point ####
-ilc3_stressed <- fread("results/proportion/ILC3_stressed_vs_non_qtl.csv.gz", data.table = FALSE)
-
-# Counting number of QTL
-ilc3_stressed_count <- ilc3_stressed %>% 
-  mutate(xpos_floor = floor(xpos)) %>% 
-  group_by(chr, xpos_floor) %>% 
-  summarise(lod = max(lods)) %>%
-  ungroup() %>%
-  summarise(qtl_count = sum(lod > 200)) %>%
-  mutate(name = "ILC3 vs LTi",
-         trait = "ILC3 vs LTi QTL",
-         cell_type = NA)
-
-
-
-lti_stressed <- fread("results/proportion/LTi_stressed_vs_non_qtl.csv.gz", data.table = FALSE)
-
-# Counting number of QTL
-lti_stressed_count <- lti_stressed %>% 
-  mutate(xpos_floor = floor(xpos)) %>% 
-  group_by(chr, xpos_floor) %>% 
-  summarise(lod = max(lods)) %>%
-  ungroup() %>%
-  summarise(qtl_count = sum(lod > 200)) %>%
-  mutate(name = "ILC3 vs LTi",
-         trait = "ILC3 vs LTi QTL",
-         cell_type = NA)
-
-
-ilc3_stressed_count + lti_stressed_count
-
-
-
-
 ## topic qtl counts ####
 
 topics <- fread(paste0(results_dir,"results/topics/qtl-topic-lods.csv.gz"), 
@@ -563,6 +574,12 @@ ilc2_lti_count <- length(reduce(resize(sort(ilc2_ltigr), 10000)))
 
 ## ILC3 vs LTi
 ilc3_lti_count <- length(reduce(resize(sort(ilc3_ltigr), 10000)))
+
+## ILC3 Stressed
+ilc3_stressed_count <- length(reduce(resize(sort(ilc3_stressedgr), 10000)))
+
+## LTi Stressed
+lti_stressed_count <- length(reduce(resize(sort(lti_stressedgr), 10000)))
 
 ## topic
 
