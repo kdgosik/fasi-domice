@@ -499,48 +499,66 @@ lti_stressed_count <- length(reduce(resize(sort(lti_stressedgr), 10000)))
 ## TODO: update beyond this point ####
 ## topic qtl counts ####
 
-topics <- fread(paste0(results_dir,"results/topics/qtl-topic-lods.csv.gz"), 
+topics <- fread(paste0(results_dir, "topics/qtl-topic-lods.csv.gz"), 
                 data.table = FALSE) %>%
   dplyr::select(-V1) %>%
   left_join(ccre) %>%
-  dplyr::select(-ends_with("_qtl")) %>%
-  mutate(pos_floor = floor(pos/1e6)) %>% 
-  group_by(chr, pos_floor) %>% 
-  summarise(across(starts_with("topic"), .fns = max)) %>%
-  dplyr::select(chr, pos_floor, starts_with("topic")) %>%
-  pivot_longer(-c(chr, pos_floor)) %>%
-  group_by(name) %>%
-  summarise(qtl_count = sum(value > 6)) %>%
-  dplyr::mutate(trait = name,
-                cell_type = NA)
+  dplyr::select(1:23) %>%
+  pivot_longer(-c(marker, chr, pos)) %>%
+  mutate(strand = "+") %>%
+  filter(!is.na(pos), !is.na(chr), value > 6)
 
+
+
+topicqtlgrl <- makeGRangesListFromDataFrame(topics,
+                                            split.field = "name",
+                                            names.field = "marker",
+                                            seqnames = "chr",
+                                            start.field = "pos",
+                                            end.field = "pos",
+                                            strand = "strand",
+                                            na.rm = TRUE,
+                                            keep.extra.columns = TRUE)
+
+## length of all genes in grl
+topicqtl_list <- lapply(reduce(resize(sort(topicqtlgrl),10000)), length)
 
 
 ## cytokine qtl counts
 
-cytokines <- fread(paste0(results_dir,"results/cytokines/qtl-steady-cytokines-lods.csv.gz"), 
+cytokines <- fread(paste0(results_dir,"cytokines/qtl-cytokines-steady-lods.csv.gz"), 
                    data.table = FALSE) %>%
   dplyr::select(-V1) %>%
   left_join(ccre) %>%
   dplyr::select(1:15) %>%
-  mutate(pos_floor = floor(pos/1e6)) %>% 
-  group_by(chr, pos_floor) %>% 
-  summarise(across(.cols = everything(), .fns = max)) %>%
-  dplyr::select(-marker, -pos) %>%
-  pivot_longer(-c(chr, pos_floor)) %>%
-  group_by(name) %>%
-  summarise(qtl_count = sum(value > 6)) %>%
-  dplyr::mutate(trait = name,
-                cell_type = NA)
+  pivot_longer(-c(marker, chr, pos)) %>%
+  mutate(strand = "+") %>%
+  filter(!is.na(pos), !is.na(chr), value > 6)
+
+
+
+cytokinesqtlgrl <- makeGRangesListFromDataFrame(cytokines,
+                                            split.field = "name",
+                                            names.field = "marker",
+                                            seqnames = "chr",
+                                            start.field = "pos",
+                                            end.field = "pos",
+                                            strand = "strand",
+                                            na.rm = TRUE,
+                                            keep.extra.columns = TRUE)
+
+## length of all genes in grl
+cytokineqtl_list <- lapply(reduce(resize(sort(cytokinesqtlgrl <- makeGRangesListFromDataFrame(cytokines,
+),10000)), length)
 
 
 
 
-outdf <- bind_rows(list(ilc1_eqtl_count, ilc1_ilc2_count, ilc1_ilc3_count,
-                        ilc1_lti_count,  ilc2_eqtl_count, ilc2_ilc3_count, 
-                        ilc2_lti_count, ilc3_eqtl_count,
-                        ilc3_lti_count, lti_eqtl_count, topics, cytokines))
-write.csv(outdf, "qtl-counts.csv", row.names = F)
+# outdf <- bind_rows(list(ilc1_eqtl_count, ilc1_ilc2_count, ilc1_ilc3_count,
+#                         ilc1_lti_count,  ilc2_eqtl_count, ilc2_ilc3_count, 
+#                         ilc2_lti_count, ilc3_eqtl_count,
+#                         ilc3_lti_count, lti_eqtl_count, topics, cytokines))
+# write.csv(outdf, "qtl-counts.csv", row.names = F)
 
 
 ## Counting ##########
