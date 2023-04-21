@@ -549,7 +549,7 @@ cytokinesqtlgrl <- makeGRangesListFromDataFrame(cytokines,
 
 ## length of all genes in grl
 cytokineqtl_list <- lapply(reduce(resize(sort(cytokinesqtlgrl <- makeGRangesListFromDataFrame(cytokines,
-),10000)), length)
+),10000)), length))
 
 
 
