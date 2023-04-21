@@ -301,20 +301,20 @@ lti_eqtl_list <- lapply(reduce(resize(sort(ltieqtlgrl),10000)), length)
 
 
 
-bar_plot_df <- list("ILC1" = ilc1_eqtl_loci_by_gene %>% group_by(cis_effect) %>% distinct(loci) %>% count(cis_effect),
-                    "ILC2" = ilc2_eqtl_loci_by_gene %>% group_by(cis_effect) %>% distinct(loci) %>% count(cis_effect),
-                    "ILC3" = ilc3_eqtl_loci_by_gene %>% group_by(cis_effect) %>% distinct(loci) %>% count(cis_effect),
-                    "LTi" = lti_eqtl_loci_by_gene %>% group_by(cis_effect) %>% distinct(loci) %>% count(cis_effect)) %>% 
-  bind_rows(.id = "cell_type") %>%
-  mutate(cis_effect = factor(cis_effect, levels = 0:1, labels = c("trans", "cis")))
-
-
-
-ggplot(bar_plot_df, aes(cell_type, n, group = cis_effect, fill = cis_effect)) + 
-  geom_bar(stat = "identity", position = "dodge") +
-  theme_minimal() + 
-  scale_fill_brewer(palette = "Dark2") +
-  labs(title = "")
+# bar_plot_df <- list("ILC1" = ilc1_eqtl_loci_by_gene %>% group_by(cis_effect) %>% distinct(loci) %>% count(cis_effect),
+#                     "ILC2" = ilc2_eqtl_loci_by_gene %>% group_by(cis_effect) %>% distinct(loci) %>% count(cis_effect),
+#                     "ILC3" = ilc3_eqtl_loci_by_gene %>% group_by(cis_effect) %>% distinct(loci) %>% count(cis_effect),
+#                     "LTi" = lti_eqtl_loci_by_gene %>% group_by(cis_effect) %>% distinct(loci) %>% count(cis_effect)) %>% 
+#   bind_rows(.id = "cell_type") %>%
+#   mutate(cis_effect = factor(cis_effect, levels = 0:1, labels = c("trans", "cis")))
+# 
+# 
+# 
+# ggplot(bar_plot_df, aes(cell_type, n, group = cis_effect, fill = cis_effect)) + 
+#   geom_bar(stat = "identity", position = "dodge") +
+#   theme_minimal() + 
+#   scale_fill_brewer(palette = "Dark2") +
+#   labs(title = "")
   
 
 
@@ -548,8 +548,7 @@ cytokinesqtlgrl <- makeGRangesListFromDataFrame(cytokines,
                                             keep.extra.columns = TRUE)
 
 ## length of all genes in grl
-cytokineqtl_list <- lapply(reduce(resize(sort(cytokinesqtlgrl <- makeGRangesListFromDataFrame(cytokines,
-),10000)), length))
+cytokineqtl_list <- lapply(reduce(resize(sort(cytokinesqtlgrl),50000)), length)
 
 
 
@@ -600,9 +599,10 @@ ilc3_stressed_count <- length(reduce(resize(sort(ilc3_stressedgr), 10000)))
 lti_stressed_count <- length(reduce(resize(sort(lti_stressedgr), 10000)))
 
 ## topic
+topicqtl_list <- lapply(reduce(resize(sort(topicqtlgrl),10000)), length)
 
 ## cytokine
-
+cytokineqtl_list <- lapply(reduce(resize(sort(cytokinesqtlgrl),10000)), length)
 
 
 
