@@ -336,7 +336,7 @@ ilc1_ilc2gr <- makeGRangesFromDataFrame(ilc1_ilc2,
                                         keep.extra.columns = TRUE)
 
 ## length of all genes in grl
-ilc1_ilc2_count <- length(reduce(resize(sort(ilc1_ilc2gr), 10000)))
+ilc1_ilc2_count <- length(reduce(resize(sort(ilc1_ilc2gr), 500000)))
 
 
 
@@ -357,7 +357,7 @@ ilc1_ilc3gr <- makeGRangesFromDataFrame(ilc1_ilc3,
                                         na.rm = TRUE)
 
 ## length of all genes in grl
-ilc1_ilc3_count <- length(reduce(resize(sort(ilc1_ilc3gr), 10000)))
+ilc1_ilc3_count <- length(reduce(resize(sort(ilc1_ilc3gr), 500000)))
 
 
 
@@ -379,7 +379,7 @@ ilc1_ltigr <- makeGRangesFromDataFrame(ilc1_lti,
                                        na.rm = TRUE)
 
 ## length of all genes in grl
-ilc1_lti_count <- length(reduce(resize(sort(ilc1_ltigr), 10000)))
+ilc1_lti_count <- length(reduce(resize(sort(ilc1_ltigr), 500000)))
 
 
 
