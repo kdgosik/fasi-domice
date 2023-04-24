@@ -323,10 +323,14 @@ lti_eqtl_list <- lapply(reduce(resize(sort(ltieqtlgrl),10000)), length)
 ilc1_ilc2 <- fread(paste0(results_dir,"proportions/gwas-ilc1-ilc2-results.csv.gz"), 
                    data.table = FALSE) %>% 
   mutate(strand = "+") %>% 
-  dplyr::filter(lods > 100) %>%
+  dplyr::mutate(
+    padj = p.adjust(p_values, method = "hochberg"),
+    lods = -log10(p.adjust(p_values, method = "hochberg")) / 10
+  ) %>%
+  dplyr::filter(lods > quantile(lods, 0.999)) %>%
   dplyr::select(marker, chr, betas, se, p_values, 
                 lods, chr, pos, cM, ensembl_gene, 
-                consequence, strand)
+                consequence, strand, xpos)
 
 ilc1_ilc2gr <- makeGRangesFromDataFrame(ilc1_ilc2,
                                         seqnames = "chr",
@@ -336,14 +340,18 @@ ilc1_ilc2gr <- makeGRangesFromDataFrame(ilc1_ilc2,
                                         keep.extra.columns = TRUE)
 
 ## length of all genes in grl
-ilc1_ilc2_count <- length(reduce(resize(sort(ilc1_ilc2gr), 500000)))
+ilc1_ilc2_count <- length(reduce(resize(sort(ilc1_ilc2gr), 1000000)))
 
 
 
 ilc1_ilc3 <- fread(paste0(results_dir,"proportions/gwas-ilc1-ilc3-results.csv.gz"), 
                    data.table = FALSE) %>% 
   mutate(strand = "+") %>% 
-  dplyr::filter(lods > 100) %>%
+  dplyr::mutate(
+    padj = p.adjust(p_values, method = "hochberg"),
+    lods = -log10(p.adjust(p_values, method = "hochberg")) / 10
+  ) %>%
+  dplyr::filter(lods > quantile(lods, 0.999)) %>%
   dplyr::select(marker, chr, betas, se, p_values, 
                 lods, chr, pos, cM, ensembl_gene, 
                 consequence, strand)
@@ -357,7 +365,7 @@ ilc1_ilc3gr <- makeGRangesFromDataFrame(ilc1_ilc3,
                                         na.rm = TRUE)
 
 ## length of all genes in grl
-ilc1_ilc3_count <- length(reduce(resize(sort(ilc1_ilc3gr), 500000)))
+ilc1_ilc3_count <- length(reduce(resize(sort(ilc1_ilc3gr), 1000000)))
 
 
 
@@ -365,7 +373,11 @@ ilc1_ilc3_count <- length(reduce(resize(sort(ilc1_ilc3gr), 500000)))
 ilc1_lti <- fread(paste0(results_dir,"proportions/gwas-ilc1-lti-results.csv.gz"), 
                    data.table = FALSE) %>% 
   mutate(strand = "+") %>% 
-  dplyr::filter(lods > 100) %>%
+  dplyr::mutate(
+    padj = p.adjust(p_values, method = "hochberg"),
+    lods = -log10(p.adjust(p_values, method = "hochberg")) / 10
+  ) %>%
+  dplyr::filter(lods > quantile(lods, 0.999)) %>%
   dplyr::select(marker, chr, betas, se, p_values, 
                 lods, chr, pos, cM, ensembl_gene, 
                 consequence, strand)
@@ -379,7 +391,7 @@ ilc1_ltigr <- makeGRangesFromDataFrame(ilc1_lti,
                                        na.rm = TRUE)
 
 ## length of all genes in grl
-ilc1_lti_count <- length(reduce(resize(sort(ilc1_ltigr), 500000)))
+ilc1_lti_count <- length(reduce(resize(sort(ilc1_ltigr), 1000000)))
 
 
 
@@ -387,7 +399,11 @@ ilc1_lti_count <- length(reduce(resize(sort(ilc1_ltigr), 500000)))
 ilc2_ilc3 <- fread(paste0(results_dir,"proportions/gwas-ilc2-ilc3-results.csv.gz"), 
                   data.table = FALSE) %>% 
   mutate(strand = "+") %>% 
-  dplyr::filter(lods > 100) %>%
+  dplyr::mutate(
+    padj = p.adjust(p_values, method = "hochberg"),
+    lods = -log10(p.adjust(p_values, method = "hochberg")) / 10
+  ) %>%
+  dplyr::filter(lods > quantile(lods, 0.999)) %>%
   dplyr::select(marker, chr, betas, se, p_values, 
                 lods, chr, pos, cM, ensembl_gene, 
                 consequence, strand)
@@ -401,15 +417,19 @@ ilc2_ilc3gr <- makeGRangesFromDataFrame(ilc2_ilc3,
                                        na.rm = TRUE)
 
 ## length of all genes in grl
-ilc2_ilc3_count <- length(reduce(resize(sort(ilc2_ilc3gr), 10000)))
+ilc2_ilc3_count <- length(reduce(resize(sort(ilc2_ilc3gr), 1000000)))
 
 
 
-
+# quantile(ilc2_lti$lods, 0.999)
 ilc2_lti <- fread(paste0(results_dir,"proportions/gwas-ilc2-lti-results.csv.gz"), 
                   data.table = FALSE) %>% 
   mutate(strand = "+") %>% 
-  dplyr::filter(lods > 100) %>%
+  dplyr::mutate(
+    padj = p.adjust(p_values, method = "hochberg"),
+    lods = -log10(p.adjust(p_values, method = "hochberg")) / 10
+  ) %>%
+  dplyr::filter(lods > quantile(lods, 0.999)) %>%
   dplyr::select(marker, chr, betas, se, p_values, 
                 lods, chr, pos, cM, ensembl_gene, 
                 consequence, strand)
@@ -423,14 +443,18 @@ ilc2_ltigr <- makeGRangesFromDataFrame(ilc2_lti,
                                        na.rm = TRUE)
 
 ## length of all genes in grl
-ilc2_lti_count <- length(reduce(resize(sort(ilc2_ltigr), 10000)))
+ilc2_lti_count <- length(reduce(resize(sort(ilc2_ltigr), 1000000)))
 
 
 
 ilc3_lti <- fread(paste0(results_dir,"proportions/gwas-ilc3-lti-results.csv.gz"), 
                   data.table = FALSE) %>% 
   mutate(strand = "+") %>% 
-  dplyr::filter(lods > 100) %>%
+  dplyr::mutate(
+    padj = p.adjust(p_values, method = "hochberg"),
+    lods = -log10(p.adjust(p_values, method = "hochberg")) / 10
+  ) %>%
+  dplyr::filter(lods > quantile(lods, 0.999)) %>%
   dplyr::select(marker, chr, betas, se, p_values, 
                 lods, chr, pos, cM, ensembl_gene, 
                 consequence, strand)
@@ -444,7 +468,7 @@ ilc3_ltigr <- makeGRangesFromDataFrame(ilc3_lti,
                                        na.rm = TRUE)
 
 ## length of all genes in grl
-ilc3_lti_count <- length(reduce(resize(sort(ilc3_ltigr), 10000)))
+ilc3_lti_count <- length(reduce(resize(sort(ilc3_ltigr), 1000000)))
 
 
 
@@ -453,7 +477,11 @@ ilc3_lti_count <- length(reduce(resize(sort(ilc3_ltigr), 10000)))
 ilc3_stressed <- fread(paste0(results_dir,"proportions/ILC3_stressed_vs_non_qtl.csv.gz"), 
                        data.table = FALSE) %>% 
   mutate(strand = "+") %>% 
-  dplyr::filter(lods > 200) %>%
+  dplyr::mutate(
+    padj = p.adjust(p_values, method = "hochberg"),
+    lods = -log10(p.adjust(p_values, method = "hochberg")) / 10
+  ) %>%
+  dplyr::filter(lods > quantile(lods, 0.999)) %>%
   dplyr::select(marker, chr, betas, p_values, 
                 lods, chr, pos, cM, ensembl_gene, 
                 consequence, strand)
@@ -468,7 +496,7 @@ ilc3_stressedgr <- makeGRangesFromDataFrame(ilc3_stressed,
 
 # Counting number of QTL
 ## length of all genes in grl
-ilc3_stressed_count <- length(reduce(resize(sort(ilc3_stressedgr), 10000)))
+ilc3_stressed_count <- length(reduce(resize(sort(ilc3_stressedgr), 1000000)))
 
 
 
@@ -476,7 +504,11 @@ ilc3_stressed_count <- length(reduce(resize(sort(ilc3_stressedgr), 10000)))
 lti_stressed <- fread(paste0(results_dir,"proportions/LTi_stressed_vs_non_qtl.csv.gz"), 
                       data.table = FALSE) %>% 
   mutate(strand = "+") %>% 
-  dplyr::filter(lods > 200) %>%
+  dplyr::mutate(
+    padj = p.adjust(p_values, method = "hochberg"),
+    lods = -log10(p.adjust(p_values, method = "hochberg")) / 10
+  ) %>%
+  dplyr::filter(lods > quantile(lods, 0.999)) %>%
   dplyr::select(marker, chr, betas, p_values, 
                 lods, chr, pos, cM, ensembl_gene, 
                 consequence, strand)
@@ -491,7 +523,7 @@ lti_stressedgr <- makeGRangesFromDataFrame(lti_stressed,
 
 # Counting number of QTL
 ## length of all genes in grl
-lti_stressed_count <- length(reduce(resize(sort(lti_stressedgr), 10000)))
+lti_stressed_count <- length(reduce(resize(sort(lti_stressedgr), 1000000)))
 
 
 
