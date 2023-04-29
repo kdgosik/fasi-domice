@@ -3,6 +3,7 @@ library(rtracklayer)
 # library(tidyverse)
 library(dplyr)
 library(tidyr)
+library(tibble)
 library(readr)
 library(ggvenn)
 library(igraph)
@@ -26,9 +27,29 @@ ccre <- fread(paste0(data_dir, "references/GM_SNPS_Consequence_cCRE.csv"), data.
 
 
 ## Gene Data
-ensembl <- as.data.frame(readGFF(paste0(data_dir, "references/Mus_musculus.GRCm38.102.gtf"))) %>%
-  filter(seqid %in% c(as.character(1:19), "X"), gene_biotype == "protein_coding", type == "gene") %>%
-  mutate(chr = paste0("chr", seqid))
+# ensembl <- as.data.frame(readGFF(paste0(data_dir, "references/Mus_musculus.GRCm38.102.gtf"))) %>%
+#   filter(seqid %in% c(as.character(1:19), "X"), gene_biotype == "protein_coding", type == "gene") %>%
+#   mutate(chr = paste0("chr", seqid))
+
+ensembl <- readGFF(paste0(data_dir, "references/Mus_musculus.GRCm38.102.gtf")) %>%
+  filter(seqid %in% c(as.character(1:19), "X"), 
+         gene_biotype == "protein_coding", 
+         type == "gene") %>%
+  dplyr::select(seqid, start, end, strand, gene_name)
+
+
+mm10 <- makeGRangesFromDataFrame(ensembl, keep.extra.columns = T)
+
+ccregr <- ccre %>%
+  dplyr::select(chr, pos, marker) %>%
+  filter(!is.na(chr)) %>%
+  makeGRangesFromDataFrame(.,
+                           seqnames.field = "chr",
+                           start.field = "pos",
+                           end.field = "pos",
+                           na.rm=TRUE, 
+                           keep.extra.columns = T)
+
 
 
 ## eQTL counts by gene ####
@@ -71,8 +92,41 @@ ilc1eqtlgrl <- makeGRangesListFromDataFrame(ilc1_eqtl_loci_by_gene,
                                             keep.extra.columns = TRUE)
 
 ## length of all genes in grl
-ilc1_eqtl_list <- lapply(reduce(resize(sort(ilc1eqtlgrl),10000)), length)
+ilc1_eqtl_list <- lapply(reduce(resize(sort(ilc1eqtlgrl), 500000)), length)
 
+# ov_mm10 <- lapply(1:3, function(i) subsetByOverlaps(mm10, ilc1eqtlgrl[[i]]))
+# ov_mm10 <- lapply(1:3, function(i) subsetByOverlaps(mm10, ilc1eqtlgrl[[i]]))
+
+ov_mm10 <- lapply(ilc1eqtlgrl, function(gr) {
+  
+  subsetByOverlaps(mm10, gr, ignore.strand=TRUE)
+  
+  })
+
+ilc1_eQTL_eGENE <- lapply(ov_mm10, as.data.frame) %>% 
+  bind_rows(.,.id='eGene') %>%
+  mutate(eGene = paste0("ILC1-", eGene)) %>%
+  dplyr::rename(eQTL_loci_gene = gene_name)
+write.csv(ilc1_eQTL_eGENE, paste0(results_dir, "eqtl/qtl-loci-by-gene-ILC1.csv"))
+
+
+## overlap eQTL with itself to count polygenic loci
+ov_ilc1_ov <- lapply(ilc1eqtlgrl, function(gr) {
+  
+  subsetByOverlaps(ilc1eqtlgrl, gr, ignore.strand=TRUE)
+  
+})
+
+
+## list of loci by eGene names for all other eGenes outputted in a dataframe.
+## TODO: how to get annotation of eQTL-loci gene?
+polygenic_count <- sapply(ov_ilc1_ov, function(ov) {
+  as.data.frame(unlist(unique(ov))) %>% 
+    rownames_to_column('eGene') %>% 
+    separate("eGene", c("eGene", "marker"), sep='\\.') %>%
+    mutate(count = n_distinct(eGene)) %>%
+    dplyr::select(-value, -value_adj)
+}, USE.NAMES = TRUE, simplify = FALSE)
 
 
 # write.csv(ilc1_eqtl_loci_by_gene,"results/eqtl/qtl-loci-by-gene-lods-ILC1.csv")
@@ -136,36 +190,20 @@ ilc2eqtlgrl <- makeGRangesListFromDataFrame(ilc2_eqtl_loci_by_gene,
                                             keep.extra.columns = TRUE)
 
 ## length of all genes in grl
-ilc2_eqtl_list <- lapply(reduce(resize(sort(ilc2eqtlgrl),10000)), length)
+ilc2_eqtl_list <- lapply(reduce(resize(sort(ilc2eqtlgrl),500000)), length)
 
-# write.csv(ilc2_eqtl_loci_by_gene,"results/eqtl/qtl-loci-by-gene-lods-ILC2.csv")
-# ilc2_eqtl_loci_by_gene %>% 
-#   dplyr::select(gene, gene_chr, gene_start, gene_end, 
-#                 loci, loci_chr = marker_chr, loci_pos = marker_pos, cis_effect) %>%
-#   write.csv("results/eqtl/qtl-loci-by-genes-ILC2.csv")
-# 
-# 
-# 
-# # Counting number of QTLs per eGene
-# ilc2_eqtl_count <- ilc2_eqtl %>% 
-#   mutate(xpos_floor = floor(xpos)) %>% 
-#   group_by(gene, marker_chr, xpos_floor) %>% 
-#   summarise(lod = max(value)) %>%
-#   group_by(gene) %>%
-#   summarise(qtl_count = sum(lod > lod_cutoff)) %>%
-#   mutate(cell_type ="ILC2",
-#          trait = paste0("ILC2 eQTL: ", gene)) %>%
-#   dplyr::rename(name = gene)
-# 
-# 
-# ilc2_counts <- ilc2_eqtl %>% 
-#   mutate(xpos_floor = floor(xpos)) %>% 
-#   group_by(gene, marker_chr, xpos_floor) %>% 
-#   summarise(lod = max(value)) %>%
-#   mutate(ILC2 = as.numeric(lod > lod_cutoff)) %>% 
-#   unite("loci", gene:xpos_floor) %>% 
-#   dplyr::select(-lod) %>%
-#   filter(ILC2 == 1)
+ov_mm10 <- lapply(ilc2eqtlgrl, function(gr) {
+  subsetByOverlaps(mm10, gr)
+  })
+
+ilc2_eQTL_eGENE <- lapply(ov_mm10, as.data.frame) %>% 
+  bind_rows(.,.id='eGene') %>%
+  mutate(eGene = paste0("ILC2-", eGene)) %>%
+  dplyr::rename(eQTL_loci_gene = gene_name)
+write.csv(ilc2_eQTL_eGENE, paste0(results_dir, "eqtl/qtl-loci-by-gene-ILC2.csv"))
+
+
+
 
 
 
@@ -203,7 +241,20 @@ ilc3eqtlgrl <- makeGRangesListFromDataFrame(ilc3_eqtl_loci_by_gene,
                                             keep.extra.columns = TRUE)
 
 ## length of all genes in grl
-ilc3_eqtl_list <- lapply(reduce(resize(sort(ilc3eqtlgrl),10000)), length)
+ilc3_eqtl_list <- lapply(reduce(resize(sort(ilc3eqtlgrl), 500000)), length)
+
+ov_mm10 <- lapply(ilc3eqtlgrl, function(gr) {
+  subsetByOverlaps(mm10, gr)
+})
+
+ilc3_eQTL_eGENE <- lapply(ov_mm10, as.data.frame) %>% 
+  bind_rows(.,.id='eGene') %>%
+  mutate(eGene = paste0("ILC3-", eGene)) %>%
+  dplyr::rename(eQTL_loci_gene = gene_name)
+write.csv(ilc3_eQTL_eGENE, paste0(results_dir, "eqtl/qtl-loci-by-gene-ILC3.csv"))
+
+
+
 
 # write.csv(ilc3_eqtl_loci_by_gene,"results/eqtl/qtl-loci-by-gene-lods-ILC3.csv")
 # ilc3_eqtl_loci_by_gene %>% 
@@ -268,34 +319,18 @@ ltieqtlgrl <- makeGRangesListFromDataFrame(lti_eqtl_loci_by_gene,
                                            keep.extra.columns = TRUE)
 
 ## length of all genes in grl
-lti_eqtl_list <- lapply(reduce(resize(sort(ltieqtlgrl),10000)), length)
+lti_eqtl_list <- lapply(reduce(resize(sort(ltieqtlgrl), 500000)), length)
 
 
-# write.csv(lti_eqtl_loci_by_gene,"results/eqtl/qtl-loci-by-gene-lods-LTi.csv")
-# lti_eqtl_loci_by_gene %>% 
-#   dplyr::select(gene, gene_chr, gene_start, gene_end, 
-#                 loci, loci_chr = marker_chr, loci_pos = marker_pos, cis_effect) %>%
-#   write.csv("results/eqtl/qtl-loci-by-genes-LTi.csv")
-# # Counting number of QTLs per eGene
-# lti_eqtl_count <- lti_eqtl %>% 
-#   mutate(xpos_floor = floor(xpos)) %>% 
-#   group_by(gene, marker_chr, xpos_floor) %>% 
-#   summarise(lod = max(value)) %>%
-#   group_by(gene) %>%
-#   summarise(qtl_count = sum(lod > lod_cutoff)) %>%
-#   mutate(cell_type ="LTi-like",
-#          trait = paste0("LTi-like eQTL: ", gene)) %>%
-#   dplyr::rename(name = gene)
-# 
-# 
-# lti_counts <- lti_eqtl %>% 
-#   mutate(xpos_floor = floor(xpos)) %>% 
-#   group_by(gene, marker_chr, xpos_floor) %>% 
-#   summarise(lod = max(value)) %>%
-#   mutate(LTi = as.numeric(lod > lod_cutoff)) %>% 
-#   unite("loci", gene:xpos_floor) %>% 
-#   dplyr::select(-lod) %>%
-#   filter(LTi == 1)
+ov_mm10 <- lapply(ltieqtlgrl, function(gr) {
+  subsetByOverlaps(mm10, gr)
+})
+
+lti_eQTL_eGENE <- lapply(ov_mm10, as.data.frame) %>% 
+  bind_rows(.,.id='eGene') %>%
+  mutate(eGene = paste0("LTi-", eGene)) %>%
+  dplyr::rename(eQTL_loci_gene = gene_name)
+write.csv(lti_eQTL_eGENE, paste0(results_dir, "eqtl/qtl-loci-by-gene-LTi.csv"))
 
 
 
@@ -340,7 +375,7 @@ ilc1_ilc2gr <- makeGRangesFromDataFrame(ilc1_ilc2,
                                         keep.extra.columns = TRUE)
 
 ## length of all genes in grl
-ilc1_ilc2_count <- length(reduce(resize(sort(ilc1_ilc2gr), 1000000)))
+ilc1_ilc2_count <- length(reduce(resize(sort(ilc1_ilc2gr), 500000)))
 
 
 
@@ -365,7 +400,7 @@ ilc1_ilc3gr <- makeGRangesFromDataFrame(ilc1_ilc3,
                                         na.rm = TRUE)
 
 ## length of all genes in grl
-ilc1_ilc3_count <- length(reduce(resize(sort(ilc1_ilc3gr), 1000000)))
+ilc1_ilc3_count <- length(reduce(resize(sort(ilc1_ilc3gr), 500000)))
 
 
 
