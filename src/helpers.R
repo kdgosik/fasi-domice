@@ -113,34 +113,42 @@ my_plot <- function( data, column, embedding = "tsne" ) {
 #' @example plot_qtl(qtl_output = out, marker_map = map, varcolumn = "topic0", cutoff = 6, plot_title = "LTi-like - Topic 0")
 
 
-plot_qtl <- function( qtl_output, marker_map, varcolumn, cutoff = 6, plot_title = "" ) {
+plot_qtl <- function( qtl_output, varcolumn, cutoff = 6, plot_title = "" ) {
   
-  xpos <- qtl2:::map_to_xpos(marker_map, gap = 25)
-  xchrbound <- qtl2:::map_to_boundaries(marker_map, gap = 25)
-  chr_breaks <- apply(xchrbound, 2, median)
+  plotdf <- qtl_output %>%
+    mutate(lods = .data[[varcolumn]])
   
-  plotdf <- as.data.frame(qtl_output) %>%
-    # tibble::rownames_to_column(var = "marker") %>%
-    left_join({
-      data.frame(xpos) %>% tibble::rownames_to_column(var = "marker")
-    })
+  ## get rectangles
+  rectangles <- plotdf %>% 
+    mutate(ymax = max(lods, na.rm=TRUE)) %>% 
+    filter(chr %in% seq(2,20,2)) %>% 
+    group_by(chr) %>% 
+    summarise(xmin = min(xpos, na.rm=T), 
+              xmax = max(xpos, na.rm=T), 
+              xmed = median(xpos, na.rm = TRUE), 
+              ymax = max(ymax)) %>% 
+    ungroup() %>%
+    mutate(ymin = 0,
+           ymax = max(ymax)) %>% 
+    arrange(xmin)
   
-  rectangles <- data.frame(
-    xmin = apply(xchrbound, 2, min),
-    xmax = apply(xchrbound, 2, max),
-    ymin = 0,
-    ymax = max(qtl_output[[varcolumn]])
-  )[seq(2,20,2), ]
+  ## get chr breaks
+  chr_breaks <- plotdf %>% 
+    filter(chr %in% 1:19) %>% 
+    group_by(chr) %>% 
+    summarise(xmed = median(xpos, na.rm = TRUE)) %>%
+    arrange(xmed) %>%
+    pull(xmed)
   
   qtl_plot <- ggplot() + 
     geom_rect(data = rectangles, 
               mapping = aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), 
               fill='gray80', alpha=0.8) +
     geom_point(data = plotdf, 
-               mapping = aes_string(x = "xpos", y = varcolumn),
+               mapping = aes(x = xpos, y = lods),
                color = c("gray", "blue")[(plotdf[[varcolumn]] > cutoff)+1]) +
     geom_line(data = plotdf, 
-              mapping = aes_string(x = "xpos", y = varcolumn)) +
+              mapping = aes(x = xpos, y = lods)) +
     geom_hline(yintercept = cutoff, color = "red", linetype = "dashed") + 
     # geom_label(data = markers_df, 
     #            aes(x = xpos, y = plot_lods, label = marker), 
@@ -148,7 +156,7 @@ plot_qtl <- function( qtl_output, marker_map, varcolumn, cutoff = 6, plot_title 
     # geom_label_repel(data = snp_lables, 
     #                  aes(label=as.factor(marker), alpha = 0.7), 
     #                  size = 2, force = 1.3)
-    scale_x_continuous(breaks = chr_breaks, label = c(as.character(1:19), "X")) + 
+    scale_x_continuous(breaks = chr_breaks, label = c(as.character(1:19))) + 
     labs(x = "Chromosome of SNP", 
          y = "LOD", 
          title = plot_title) +
