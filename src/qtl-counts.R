@@ -2,29 +2,21 @@ library(data.table)
 library(rtracklayer)
 # library(tidyverse)
 library(dplyr)
+library(stringr)
 library(tidyr)
 library(tibble)
 library(readr)
-library(ggvenn)
-library(igraph)
-library(ggforce)
-
-# BiocManager::install(c("GenomicAlignments", "GenomicRanges"))
-
-# project_dir <- "/Users/kirkgosik/Google Drive/My Drive/projects/"
-# domice_dir <- paste0(project_dir, "domice/paper of QTL study/Revised materials of ILC-QTL paper cell Science format/")
-# data_dir <- paste0(domice_dir, "data/")
-# results_dir <- paste0(data_dir, "results/")
-# 
-# figure_path <- paste0(project_path, "results/figures/")
-# data_path <- paste0(project_path, "data/")
-# source(paste0(figure_path, "helpers.R"))
+# library(ggvenn)
+# library(igraph)
+# library(ggforce)
 
 
+source("../fasi-domice/setup.R")
 
 # GM_Snps meta data
 ccre <- fread(paste0(data_dir, "references/GM_SNPS_Consequence_cCRE.csv"), data.table = FALSE)
 
+vars <- read_csv("/workspace/fasi-domice/data/allchannels/vars.csv")
 
 ## Gene Data
 # ensembl <- as.data.frame(readGFF(paste0(data_dir, "references/Mus_musculus.GRCm38.102.gtf"))) %>%
@@ -94,65 +86,77 @@ ilc1eqtlgrl <- makeGRangesListFromDataFrame(ilc1_eqtl_loci_by_gene,
 ## length of all genes in grl
 ilc1_eqtl_list <- lapply(reduce(resize(sort(ilc1eqtlgrl), 500000)), length)
 
-# ov_mm10 <- lapply(1:3, function(i) subsetByOverlaps(mm10, ilc1eqtlgrl[[i]]))
-# ov_mm10 <- lapply(1:3, function(i) subsetByOverlaps(mm10, ilc1eqtlgrl[[i]]))
-
-ov_mm10 <- lapply(ilc1eqtlgrl, function(gr) {
-  
-  subsetByOverlaps(mm10, gr, ignore.strand=TRUE)
-  
-  })
-
-ilc1_eQTL_eGENE <- lapply(ov_mm10, as.data.frame) %>% 
-  bind_rows(.,.id='eGene') %>%
-  mutate(eGene = paste0("ILC1-", eGene)) %>%
-  dplyr::rename(eQTL_loci_gene = gene_name)
-write.csv(ilc1_eQTL_eGENE, paste0(results_dir, "eqtl/qtl-loci-by-gene-ILC1.csv"))
-
-
-## overlap eQTL with itself to count polygenic loci
-ov_ilc1_ov <- lapply(ilc1eqtlgrl, function(gr) {
-  
-  subsetByOverlaps(ilc1eqtlgrl, gr, ignore.strand=TRUE)
-  
+## count monogenic vs polygenic
+ilc1_polygenic_counts <- lapply(seq_along(ilc1eqtlgrl), function(i) { 
+  sum(GenomicRanges::countOverlaps(reduce(resize(sort(ilc1eqtlgrl), 500000)),
+                                   reduce(resize(sort(ilc1eqtlgrl), 500000))[[i]])>0) 
 })
 
+## e.g.
+# subsetByOverlaps(reduce(resize(sort(ilc1eqtlgrl), 500000)),
+#                  +                  reduce(resize(sort(ilc1eqtlgrl), 500000))[[203]])
 
-## list of loci by eGene names for all other eGenes outputted in a dataframe.
-## TODO: how to get annotation of eQTL-loci gene?
-polygenic_count <- sapply(ov_ilc1_ov, function(ov) {
-  as.data.frame(unlist(unique(ov))) %>% 
-    rownames_to_column('eGene') %>% 
-    separate("eGene", c("eGene", "marker"), sep='\\.') %>%
-    mutate(count = n_distinct(eGene)) %>%
-    dplyr::select(-value, -value_adj)
-}, USE.NAMES = TRUE, simplify = FALSE)
+ilc1_polygenic_df <- lapply(seq_along(ilc1eqtlgrl), function(i) { 
+  subsetByOverlaps(reduce(resize(sort(ilc1eqtlgrl), 500000)),
+                                   reduce(resize(sort(ilc1eqtlgrl), 500000))[[i]]) %>%
+    as.data.frame() %>%
+    distinct(group_name, .keep_all = TRUE)
+}) %>%
+  bind_rows(.,.id = "loci_id") %>%
+  mutate(loci_id = paste0('loci_', str_pad(loci_id, width=3, side = 'left', pad='0'))) %>%
+  dplyr::rename(eGene = group_name,
+                loci_chr = seqnames,
+                loci_start = start,
+                loci_end = end) %>%
+  dplyr::select(-width) %>%
+  group_by(loci_id) %>%
+  mutate(eGene_count = n_distinct(eGene)) %>%
+  ungroup()
+
+## making GRange List of loci_id to find overlaps
+ilc1_polygenic_dfgrl <- makeGRangesListFromDataFrame(ilc1_polygenic_df,
+                                               split.field = "loci_id",
+                                               names.field = "eGene",
+                                               seqnames = "loci_chr",
+                                               start.field = "loci_start",
+                                               end.field = "loci_end",
+                                               strand = "strand",
+                                               keep.extra.columns = TRUE)
+
+## creating loci gene annotations
+ilc1_outdf <- sapply(names(ilc1_polygenic_dfgrl), function(i) { 
+  subsetByOverlaps(mm10, ilc1_polygenic_dfgrl[[i]]) %>% 
+    as.data.frame() 
+  }, USE.NAMES = TRUE, simplify = FALSE ) %>% 
+  bind_rows(., .id='loci_id') %>%
+  dplyr::select(loci_id,
+                eQTL_loci_gene_chr = seqnames,
+                eQTL_loci_gene_start = start,
+                eQTL_loci_gene_end = end,
+                eQTL_loci_gene = gene_name)
 
 
-# write.csv(ilc1_eqtl_loci_by_gene,"results/eqtl/qtl-loci-by-gene-lods-ILC1.csv")
-# ilc1_eqtl_loci_by_gene %>% 
-#   dplyr::select(gene, gene_chr, gene_start, gene_end, 
-#                 loci, loci_chr = marker_chr, loci_pos = marker_pos, cis_effect) %>%
-#   write.csv("results/eqtl/qtl-loci-by-genes-ILC1.csv")
-# 
-# 
-# # Counting number of QTLs per eGene
-# ilc1_eqtl_count <- ilc1_eqtl_loci_by_gene %>%
-#   group_by(gene) %>%
-#   summarise(qtl_count = sum(lod > lod_cutoff)) %>%
-#   mutate(cell_type ="ILC1",
-#          trait = paste0("ILC1 eQTL: ", gene)) %>%
-#   dplyr::rename(name = gene)
-# 
-# 
-# ilc1_counts <- ilc1_eqtl %>% 
-#   mutate(xpos_floor = floor(xpos)) %>% 
-#   group_by(gene, marker_chr, xpos_floor) %>% 
-#   summarise(lod = max(value)) %>%
-#   mutate(ILC1 = as.numeric(lod > lod_cutoff)) %>% 
-#   unite("loci", gene:xpos_floor) %>% 
-#   dplyr::select(-lod) %>%
-#   filter(ILC1 == 1)
+ilc1_eqtl_loci_by_gene_outdf <- full_join(ilc1_polygenic_df, ilc1_outdf) %>% 
+  dplyr::select(-group) %>%
+  mutate(cell_type = "ILC1")
+write.csv(ilc1_eqtl_loci_by_gene_outdf, paste0(results_dir, "eqtl/qtl-loci-by-gene-ILC1.csv"))
+
+
+ilc1_eqtl_polygeneicdf <- ilc1_eqtl_loci_by_gene_outdf %>%
+  filter(eGene_count > 1)
+write.csv(ilc1_eqtl_polygeneicdf, paste0(results_dir, "eqtl/qtl-loci-by-gene-ILC1_polygenic_only.csv"))
+
+qtl_loci_by_gene_ILC1 <- read_csv("/workspace/fasi-domice/results/eqtl/qtl-loci-by-gene-ILC1.csv")
+
+loci_gene_expressed_ilc1 <- qtl_loci_by_gene_ILC1 %>% 
+  filter(eQTL_loci_gene %in% vars$index[vars$ilc1_expressed==1]) %>% 
+  pull(loci_id) %>% 
+  n_distinct()
+
+loci_total_ilc1 <- qtl_loci_by_gene_ILC1 %>% 
+  # filter(eQTL_loci_gene %in% vars$index[vars$ilc1_expressed==1]) %>% 
+  pull(loci_id) %>% 
+  n_distinct()
 
 
 
@@ -192,18 +196,79 @@ ilc2eqtlgrl <- makeGRangesListFromDataFrame(ilc2_eqtl_loci_by_gene,
 ## length of all genes in grl
 ilc2_eqtl_list <- lapply(reduce(resize(sort(ilc2eqtlgrl),500000)), length)
 
-ov_mm10 <- lapply(ilc2eqtlgrl, function(gr) {
-  subsetByOverlaps(mm10, gr)
-  })
 
-ilc2_eQTL_eGENE <- lapply(ov_mm10, as.data.frame) %>% 
-  bind_rows(.,.id='eGene') %>%
-  mutate(eGene = paste0("ILC2-", eGene)) %>%
-  dplyr::rename(eQTL_loci_gene = gene_name)
-write.csv(ilc2_eQTL_eGENE, paste0(results_dir, "eqtl/qtl-loci-by-gene-ILC2.csv"))
+## count monogenic vs polygenic
+ilc2_polygenic_counts <- lapply(seq_along(ilc2eqtlgrl), function(i) { 
+  sum(GenomicRanges::countOverlaps(reduce(resize(sort(ilc2eqtlgrl), 500000)),
+                                   reduce(resize(sort(ilc2eqtlgrl), 500000))[[i]])>0) 
+})
 
 
 
+ilc2_polygenic_df <- lapply(seq_along(ilc2eqtlgrl), function(i) { 
+  subsetByOverlaps(reduce(resize(sort(ilc2eqtlgrl), 500000)),
+                   reduce(resize(sort(ilc2eqtlgrl), 500000))[[i]]) %>%
+    as.data.frame() %>%
+    distinct(group_name, .keep_all = TRUE)
+}) %>%
+  bind_rows(.,.id = "loci_id") %>%
+  mutate(loci_id = paste0('loci_', str_pad(loci_id, width=3, side = 'left', pad='0'))) %>%
+  dplyr::rename(eGene = group_name,
+                loci_chr = seqnames,
+                loci_start = start,
+                loci_end = end) %>%
+  dplyr::select(-width) %>%
+  group_by(loci_id) %>%
+  mutate(eGene_count = n_distinct(eGene)) %>%
+  ungroup()
+
+## making GRange List of loci_id to find overlaps
+ilc2_polygenic_dfgrl <- makeGRangesListFromDataFrame(ilc2_polygenic_df,
+                                                split.field = "loci_id",
+                                                names.field = "eGene",
+                                                seqnames = "loci_chr",
+                                                start.field = "loci_start",
+                                                end.field = "loci_end",
+                                                strand = "strand",
+                                                keep.extra.columns = TRUE)
+
+## creating loci gene annotations
+ilc2_outdf <- sapply(names(ilc2_polygenic_dfgrl), function(i) { 
+  subsetByOverlaps(mm10, ilc2_polygenic_dfgrl[[i]]) %>% 
+    as.data.frame() 
+}, USE.NAMES = TRUE, simplify = FALSE ) %>% 
+  bind_rows(., .id='loci_id') %>%
+  dplyr::select(loci_id,
+                eQTL_loci_gene_chr = seqnames,
+                eQTL_loci_gene_start = start,
+                eQTL_loci_gene_end = end,
+                eQTL_loci_gene = gene_name)
+
+
+ilc2_eqtl_loci_by_gene_outdf <- full_join(ilc2_polygenic_df, ilc2_outdf) %>% 
+  dplyr::select(-group) %>%
+  mutate(cell_type = "ILC2")
+write.csv(ilc2_eqtl_loci_by_gene_outdf, paste0(results_dir, "eqtl/qtl-loci-by-gene-ILC2.csv"))
+
+
+ilc2_eqtl_polygeneicdf <- ilc2_eqtl_loci_by_gene_outdf %>%
+  filter(eGene_count > 1)
+write.csv(ilc2_eqtl_polygeneicdf, paste0(results_dir, "eqtl/qtl-loci-by-gene-ILC2_polygenic_only.csv"))
+
+
+## count loci genes expressed in cell type
+qtl_loci_by_gene_ILC2 <- read_csv("/workspace/fasi-domice/results/eqtl/qtl-loci-by-gene-ILC2.csv")
+
+loci_gene_expressed_ilc2 <- qtl_loci_by_gene_ILC2 %>% 
+  filter(eQTL_loci_gene %in% vars$index[vars$ilc2_expressed==1]) %>% 
+  pull(loci_id) %>% 
+  n_distinct()
+
+loci_total_ilc2 <- qtl_loci_by_gene_ILC2 %>% 
+  # filter(eQTL_loci_gene %in% vars$index[vars$ilc1_expressed==1]) %>% 
+  pull(loci_id) %>% 
+  n_distinct()
+loci_gene_expressed_ilc2 / loci_total_ilc2
 
 
 
@@ -243,45 +308,78 @@ ilc3eqtlgrl <- makeGRangesListFromDataFrame(ilc3_eqtl_loci_by_gene,
 ## length of all genes in grl
 ilc3_eqtl_list <- lapply(reduce(resize(sort(ilc3eqtlgrl), 500000)), length)
 
-ov_mm10 <- lapply(ilc3eqtlgrl, function(gr) {
-  subsetByOverlaps(mm10, gr)
+
+## count monogenic vs polygenic
+ilc3_polygenic_counts <- lapply(seq_along(ilc3eqtlgrl), function(i) { 
+  sum(GenomicRanges::countOverlaps(reduce(resize(sort(ilc3eqtlgrl), 500000)),
+                                   reduce(resize(sort(ilc3eqtlgrl), 500000))[[i]])>0) 
 })
 
-ilc3_eQTL_eGENE <- lapply(ov_mm10, as.data.frame) %>% 
-  bind_rows(.,.id='eGene') %>%
-  mutate(eGene = paste0("ILC3-", eGene)) %>%
-  dplyr::rename(eQTL_loci_gene = gene_name)
-write.csv(ilc3_eQTL_eGENE, paste0(results_dir, "eqtl/qtl-loci-by-gene-ILC3.csv"))
 
 
+ilc3_polygenic_df <- lapply(seq_along(ilc3eqtlgrl), function(i) { 
+  subsetByOverlaps(reduce(resize(sort(ilc3eqtlgrl), 500000)),
+                   reduce(resize(sort(ilc3eqtlgrl), 500000))[[i]]) %>%
+    as.data.frame() %>%
+    distinct(group_name, .keep_all = TRUE)
+}) %>%
+  bind_rows(.,.id = "loci_id") %>%
+  mutate(loci_id = paste0('loci_', str_pad(loci_id, width=3, side = 'left', pad='0'))) %>%
+  dplyr::rename(eGene = group_name,
+                loci_chr = seqnames,
+                loci_start = start,
+                loci_end = end) %>%
+  dplyr::select(-width) %>%
+  group_by(loci_id) %>%
+  mutate(eGene_count = n_distinct(eGene)) %>%
+  ungroup()
+
+## making GRange List of loci_id to find overlaps
+ilc3_polygenic_dfgrl <- makeGRangesListFromDataFrame(ilc3_polygenic_df,
+                                                     split.field = "loci_id",
+                                                     names.field = "eGene",
+                                                     seqnames = "loci_chr",
+                                                     start.field = "loci_start",
+                                                     end.field = "loci_end",
+                                                     strand = "strand",
+                                                     keep.extra.columns = TRUE)
+
+## creating loci gene annotations
+ilc3_outdf <- sapply(names(ilc3_polygenic_dfgrl), function(i) { 
+  subsetByOverlaps(mm10, ilc3_polygenic_dfgrl[[i]]) %>% 
+    as.data.frame() 
+}, USE.NAMES = TRUE, simplify = FALSE ) %>% 
+  bind_rows(., .id='loci_id') %>%
+  dplyr::select(loci_id,
+                eQTL_loci_gene_chr = seqnames,
+                eQTL_loci_gene_start = start,
+                eQTL_loci_gene_end = end,
+                eQTL_loci_gene = gene_name)
 
 
-# write.csv(ilc3_eqtl_loci_by_gene,"results/eqtl/qtl-loci-by-gene-lods-ILC3.csv")
-# ilc3_eqtl_loci_by_gene %>% 
-#   dplyr::select(gene, gene_chr, gene_start, gene_end, 
-#                 loci, loci_chr = marker_chr, loci_pos = marker_pos, cis_effect) %>%
-#   write.csv("results/eqtl/qtl-loci-by-genes-ILC3.csv")
-# 
-# # Counting number of QTLs per eGene
-# ilc3_eqtl_count <- ilc3_eqtl %>% 
-#   mutate(xpos_floor = floor(xpos)) %>% 
-#   group_by(gene, marker_chr, xpos_floor) %>% 
-#   summarise(lod = max(value)) %>%
-#   group_by(gene) %>%
-#   summarise(qtl_count = sum(lod > lod_cutoff)) %>%
-#   mutate(cell_type ="ILC3",
-#          trait = paste0("ILC3 eQTL: ", gene)) %>%
-#   dplyr::rename(name = gene)
-# 
-# 
-# ilc3_counts <- ilc3_eqtl %>% 
-#   mutate(xpos_floor = floor(xpos)) %>% 
-#   group_by(gene, marker_chr, xpos_floor) %>% 
-#   summarise(lod = max(value)) %>%
-#   mutate(ILC3 = as.numeric(lod > lod_cutoff)) %>% 
-#   unite("loci", gene:xpos_floor) %>% 
-#   dplyr::select(-lod) %>%
-#   filter(ILC3 == 1)
+ilc3_eqtl_loci_by_gene_outdf <- full_join(ilc3_polygenic_df, ilc3_outdf) %>% 
+  dplyr::select(-group) %>%
+  mutate(cell_type = "ILC3")
+write.csv(ilc3_eqtl_loci_by_gene_outdf, paste0(results_dir, "eqtl/qtl-loci-by-gene-ILC3.csv"))
+
+
+ilc3_eqtl_polygeneicdf <- ilc3_eqtl_loci_by_gene_outdf %>%
+  filter(eGene_count > 1)
+write.csv(ilc3_eqtl_polygeneicdf, paste0(results_dir, "eqtl/qtl-loci-by-gene-ILC3_polygenic_only.csv"))
+
+## count loci genes expressed in cell type
+qtl_loci_by_gene_ILC3 <- read_csv("/workspace/fasi-domice/results/eqtl/qtl-loci-by-gene-ILC3.csv")
+
+loci_gene_expressed_ilc3 <- qtl_loci_by_gene_ILC3 %>% 
+  filter(eQTL_loci_gene %in% vars$index[vars$ilc3_expressed==1]) %>% 
+  pull(loci_id) %>% 
+  n_distinct()
+
+loci_total_ilc3 <- qtl_loci_by_gene_ILC3 %>% 
+  # filter(eQTL_loci_gene %in% vars$index[vars$ilc1_expressed==1]) %>% 
+  pull(loci_id) %>% 
+  n_distinct()
+loci_gene_expressed_ilc3 / loci_total_ilc3
 
 
 
@@ -322,35 +420,77 @@ ltieqtlgrl <- makeGRangesListFromDataFrame(lti_eqtl_loci_by_gene,
 lti_eqtl_list <- lapply(reduce(resize(sort(ltieqtlgrl), 500000)), length)
 
 
-ov_mm10 <- lapply(ltieqtlgrl, function(gr) {
-  subsetByOverlaps(mm10, gr)
+## count monogenic vs polygenic
+lti_polygenic_counts <- lapply(seq_along(ltieqtlgrl), function(i) { 
+  sum(GenomicRanges::countOverlaps(reduce(resize(sort(ltieqtlgrl), 500000)),
+                                   reduce(resize(sort(ltieqtlgrl), 500000))[[i]])>0) 
 })
 
-lti_eQTL_eGENE <- lapply(ov_mm10, as.data.frame) %>% 
-  bind_rows(.,.id='eGene') %>%
-  mutate(eGene = paste0("LTi-", eGene)) %>%
-  dplyr::rename(eQTL_loci_gene = gene_name)
-write.csv(lti_eQTL_eGENE, paste0(results_dir, "eqtl/qtl-loci-by-gene-LTi.csv"))
 
 
+lti_polygenic_df <- lapply(seq_along(ltieqtlgrl), function(i) { 
+  subsetByOverlaps(reduce(resize(sort(ltieqtlgrl), 500000)),
+                   reduce(resize(sort(ltieqtlgrl), 500000))[[i]]) %>%
+    as.data.frame() %>%
+    distinct(group_name, .keep_all = TRUE)
+}) %>%
+  bind_rows(.,.id = "loci_id") %>%
+  mutate(loci_id = paste0('loci_', str_pad(loci_id, width=3, side = 'left', pad='0'))) %>%
+  dplyr::rename(eGene = group_name,
+                loci_chr = seqnames,
+                loci_start = start,
+                loci_end = end) %>%
+  dplyr::select(-width) %>%
+  group_by(loci_id) %>%
+  mutate(eGene_count = n_distinct(eGene)) %>%
+  ungroup()
+
+## making GRange List of loci_id to find overlaps
+lti_polygenic_dfgrl <- makeGRangesListFromDataFrame(lti_polygenic_df,
+                                                     split.field = "loci_id",
+                                                     names.field = "eGene",
+                                                     seqnames = "loci_chr",
+                                                     start.field = "loci_start",
+                                                     end.field = "loci_end",
+                                                     strand = "strand",
+                                                     keep.extra.columns = TRUE)
+
+## creating loci gene annotations
+lti_outdf <- sapply(names(lti_polygenic_dfgrl), function(i) { 
+  subsetByOverlaps(mm10, lti_polygenic_dfgrl[[i]]) %>% 
+    as.data.frame() 
+}, USE.NAMES = TRUE, simplify = FALSE ) %>% 
+  bind_rows(., .id='loci_id') %>%
+  dplyr::select(loci_id,
+                eQTL_loci_gene_chr = seqnames,
+                eQTL_loci_gene_start = start,
+                eQTL_loci_gene_end = end,
+                eQTL_loci_gene = gene_name)
 
 
+lti_eqtl_loci_by_gene_outdf <- full_join(lti_polygenic_df, lti_outdf) %>% 
+  dplyr::select(-group) %>%
+  mutate(cell_type = "LTi-like")
+write.csv(lti_eqtl_loci_by_gene_outdf, paste0(results_dir, "eqtl/qtl-loci-by-gene-LTi.csv"))
 
-# bar_plot_df <- list("ILC1" = ilc1_eqtl_loci_by_gene %>% group_by(cis_effect) %>% distinct(loci) %>% count(cis_effect),
-#                     "ILC2" = ilc2_eqtl_loci_by_gene %>% group_by(cis_effect) %>% distinct(loci) %>% count(cis_effect),
-#                     "ILC3" = ilc3_eqtl_loci_by_gene %>% group_by(cis_effect) %>% distinct(loci) %>% count(cis_effect),
-#                     "LTi" = lti_eqtl_loci_by_gene %>% group_by(cis_effect) %>% distinct(loci) %>% count(cis_effect)) %>% 
-#   bind_rows(.id = "cell_type") %>%
-#   mutate(cis_effect = factor(cis_effect, levels = 0:1, labels = c("trans", "cis")))
-# 
-# 
-# 
-# ggplot(bar_plot_df, aes(cell_type, n, group = cis_effect, fill = cis_effect)) + 
-#   geom_bar(stat = "identity", position = "dodge") +
-#   theme_minimal() + 
-#   scale_fill_brewer(palette = "Dark2") +
-#   labs(title = "")
-  
+
+lti_eqtl_polygeneicdf <- lti_eqtl_loci_by_gene_outdf %>%
+  filter(eGene_count > 1)
+write.csv(lti_eqtl_polygeneicdf, paste0(results_dir, "eqtl/qtl-loci-by-gene-LTi_polygenic_only.csv"))
+
+## count loci genes expressed in cell type
+qtl_loci_by_gene_LTi <- read_csv("/workspace/fasi-domice/results/eqtl/qtl-loci-by-gene-LTi.csv")
+
+loci_gene_expressed_lti <- qtl_loci_by_gene_LTi %>% 
+  filter(eQTL_loci_gene %in% vars$index[vars$lti_expressed==1]) %>% 
+  pull(loci_id) %>% 
+  n_distinct()
+
+loci_total_lti <- qtl_loci_by_gene_LTi %>% 
+  # filter(eQTL_loci_gene %in% vars$index[vars$ilc1_expressed==1]) %>% 
+  pull(loci_id) %>% 
+  n_distinct()
+loci_gene_expressed_lti / loci_total_lti
 
 
 ## proportion qtl counts ####
@@ -507,8 +647,7 @@ ilc3_lti_count <- length(reduce(resize(sort(ilc3_ltigr), 1000000)))
 
 
 
-
-
+## within proportion ####
 ilc3_stressed <- fread(paste0(results_dir,"proportions/ILC3_stressed_vs_non_qtl.csv.gz"), 
                        data.table = FALSE) %>% 
   mutate(strand = "+") %>% 
@@ -560,10 +699,93 @@ lti_stressedgr <- makeGRangesFromDataFrame(lti_stressed,
 ## length of all genes in grl
 lti_stressed_count <- length(reduce(resize(sort(lti_stressedgr), 1000000)))
 
+prop_count_list <- list("ILC1_ILC2"=ilc1_ilc2_count, 
+                        "ILC1_ILC3"=ilc1_ilc3_count,
+                        "ILC1_LTi"=ilc1_lti_count,
+                        "ILC2_ILC3"=ilc2_ilc3_count,
+                        "ILC2_LTi"=ilc2_lti_count,
+                        "ILC3_LTi"=ilc3_lti_count,
+                        "ILC3_activated"=ilc3_stressed_count,
+                        "LTi_activated"=lti_stressed_count)
+
+prop_list <- list("ILC1_ILC2"=ilc1_ilc2gr, 
+                  "ILC1_ILC3"=ilc1_ilc3gr,
+                  "ILC1_LTi"=ilc1_ltigr,
+                  "ILC2_ILC3"=ilc2_ilc3gr,
+                  "ILC2_LTi"=ilc2_ltigr,
+                  "ILC3_LTi"=ilc3_ltigr,
+                  "ILC3_activated"=ilc3_stressedgr,
+                  "LTi_activated"=lti_stressedgr)
+
+prop_grl <- as(prop_list, "GRangesList")
+
+
+## length of all genes in grl
+prop_grl_list <- lapply(reduce(resize(sort(prop_grl), 500000)), length)
+
+
+## count monogenic vs polygenic
+prop_polygenic_counts <- lapply(seq_along(prop_grl), function(i) { 
+  sum(GenomicRanges::countOverlaps(reduce(resize(sort(prop_grl), 500000)),
+                                   reduce(resize(sort(prop_grl), 500000))[[i]])>0) 
+})
 
 
 
-## TODO: update beyond this point ####
+prop_polygenic_df <- lapply(seq_along(prop_grl), function(i) { 
+  subsetByOverlaps(reduce(resize(sort(prop_grl), 500000)),
+                   reduce(resize(sort(prop_grl), 500000))[[i]]) %>%
+    as.data.frame() %>%
+    distinct(group_name, .keep_all = TRUE)
+}) %>%
+  bind_rows(.,.id = "loci_id") %>%
+  mutate(loci_id = paste0('loci_', str_pad(loci_id, width=3, side = 'left', pad='0'))) %>%
+  dplyr::rename(proportion = group_name,
+                loci_chr = seqnames,
+                loci_start = start,
+                loci_end = end) %>%
+  dplyr::select(-width) %>%
+  group_by(loci_id) %>%
+  mutate(proportion_count = n_distinct(proportion)) %>%
+  ungroup()
+
+## making GRange List of loci_id to find overlaps
+prop_polygenic_dfgrl <- makeGRangesListFromDataFrame(prop_polygenic_df,
+                                                     split.field = "loci_id",
+                                                     names.field = "proportion",
+                                                     seqnames = "loci_chr",
+                                                     start.field = "loci_start",
+                                                     end.field = "loci_end",
+                                                     strand = "strand",
+                                                     keep.extra.columns = TRUE)
+
+## creating loci gene annotations
+prop_outdf <- sapply(names(prop_polygenic_dfgrl), function(i) { 
+  subsetByOverlaps(mm10, prop_polygenic_dfgrl[[i]]) %>% 
+    as.data.frame() 
+}, USE.NAMES = TRUE, simplify = FALSE ) %>% 
+  bind_rows(., .id='loci_id') %>%
+  dplyr::select(loci_id,
+                propQTL_loci_gene_chr = seqnames,
+                propQTL_loci_gene_start = start,
+                propQTL_loci_gene_end = end,
+                propQTL_loci_gene = gene_name)
+
+
+prop_loci_by_gene_outdf <- full_join(prop_polygenic_df, prop_outdf) %>% 
+  dplyr::select(-group)
+
+
+write.csv(prop_loci_by_gene_outdf, paste0(results_dir, "proportions/qtl-loci-by-gene-proportions.csv"))
+
+
+prop_polygeneicdf <- prop_loci_by_gene_outdf %>%
+  filter(proportion_count > 1)
+write.csv(prop_polygeneicdf, paste0(results_dir, "proportions/qtl-loci-by-gene-proportions_polygenic_only.csv"))
+
+
+
+
 ## topic qtl counts ####
 
 topics <- fread(paste0(results_dir, "topics/qtl-topic-lods.csv.gz"), 
@@ -588,7 +810,78 @@ topicqtlgrl <- makeGRangesListFromDataFrame(topics,
                                             keep.extra.columns = TRUE)
 
 ## length of all genes in grl
-topicqtl_list <- lapply(reduce(resize(sort(topicqtlgrl),10000)), length)
+topicqtl_list <- lapply(reduce(resize(sort(topicqtlgrl),500000)), length)
+
+
+## count monogenic vs polygenic
+topic_polygenic_counts <- lapply(seq_along(topicqtlgrl), function(i) { 
+  sum(GenomicRanges::countOverlaps(reduce(resize(sort(topicqtlgrl), 500000)),
+                                   reduce(resize(sort(topicqtlgrl), 500000))[[i]])>0) 
+})
+
+
+
+topic_polygenic_df <- lapply(seq_along(topicqtlgrl), function(i) { 
+  
+  fovdf <- findOverlaps(reduce(resize(sort(topicqtlgrl), 500000)),
+                        reduce(resize(sort(topicqtlgrl), 500000))[[i]]) %>%
+    as.data.frame()
+  
+  keep_ids <- sort(unique(c(fovdf$queryHits, fovdf$subjectHits)))
+  
+  ovdf <- subsetByOverlaps(reduce(resize(sort(topicqtlgrl), 500000)),
+                           reduce(resize(sort(topicqtlgrl), 500000))[[i]]) %>%
+    as.data.frame()
+  
+  outdf <- ovdf[keep_ids, ] %>% mutate(loci = fovdf$subjectHits)
+  outdf
+  
+}) %>%
+  bind_rows(.,.id = "loci_id") %>%
+  mutate(loci_id = paste0('loci_', str_pad(loci_id, width=3, side = 'left', pad='0'), loci)) %>%
+  dplyr::rename(topic = group_name,
+                loci_chr = seqnames,
+                loci_start = start,
+                loci_end = end) %>%
+  dplyr::select(-width) %>%
+  group_by(loci_id) %>%
+  mutate(topic_count = n_distinct(topic)) %>%
+  ungroup()
+
+## making GRange List of loci_id to find overlaps
+topic_polygenic_dfgrl <- makeGRangesListFromDataFrame(topic_polygenic_df,
+                                                     split.field = "loci_id",
+                                                     names.field = "topic",
+                                                     seqnames = "loci_chr",
+                                                     start.field = "loci_start",
+                                                     end.field = "loci_end",
+                                                     strand = "strand",
+                                                     keep.extra.columns = TRUE)
+
+## creating loci gene annotations
+topic_outdf <- sapply(names(topic_polygenic_dfgrl), function(i) { 
+  subsetByOverlaps(mm10, topic_polygenic_dfgrl[[i]]) %>% 
+    as.data.frame() 
+}, USE.NAMES = TRUE, simplify = FALSE ) %>% 
+  bind_rows(., .id='loci_id') %>%
+  dplyr::select(loci_id,
+                topicQTL_loci_gene_chr = seqnames,
+                topicQTL_loci_gene_start = start,
+                topicQTL_loci_gene_end = end,
+                topicQTL_loci_gene = gene_name)
+
+
+topic_loci_by_gene_outdf <- full_join(topic_polygenic_df, topic_outdf) %>% 
+  dplyr::select(-group)
+
+
+write.csv(topic_loci_by_gene_outdf, paste0(results_dir, "topics/qtl-loci-by-gene-topics.csv"))
+
+
+topic_polygeneicdf <- topic_loci_by_gene_outdf %>%
+  filter(topic_count > 1)
+write.csv(topic_polygeneicdf, paste0(results_dir, "topics/qtl-loci-by-gene-topics_polygenic_only.csv"))
+
 
 
 ## cytokine qtl counts
@@ -604,7 +897,7 @@ cytokines <- fread(paste0(results_dir,"cytokines/qtl-cytokines-steady-lods.csv.g
 
 
 
-cytokinesqtlgrl <- makeGRangesListFromDataFrame(cytokines,
+cytokineqtlgrl <- makeGRangesListFromDataFrame(cytokines,
                                             split.field = "name",
                                             names.field = "marker",
                                             seqnames = "chr",
@@ -615,16 +908,78 @@ cytokinesqtlgrl <- makeGRangesListFromDataFrame(cytokines,
                                             keep.extra.columns = TRUE)
 
 ## length of all genes in grl
-cytokineqtl_list <- lapply(reduce(resize(sort(cytokinesqtlgrl),50000)), length)
+cytokineqtl_list <- lapply(reduce(resize(sort(cytokineqtlgrl), 5000000)), length)
+
+
+## count monogenic vs polygenic
+cytokine_polygenic_counts <- lapply(seq_along(cytokineqtlgrl), function(i) { 
+  sum(GenomicRanges::countOverlaps(reduce(resize(sort(cytokineqtlgrl), 500000)),
+                                   reduce(resize(sort(cytokineqtlgrl), 500000))[[i]])>0) 
+})
 
 
 
+cytokine_polygenic_df <- lapply(seq_along(cytokineqtlgrl), function(i) { 
+  
+  fovdf <- GenomicRanges::findOverlaps(reduce(resize(sort(cytokineqtlgrl), 500000)),
+                        reduce(resize(sort(cytokineqtlgrl), 500000))[[i]]) %>%
+    as.data.frame()
+  
+  keep_ids <- sort(unique(c(fovdf$queryHits, fovdf$subjectHits)))
+  
+  ovdf <- subsetByOverlaps(reduce(resize(sort(cytokineqtlgrl), 500000)),
+                           reduce(resize(sort(cytokineqtlgrl), 500000))[[i]]) %>%
+    as.data.frame()
+  
+  outdf <- ovdf[keep_ids, ] %>% mutate(loci = fovdf$subjectHits)
+  outdf
+  
+}) %>%
+  bind_rows(.,.id = "loci_id") %>%
+  mutate(loci_id = paste0('loci_', str_pad(loci_id, width=3, side = 'left', pad='0'), loci)) %>%
+  # mutate(loci_id = paste0('loci_', str_pad(loci_id, width=3, side = 'left', pad='0'))) %>%
+  dplyr::rename(cytokine = group_name,
+                loci_chr = seqnames,
+                loci_start = start,
+                loci_end = end) %>%
+  dplyr::select(-width) %>%
+  group_by(loci_id) %>%
+  mutate(cytokine_count = n_distinct(cytokine)) %>%
+  ungroup()
 
-# outdf <- bind_rows(list(ilc1_eqtl_count, ilc1_ilc2_count, ilc1_ilc3_count,
-#                         ilc1_lti_count,  ilc2_eqtl_count, ilc2_ilc3_count, 
-#                         ilc2_lti_count, ilc3_eqtl_count,
-#                         ilc3_lti_count, lti_eqtl_count, topics, cytokines))
-# write.csv(outdf, "qtl-counts.csv", row.names = F)
+## making GRange List of loci_id to find overlaps
+cytokine_polygenic_dfgrl <- makeGRangesListFromDataFrame(cytokine_polygenic_df,
+                                                      split.field = "loci_id",
+                                                      names.field = "cytokine",
+                                                      seqnames = "loci_chr",
+                                                      start.field = "loci_start",
+                                                      end.field = "loci_end",
+                                                      strand = "strand",
+                                                      keep.extra.columns = TRUE)
+
+## creating loci gene annotations
+cytokine_outdf <- sapply(names(cytokine_polygenic_dfgrl), function(i) { 
+  subsetByOverlaps(mm10, cytokine_polygenic_dfgrl[[i]]) %>% 
+    as.data.frame() 
+}, USE.NAMES = TRUE, simplify = FALSE ) %>% 
+  bind_rows(., .id='loci_id') %>%
+  dplyr::select(loci_id,
+                cytokineQTL_loci_gene_chr = seqnames,
+                cytokineQTL_loci_gene_start = start,
+                cytokineQTL_loci_gene_end = end,
+                cytokineQTL_loci_gene = gene_name)
+
+
+cytokine_loci_by_gene_outdf <- full_join(cytokine_polygenic_df, cytokine_outdf) %>% 
+  dplyr::select(-group)
+
+
+write.csv(cytokine_loci_by_gene_outdf, paste0(results_dir, "cytokines/qtl-loci-by-gene-cytokines.csv"))
+
+
+cytokine_polygeneicdf <- cytokine_loci_by_gene_outdf %>%
+  filter(cytokine_count > 1)
+write.csv(cytokine_polygeneicdf, paste0(results_dir, "cytokines/qtl-loci-by-gene-cytokines_polygenic_only.csv"))
 
 
 ## Counting ##########

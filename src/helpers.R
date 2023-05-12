@@ -208,8 +208,11 @@ gwas_plot <- function( gwas_data, plot_title, cutoff ) {
     geom_rect(data = rectangles, 
               mapping = aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), 
               fill = 'gray80', alpha = 0.8) +
+    # geom_point(data = gwas_data, 
+    #            mapping = aes(x = xpos, y = lods), shape = 46) +
     geom_point(data = gwas_data, 
-               mapping = aes(x = xpos, y = lods), shape = 46) +
+               mapping = aes(x = xpos, y = lods),
+               color = c("gray", "blue")[(gwas_data$lods > cutoff)+1]) +
     geom_hline(yintercept = cutoff, color = "red", linetype = "dashed") + 
     # geom_label(data = markers_df, 
     #            aes(x = xpos, y = plot_lods, label = marker), 
@@ -359,4 +362,14 @@ plot_founder <- function( df, markers ) {
     geom_tile()
   
 }
+
+
+
+
+#'
+#'
+#'
+#'
+#'
+
 

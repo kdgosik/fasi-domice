@@ -1,0 +1,5110 @@
+---
+title: "Manuscript-figures"
+author: "Kirk Gosik"
+date: "6/26/2020"
+output: html_document
+---
+
+# Manuscript Figures
+
+## Setup
+
+This part is just setup for reading in necessary packages and setting project directories.  It also contains a helper function for reading in zipped files for the genotype datasets.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+library(readxl)
+library(magrittr)
+library(qtl2)
+library(tidyverse)
+library(igraph)
+library(Seurat)
+library(cowplot)
+library(VennDiagram)
+library(RColorBrewer)
+library(Gviz)
+library(QTLRel)
+library(snpStats)
+
+project_path <- "/ahg/regevdata/projects/FASI_DOmice/"
+if( length(dir(project_path)) == 0 ) project_path <- "/Volumes/ahg_regevdata/projects/FASI_DOmice/"
+
+## assigning project paths
+geno_path <- paste0(project_path, "genotype/")
+pheno_path <- paste0(project_path, "phenotype/")
+my_path <- paste0(project_path, "kirk/")
+data_agg_path <- paste0(my_path, "data/aggregate-expression/")
+
+fread_zip <- function(zipfile, skip = 9){
+  
+  # Create a name for the dir where we'll unzip
+  zipdir <- tempfile()
+  
+  # Create the dir using that name
+  dir.create(zipdir)
+  
+  # Unzip the file into the dir
+  unzip(zipfile, exdir = zipdir)
+  
+  # Get a list of files in the dir
+  files <- list.files(zipdir, full.names = TRUE)
+  
+  dat <- fread(files, skip = skip)
+  gc(reset = TRUE)
+  return(dat)
+}
+```
+
+### helpers
+
+More helpers for creating plots.  Uniform color schemes and plotting functions.
+
+```{r my_themes}
+# ## Seurat default colors
+# default.colors <- c(scales::hue_pal()(length(x = levels(x = group.use))))
+#       if (!is.null(x = names(x = group.colors))) {
+#         cols <- unname(obj = group.colors[levels(x = group.use)])
+#       } else {
+#         cols <- group.colors[1:length(x = levels(x = group.use))] %||% default.colors
+#         pal.max <- length(x = col.dups) + through
+#           cols.extra <- hue_pal()(pal.max)[(through + 1):pal.max]
+#           cols[col.dups] <- cols.extra
+          
+          
+
+vega_20_scanpy = c("#1f77b4","#ff7f0e","#2ca02c","#d62728","#9467bd","#8c564b","#e377c2",  
+                   "#bcbd22","#17becf","#aec7e8","#ffbb78","#98df8a","#ff9896","#c5b0d5",
+                   "#c49c94","#f7b6d2","#dbdb8d","#9edae5","#ad494a","#8c6d31")  
+
+zeileis_26 = c("#023fa5","#7d87b9","#bec1d4","#d6bcc0","#bb7784","#8e063b","#4a6fe3",
+               "#8595e1","#b5bbe3","#e6afb9","#e07b91","#d33f6a","#11c638","#8dd593",
+               "#c6dec7","#ead3c6","#f0b98d","#ef9708","#0fcfc0","#9cded6","#d5eae7",
+               "#f3e1eb","#f6c4e1","#f79cd4","#7f7f7f","#c7c7c7","#1CE6FF","#336600")
+
+godsnot_64 = c("#FFFF00","#1CE6FF","#FF34FF","#FF4A46","#008941","#006FA6","#A30059",
+               "#FFDBE5","#7A4900","#0000A6","#63FFAC","#B79762","#004D43","#8FB0FF",
+               "#997D87","#5A0007","#809693","#FEFFE6","#1B4400","#4FC601","#3B5DFF",
+               "#4A3B53","#FF2F80","#61615A","#BA0900","#6B7900","#00C2A0","#FFAA92",
+               "#FF90C9","#B903AA","#D16100","#DDEFFF","#000035","#7B4F4B","#A1C299",
+               "#300018","#0AA6D8","#013349","#00846F","#372101","#FFB500","#C2FFED",
+               "#A079BF","#CC0744","#C0B9B2","#C2FF99","#001E09","#00489C","#6F0062",
+               "#0CBD66","#EEC3FF","#456D75","#B77B68","#7A87A1","#788D66","#885578",
+               "#FAD09F","#FF8A9A","#D157A0","#BEC459","#456648","#0086ED","#886F4C",
+               "#34362D","#B4A8BD","#00A6AA","#452C2C","#636375","#A3C8C9","#FF913F",
+               "#938A81","#575329","#00FECF","#B05B6F","#8CD0FF","#3B9700","#04F757",
+               "#C8A1A1","#1E6E00","#7900D7","#A77500","#6367A9","#A05837","#6B002C",
+               "#772600","#D790FF","#9B9700","#549E79","#FFF69F","#201625","#72418F",
+               "#BC23FF","#99ADC0","#3A2465","#922329","#5B4534","#FDE8DC","#404E55",
+               "#0089A3","#CB7E98","#A4E804","#324E72","#6A3A4C")
+
+my_theme <- theme(
+    axis.line=element_blank(),
+    axis.text.x=element_blank(),
+    axis.text.y=element_blank(),
+    axis.ticks=element_blank(),
+    # axis.title.x=element_blank(),
+    # axis.title.y=element_blank(),
+    # legend.position="none",
+    panel.background=element_blank(),
+    # panel.border=element_blank(),
+    panel.grid.major=element_blank(),
+    panel.grid.minor=element_blank(),
+    plot.background=element_blank()
+    )
+
+my_theme_nolegened <- theme(
+    axis.line=element_blank(),
+    axis.text.x=element_blank(),
+    axis.text.y=element_blank(),
+    axis.ticks=element_blank(),
+    # axis.title.x=element_blank(),
+    # axis.title.y=element_blank(),
+    legend.position="none",
+    panel.background=element_blank(),
+    # panel.border=element_blank(),
+    panel.grid.major=element_blank(),
+    panel.grid.minor=element_blank(),
+    plot.background=element_blank()
+    )
+
+my_blank_theme <- theme(
+    axis.line=element_blank(),
+    axis.text.x=element_blank(),
+    axis.text.y=element_blank(),
+    axis.ticks=element_blank(),
+    axis.title.x=element_blank(),
+    axis.title.y=element_blank(),
+    legend.position="none",
+    panel.background=element_blank(),
+    # panel.border=element_blank(),
+    panel.grid.major=element_blank(),
+    panel.grid.minor=element_blank(),
+    plot.background=element_blank()
+    )
+
+
+my_plot <- function( data, column, embedding = "tsne" ) { 
+    
+    ggplot(data, aes_string(x = paste0("X_", embedding, "1"), 
+                            y = paste0("X_", embedding, "2"), 
+                            color = column)) +
+      geom_point(shape = 46) + 
+      # my_theme_nolegened + 
+      # scale_color_gradient(low="lightgrey", high="darkblue") +
+      scale_color_gradient(low="darkblue", high="lightgreen") +
+      labs(title = tools::toTitleCase(column))
+  
+}
+
+## CHECK PLOT #######
+# plot_quantile <- function( data, variable, group ) {
+#   
+#   AA <- quantile(as.numeric(data[[variable]][df[[group]] == 0]), 50:99 / 100, na.rm = TRUE)
+#   Aa <- quantile(as.numeric(data[[variable]][df[[group]] == 1]), 50:99 / 100, na.rm = TRUE)
+#   aa <- quantile(as.numeric(data[[variable]][df[[group]] == 2]), 50:99 / 100, na.rm = TRUE)
+#   
+#   out <- data.frame(quantile = rep(50:99/100, 3), 
+#                     genotype = c(rep("AA", 50),  rep("Aa", 50), rep("aa", 50)), 
+#                     variable = c(AA, Aa, aa))
+#   
+#   ggplot(out, aes(quantile, variable, color = genotype)) + 
+#     geom_point() + 
+#     geom_line() + 
+#     labs(title = group)
+#   
+# }
+
+my_quantile <- function(x) quantile(x, 50:100/100, na.rm=TRUE)
+
+plot_quantile <- function(data, column, names_to) {
+  data.frame(
+    quantile = 50:100/100,
+    AA = my_quantile(data[data[[names_to]]==0, column]), 
+    Aa = my_quantile(data[data[[names_to]]==1, column]),
+    aa = my_quantile(data[data[[names_to]]==2, column])
+    ) %>% 
+    pivot_longer(AA:aa, names_to = names_to) %>% 
+    ggplot(., aes_string("quantile", "value", color = names_to)) + 
+    geom_point() + 
+    geom_line() +
+    labs(title = column)  + 
+    theme(    
+      panel.background=element_blank(),
+      panel.grid.major=element_blank(),
+      panel.grid.minor=element_blank(),
+      plot.background=element_blank()
+      )
+}
+
+
+
+
+
+## TODO: Update ######
+# # load(marker_file) ## load GM_snps
+# marker_map <- readRDS(paste0(geno_path, "Regev_map_20171221.rds"))
+# marker_map <- readRDS(marker_map_file)
+
+# tf_lods <- tf_lods %>%
+#   left_join({
+#     data.frame(xpos) %>% rownames_to_column(var = "X1")
+#   })
+
+## NEEDS WORK ########
+plot_qtl <- function( qtl_output, marker_map, varcolumn ) {
+  
+  df <- as.data.frame(qtl_output) %>%
+    left_join({
+      data.frame(xpos) %>% tibble::rownames_to_column(var = "marker")
+    })
+  
+  xpos <- qtl2:::map_to_xpos(marker_map, gap = 25)
+  xchrbound <- qtl2:::map_to_boundaries(marker_map, gap = 25)
+  chr_breaks <- apply(xchrbound, 2, median)
+  
+  rectangles <- data.frame(
+    xmin = apply(xchrbound, 2, min),
+    xmax = apply(xchrbound, 2, max),
+    ymin = 0,
+    ymax = max(qtl_output[[varcolumn]])
+    )[seq(2,20,2), ]
+  
+  gwas_plot <- ggplot() + 
+    geom_rect(data = rectangles, 
+              mapping = aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), 
+              fill='gray80', alpha=0.8) +
+    geom_point(data = qtl_output, 
+               mapping = aes_string(x = "xpos", y = varcolumn), shape = 46) +
+    geom_hline(yintercept = 11, color = "red", linetype = "dashed") + 
+    # geom_label(data = markers_df, 
+    #            aes(x = xpos, y = plot_lods, label = marker), 
+    #            size = 2) +
+    # geom_label_repel(data = snp_lables, 
+    #                  aes(label=as.factor(marker), alpha = 0.7), 
+    #                  size = 2, force = 1.3)
+    scale_x_continuous(breaks = chr_breaks, label = c(as.character(1:19), "X")) + 
+    labs(x = "Chromosome of SNP", 
+         y = "P-value(-log10 scale)", 
+         title = varcolumn) +
+    theme(
+      axis.line=element_blank(),
+      axis.ticks=element_blank(),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank()
+      )
+  
+  gwas_plot
+  
+}
+
+
+
+gwas_plot <- function( gwas_data, marker_map, plot_title ) {
+  
+  xpos <- qtl2:::map_to_xpos(marker_map, gap = 25)
+  xchrbound <- qtl2:::map_to_boundaries(marker_map, gap = 25)
+  chr_breaks <- apply(xchrbound, 2, median)
+  
+  rectangles <- data.frame(
+    xmin = apply(xchrbound, 2, min),
+    xmax = apply(xchrbound, 2, max),
+    ymin = 0,
+    ymax = max(gwas_data$lods)
+    )[seq(2,20,2), ]
+  
+  ggplot() + 
+    geom_rect(data = rectangles, 
+              mapping = aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), 
+              fill = 'gray80', alpha = 0.8) +
+    geom_point(data = gwas_data, 
+               mapping = aes(x = xpos, y = lods), shape = 46) +
+    geom_hline(yintercept = 11, color = "red", linetype = "dashed") + 
+    # geom_label(data = markers_df, 
+    #            aes(x = xpos, y = plot_lods, label = marker), 
+    #            size = 2) +
+    # geom_label_repel(data = snp_lables, 
+    #                  aes(label=as.factor(marker), alpha = 0.7), 
+    #                  size = 2, force = 1.3)
+    scale_x_continuous(breaks = chr_breaks, label = c(as.character(1:19), "X")) + 
+    labs(x = "Chromosome of SNP", 
+         y = "P-value(-log10 scale)", 
+         title = plot_title) +
+    theme(
+      axis.line=element_blank(),
+      axis.ticks=element_blank(),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank()
+      )
+  
+}
+
+```
+
+
+
+## Load Data
+
+This chunk loads in the bulk of the data used to create the figures.  It can't all be read in at the same time and would need to be broken up for each of the plots they are needed for.  
+
+```{r load_data}
+obj <- readRDS(paste0(my_path, "data/seurat/allchannels.rds"))
+
+obs <- fread(paste0(my_path, "data/scanpy/allchannels/obs.csv"), data.table = FALSE)
+vars <- fread(paste0(my_path, "data/scanpy/allchannels/vars.csv"), data.table = FALSE)
+obsm <- fread(paste0(my_path, "data/scanpy/allchannels/obsm.csv"), data.table = FALSE)
+obsm <- data.frame(index = obs$index, obsm)
+## rm(obs)
+
+## meta <- fread(paste0(my_path, "data/MetaDataAllChannels.csv"), stringsAsFactors=FALSE)
+
+
+## read SNP consequence dataset
+cat("Reading SNP Consequence file ... \n")
+conseq <- fread(paste0(my_path, "data/reference/GM_SNPS_Consequence.csv"), 
+                data.table = FALSE)
+
+ensembl <- fread(paste0(my_path, "data/reference/ensembl.Mus_musculus.GRCm38.93.csv")) %>%
+  filter(chr %in% c(as.character(1:19), "X")) %>%
+  left_join({
+    fread(paste0(my_path, "data/reference/GeneID.csv"), 
+                 col.names = c("symbol", "gene"), data.table = FALSE)
+  })
+
+
+## Read marker map
+marker_map <- readRDS(paste0(geno_path, "Regev_map_20171221.rds"))
+
+
+## ALREADY RUN ###################
+# ## Promoter-like (PLS) 
+# ## Proximal enhancer-like (pELS)
+# ## Distal enhancer-like (dELS)
+# ## CTCF-only
+# ## DNase-H3K4me3
+# encode <- read_delim(
+#   file = paste0(my_path, "data/mm10-ccREs.bed"),
+#   delim = "\t", 
+#   col_names = c("chromosome", "start", "end", "id1", "id2", "type")) %>%
+#   mutate(chr = str_remove(chromosome, "chr"))
+# 
+# encode_filtered <- lapply(1 : NROW(conseq), function(i) {
+#   cat("index:",i)
+#   encode %>%
+#     filter(chr == conseq$chr[i],
+#            start <= conseq$pos[i],
+#            end >= conseq$pos[i]) %>%
+#     mutate(pos = conseq$pos[i])
+#   
+#   }) %>%
+#   do.call(rbind, .)
+# 
+# encode_conseq <- conseq %>%
+#   left_join(encode_filtered, by = c("chr", "pos"))
+# 
+# write_csv(encode_conseq, "GM_SNPS_Consequence_cCRE.csv")
+ccre <- fread(paste0(my_path, "data/GM_SNPS_Consequence_cCRE.csv"))
+ccre[, recomb_rate := round(cM / (pos / 1e6), 4)]
+
+
+
+# https://www.bioconductor.org/packages/release/bioc/vignettes/snpStats/inst/doc/ld-vignette.pdf
+## Read SNP data
+longfile <- paste0(geno_path, "20180706_batch4_G30_foreQTLandImmune/Broad_Inst_Xu_MURGIGV01_20180706/Broad_Inst_Xu_MURGIGV01_20180706_FinalReport.zip")
+
+final <- fread_zip(longfile)
+
+## getting mice ids to use later
+mice_ids <- unique(final$`Sample ID`)
+
+## intial QC Filter
+final <- final[`GC Score` > 0.5, ]
+## assigning genotype with Reference Allele A
+final[, genotype := as.numeric(`Allele1 - AB` == "A") + as.numeric(`Allele2 - AB` == "A")]
+
+## assigning NA genotype
+# final[`Allele1 - AB` == "-", genotype := NA]
+
+## making genotype dataframe
+cat("Making genotype dataframe ... \n")
+geno <- final[, .SD,.SDcols = c("SNP Name", "Sample ID", "genotype")] %>%
+  # tidyr::spread( `SNP Name`, genotype ) %>%
+  tidyr::pivot_wider(names_from = `SNP Name`, 
+                     values_from = genotype, 
+                     values_fill = list(genotype = 0)) %>%
+  dplyr::rename( SampleID = `Sample ID` ) %>%
+  as.data.frame()
+
+rownames(geno) <- geno[,1]
+
+## https://bioconductor.org/packages/release/bioc/vignettes/snpStats/inst/doc/data-input-vignette.pdf
+# gdata <- read.long(allelesfile,
+#                    fields=c(snp=1, sample=2, allele.A=3, allele.B=4, confidence=5),
+#                    threshold=0.95)
+# gdata
+# Create a name for the dir where we'll unzip
+zipdir <- tempfile()
+# Create the dir using that name
+dir.create(zipdir)
+# Unzip the file into the dir
+unzip(longfile, exdir = zipdir)
+
+writeLines(text = readLines(list.files(zipdir, full.names = TRUE))[-c(1:10)],
+           con = paste0(geno_path, "20180706-final-report.txt"))
+# cat(readLines(paste0(geno_path, "20180706-final-report.txt")))
+
+gdata <- read.long(paste0(geno_path, "20180706-final-report.txt"),
+                   fields = c(snp=1, sample=2, allele.A=3, allele.B=4))
+```
+
+
+### Creating Plotting Data
+
+Combining a lot of the loaded data above and parsing down to the necessary features for the majority of the plots.  Saving that into a dataframe that can be quickly accessed when needed. 
+
+```{r create_plot_data}
+## ALREADY RUN #####################
+# keep_cols <- c("index", "Channel", "louvain_labels", "nUMI", "percent_mito", "LogProb",
+#                "PValue", "Limited", "FDR", "doublet", "S.Score", "G2M.Score", "Phase",
+#                "BIOCARTA_GATA3_PATHWAY", "BIOCARTA_HIF_PATHWAY",
+#                "BIOCARTA_TCAPOPTOSIS_PATHWAY", "BIOCARTA_P53HYPOXIA_PATHWAY",
+#                "BIOCARTA_IL17_PATHWAY", "BIOCARTA_IL3_PATHWAY", "BIOCARTA_IL5_PATHWAY",
+#                "BIOCARTA_IL6_PATHWAY", "BIOCARTA_IL22BP_PATHWAY", "BIOCARTA_IL7_PATHWAY",
+#                "BIOCARTA_TCRA_PATHWAY", "BIOCARTA_NO2IL12_PATHWAY",
+#                "BIOCARTA_NKCELLS_PATHWAY", "BIOCARTA_TH1TH2_PATHWAY",
+#                "BIOCARTA_TNFR2_PATHWAY", "PRB.DBL", "BestCall", "scrublet", "Ambient",
+#                "called_cell_types", "DTT_used", "dissociation_genes",
+#                "louvain_8_subclusters", "called_cell_types_new",
+#                paste0("topic", 0:19), "filtered_set")
+# 
+# mhc2_genes <- grep("^H2",obj@assays$RNA@data@Dimnames[[1]], value = TRUE)
+# ccr_ccl_genes <- grep("Ccr|Cxc|Ccl",obj@assays$RNA@data@Dimnames[[1]], value = TRUE)
+# 
+# plot_df <- data.frame(index = obj@assays$RNA@data@Dimnames[[2]],
+#                  Ntm = obj@assays$RNA@data["Ntm", ],
+#                  Il4 = obj@assays$RNA@data["Il4", ],
+#                  Il5 = obj@assays$RNA@data["Il5", ],
+#                  Il6 = obj@assays$RNA@data['Il6', ],
+#                  Il13 = obj@assays$RNA@data["Il13", ],
+#                  Il22 = obj@assays$RNA@data["Il22", ],
+#                  Il25 = obj@assays$RNA@data["Il25", ],
+#                  Il33 = obj@assays$RNA@data["Il33", ],
+#                  Cd4 = obj@assays$RNA@data["Cd4", ],
+#                  Cd6 = obj@assays$RNA@data["Cd6", ],
+#                  Tpm2 = obj@assays$RNA@data["Tpm2", ],
+#                  Gda = obj@assays$RNA@data["Gda", ],
+#                  Stim2 = obj@assays$RNA@data["Stim2", ],
+#                  Il17a = obj@assays$RNA@data["Il17a", ],
+#                  Il18r1 = obj@assays$RNA@data["Il18r1", ],
+#                  Il18rap = obj@assays$RNA@data["Il18rap", ],
+#                  Zfp36 = obj@assays$RNA@data["Zfp36", ],
+#                  Gata3 = obj@assays$RNA@data["Gata3", ],  ## topic11
+#                  Calca = obj@assays$RNA@data["Calca", ], ## topic11
+#                  Rora = obj@assays$RNA@data["Rora", ],
+#                  Tnf = obj@assays$RNA@data["Tnf", ],
+#                  Ifng = obj@assays$RNA@data["Ifng", ],
+#                  Klrg1 = obj@assays$RNA@data["Klrg1", ],
+#                  Nk1.1 = obj@assays$RNA@data["Klrb1c", ], ## topic0
+#                  Ptpn1 = obj@assays$RNA@data["Ptpn1", ], ## topic0
+#                  Arhgdib = obj@assays$RNA@data["Arhgdib", ],
+#                  Cacna1e = obj@assays$RNA@data["Cacna1e", ],
+#                  Rbpj = obj@assays$RNA@data["Rbpj", ],
+#                  Nlrp12 = obj@assays$RNA@data["Nlrp12", ],
+#                  Slc39a10 = obj@assays$RNA@data["Slc39a10", ],  ## topic8
+#                  Slc39a11 = obj@assays$RNA@data["Slc39a11", ],  ## topic8
+#                  Sox9 = obj@assays$RNA@data["Sox9", ],  ## topic8
+#                  Sstr2 = obj@assays$RNA@data["Sstr2", ], ## topic8
+#                  # Sstr4 = obj@assays$RNA@data["Sstr4", ],
+#                  Thbd = obj@assays$RNA@data["Thbd", ],
+#                  Cd93 = obj@assays$RNA@data["Cd93", ],
+#                  Aftph = obj@assays$RNA@data["Aftph", ],  ## topic 4 gene?
+#                  Socs2 = obj@assays$RNA@data["Socs2", ],
+#                  Plxna4 = obj@assays$RNA@data["Plxna4", ],
+#                  Cers6 = obj@assays$RNA@data["Cers6", ],
+#                  Cradd= obj@assays$RNA@data["Cradd", ],
+#                  Ncr1 = obj@assays$RNA@data["Ncr1", ],
+#                  Bcl6 = obj@assays$RNA@data["Bcl6", ],
+#                  Rorc = obj@assays$RNA@data["Rorc", ],
+#                  Tbet = obj@assays$RNA@data["Tbx21", ],
+#                  Ox40l = obj@assays$RNA@data["Tnfsf4", ], # MGI:104511
+#                  Id2 = obj@assays$RNA@data["Id2", ],
+#                  Nfil3 = obj@assays$RNA@data["Nfil3", ],
+#                  Plzf = obj@assays$RNA@data["Zbtb16", ],   ## Zbtb16
+#                  Tcf1 = obj@assays$RNA@data["Tcf7", ], ## Tcf7
+#                  Tox = obj@assays$RNA@data["Tox", ],
+#                  Bcl11b = obj@assays$RNA@data["Bcl11b", ],
+#                  Eomes = obj@assays$RNA@data["Eomes", ],  ## tf gene
+#                  Crth2 = obj@assays$RNA@data["Ptgdr2", ],  ## tf gene
+#                  Areg = obj@assays$RNA@data["Areg", ],  ## tf gene
+#                  Ckit = obj@assays$RNA@data["Kit", ],  ## tf gene
+#                  Cnn2 = obj@assays$RNA@data["Cnn2", ],  ## eQTL gene ILC1
+#                  Hopx = obj@assays$RNA@data["Hopx", ],  ## cis-eQTL gene ILC1
+#                  Ppp1r2 = obj@assays$RNA@data["Ppp1r2", ],  ## cis-eQTL gene ILC1
+#                  Abcb1b = obj@assays$RNA@data["Abcb1b", ],  ## cis-eQTL gene ILC2
+#                  Pdcd5 = obj@assays$RNA@data["Pdcd5", ],  ## cis-eQTL gene ILC2
+#                  Sptssa = obj@assays$RNA@data["Sptssa", ],  ## cis-eQTL gene ILC2
+#                  Hmha1 = obj@assays$RNA@data["Hmha1", ],  ## cis-eQTL gene ILC3
+#                  Lgals3 = obj@assays$RNA@data["Lgals3", ],  ## cis-eQTL gene ILC3
+#                  Necap2 = obj@assays$RNA@data["Necap2", ],  ## cis-eQTL gene LTi-like
+#                  Tmem132c = obj@assays$RNA@data["Tmem132c", ],  ## ILC Proportions
+#                  Lgr6 = obj@assays$RNA@data["Lgr6", ],  ## ILC Proportions
+#                  Rrbp1 = obj@assays$RNA@data["Rrbp1", ],  ## ILC Proportions
+#                  Il20ra = obj@assays$RNA@data["Il20ra", ],  ## ILC Proportions
+#                  Fam21 = obj@assays$RNA@data["Fam21", ],   ## ILC Proportions
+#                  Banf2 = obj@assays$RNA@data["Banf2", ],  ## ILC Proportions
+#                  Pgm1 = obj@assays$RNA@data["Pgm1", ],  ## ILC Proportions
+#                  Atp6ap1l = obj@assays$RNA@data["Atp6ap1l", ],  ## IgE QTL genes
+#                  Atg10 = obj@assays$RNA@data["Atg10", ],  ## IgE QTL genes
+#                  Acot12 = obj@assays$RNA@data["Acot12", ],  ## IgE QTL genes
+#                  Ssbp2 = obj@assays$RNA@data["Ssbp2", ],  ## IgE QTL genes
+#                  Zcchc9 = obj@assays$RNA@data["Zcchc9", ],  ## IgE QTL genes
+#                  Rasgrf2= obj@assays$RNA@data["Rasgrf2", ],  ## IgE QTL genes
+#                  Myh9 = obj@assays$RNA@data["Myh9", ], ## ILC2 eGene IgE QTL
+#                  Borcs8 = obj@assays$RNA@data["Borcs8", ], ## ILC2 eGene IgE QTL
+#                  Fis1 = obj@assays$RNA@data["Fis1", ], ## ILC2 eGene IgE QTL
+#                  Nfkb1 = obj@assays$RNA@data["Nfkb1", ], ## ILC2 eGene IgE QTL
+#                  Ahr = obj@assays$RNA@data["Ahr", ], ## Ahr with Ccr6, IL-22, topic3?
+#                  Vip = obj@assays$RNA@data["Vip", ], ## ILC2 signal
+#                  stringsAsFactors = FALSE) %>%
+#   ## left_join(meta[, .SD, .SDcols = keep_cols]) %>%
+#   left_join(obs[, keep_cols]) %>%
+#   left_join(obsm[,c("index", "X_tsne1", "X_tsne2", "X_umap1", "X_umap2",
+#                     "X_diffmap1", "X_diffmap2", "X_diffmap_pca1", "X_diffmap_pca2",
+#                     "X_diffmap_sym1", "X_diffmap_sym2", "X_net_fle1", "X_net_fle2",
+#                     "X_net_fle_pred1", "X_net_fle_pred2")]) %>%
+#   mutate(louvain_labels = factor(louvain_labels),
+#          Channel = factor(Channel),
+#          activated = ifelse(louvain_labels %in% 4:5, 2, 1),
+#          log_umi = log(nUMI)) %>%
+#   left_join(data.frame(index = obj@assays$RNA@data@Dimnames[[2]],   ## mhcII genes
+#                        t(as.matrix(obj@assays$RNA@data[mhc2_genes,])))) %>%
+#   left_join(data.frame(index = obj@assays$RNA@data@Dimnames[[2]],   ## ccr_ccl genes
+#                        t(as.matrix(obj@assays$RNA@data[ccr_ccl_genes,]))))
+# 
+# write_csv(plot_df, paste0(my_path, "data/manuscript-plot-data.csv"))
+## plot_df <- read_csv(paste0(my_path, "data/manuscript-plot-data.csv"))
+plot_df <- fread(paste0(my_path, "data/manuscript-plot-data.csv"), data.table = FALSE)
+```
+
+
+## Munging Data
+
+Scripts needed to create the data used. 
+  - run-uger-eqtl.R
+    - results/qtl-plot-lods-ILC1-mean.csv
+    - results/qtl-plot-lods-ILC1-cv.csv
+    - results/qtl-plot-lods-ILC2-mean.csv
+    - results/qtl-plot-lods-ILC2-cv.csv
+    - results/qtl-plot-lods-NCR1+ ILC3-mean.csv
+    - results/qtl-plot-lods-NCR1+ ILC3-cv.csv
+    - results/qtl-plot-lods-Lti ILC3-mean.csv
+    - results/qtl-plot-lods-Lti ILC3-cv.csv
+
+```{r ilc1_genes_eqtls}
+## ILC1
+ilc1_obj <- subset(x = obj, subset = called_cell_types == "ILC1" & filtered_set == 1)
+
+## keep columns with at least 10% expression
+ilc1_expressed <- names(which(Matrix::rowMeans(x = ilc1_obj@assays$RNA@data > 0) > 0.1))
+rm(ilc1_obj)
+
+## ILC1 eQTL Mean
+ilc1_mean <- fread(paste0(my_path, "results/qtl-plot-lods-ILC1-mean.csv")) %>%
+  dplyr::left_join({ 
+    conseq %>% dplyr::select(marker, marker_pos = pos, ensembl_gene, conseq_clean) }) %>%
+  dplyr::left_join({ 
+    ensembl %>% dplyr::select(id = gene, gene_start = start, gene_end = end) }) %>%
+  dplyr::mutate(cis_effect = as.numeric(marker_chr == gene_chr & 
+                                   {marker_pos > (gene_start - 1e6) & 
+                                       marker_pos < (gene_end + 1e6)})) %>%
+  dplyr::mutate(value_adj = ifelse(cis_effect==1, value + 6, value), cell_type = "ILC1") %>%
+  dplyr::filter(value_adj > 10)
+
+## ILC1 eQTL CV
+ilc1_cv <- fread(paste0(my_path, "results/qtl-plot-lods-ILC1-cv.csv")) %>%
+  dplyr::left_join({ 
+    conseq %>% dplyr::select(marker, marker_pos = pos, ensembl_gene, conseq_clean) }) %>%
+  dplyr::left_join({ 
+    ensembl %>% dplyr::select(id = gene, gene_start = start, gene_end = end) }) %>%
+  dplyr::mutate(cis_effect = as.numeric(marker_chr == gene_chr & 
+                                   {marker_pos > (gene_start - 1e6) & 
+                                       marker_pos < (gene_end + 1e6)})) %>%
+  dplyr::mutate(value_adj = ifelse(cis_effect==1, value + 6, value), cell_type = "ILC1") %>%
+  dplyr::filter(value_adj > 10)
+```
+
+
+```{r ilc2_genes_eqtls}
+## ILC2
+ilc2_obj <- subset(x = obj, subset = called_cell_types == "ILC2" & filtered_set == 1)
+  
+## keep columns with at least 10% expression
+ilc2_expressed <- names(which(Matrix::rowMeans(x = ilc2_obj@assays$RNA@data > 0) > 0.1))
+rm(ilc2_obj)
+
+## ILC2 eQTL Mean
+ilc2_mean <- fread(paste0(my_path, "results/qtl-plot-lods-ILC2-mean.csv")) %>%
+  dplyr::left_join({ 
+    conseq %>% dplyr::select(marker, marker_pos = pos, ensembl_gene, conseq_clean) }) %>%
+  dplyr::left_join({ 
+    ensembl %>% dplyr::select(id = gene, gene_start = start, gene_end = end) }) %>%
+  dplyr::mutate(cis_effect = as.numeric(marker_chr == gene_chr & 
+                                   {marker_pos > (gene_start - 1e6) & 
+                                       marker_pos < (gene_end + 1e6)})) %>%
+  dplyr::mutate(value_adj = ifelse(cis_effect==1, value + 6, value), cell_type = "ILC2") %>%
+  dplyr::filter(value_adj > 10)
+
+
+## ILC2 eQTL CV
+ilc2_cv <- fread(paste0(my_path, "results/qtl-plot-lods-ILC2-cv.csv")) %>%
+  dplyr::left_join({ 
+    conseq %>% dplyr::select(marker, marker_pos = pos, ensembl_gene, conseq_clean) }) %>%
+  dplyr::left_join({ 
+    ensembl %>% dplyr::select(id = gene, gene_start = start, gene_end = end) }) %>%
+  dplyr::mutate(cis_effect = as.numeric(marker_chr == gene_chr & 
+                                   {marker_pos > (gene_start - 1e6) & 
+                                       marker_pos < (gene_end + 1e6)})) %>%
+  dplyr::mutate(value_adj = ifelse(cis_effect==1, value + 6, value), cell_type = "ILC2") %>%
+  dplyr::filter(value_adj > 10)
+```
+
+
+```{r ilc3_genes_eqtls}
+## NCR1+ ILC3
+ilc3_obj <- subset(x = obj, subset = called_cell_types == "NCR1+ ILC3" & filtered_set == 1)
+  
+## keep columns with at least 10% expression
+ilc3_expressed <- names(which(Matrix::rowMeans(x = ilc3_obj@assays$RNA@data > 0) > 0.1))
+rm(ilc3_obj)
+
+
+
+## ILC3 eQTL Mean
+ilc3_mean <- fread(paste0(my_path, "results/qtl-plot-lods-NCR1+ ILC3-mean.csv")) %>%
+  dplyr::left_join({ 
+    conseq %>% dplyr::select(marker, marker_pos = pos, ensembl_gene, conseq_clean) }) %>%
+  dplyr::left_join({ 
+    ensembl %>% dplyr::select(id = gene, gene_start = start, gene_end = end) }) %>%
+  dplyr::mutate(cis_effect = as.numeric(marker_chr == gene_chr & 
+                                   {marker_pos > (gene_start - 1e6) & 
+                                       marker_pos < (gene_end + 1e6)})) %>%
+  dplyr::mutate(value_adj = ifelse(cis_effect==1, value + 6, value), cell_type = "ILC3") %>%
+  dplyr::filter(value_adj > 10)
+
+
+
+## ILC3 eQTL CV
+ilc3_cv <- fread(paste0(my_path, "results/qtl-plot-lods-NCR1+ ILC3-cv.csv")) %>%
+  dplyr::left_join({ 
+    conseq %>% dplyr::select(marker, marker_pos = pos, ensembl_gene, conseq_clean) }) %>%
+  dplyr::left_join({ 
+    ensembl %>% dplyr::select(id = gene, gene_start = start, gene_end = end) }) %>%
+  dplyr::mutate(cis_effect = as.numeric(marker_chr == gene_chr & 
+                                   {marker_pos > (gene_start - 1e6) & 
+                                       marker_pos < (gene_end + 1e6)})) %>%
+  dplyr::mutate(value_adj = ifelse(cis_effect==1, value + 6, value), cell_type = "ILC3") %>%
+  dplyr::filter(value_adj > 10)
+```
+
+
+
+```{r lti_genes_eqtls}
+## Lti ILC3
+lti_obj <- subset(x = obj, subset = called_cell_types == 'Lti ILC3' & filtered_set == 1)
+  
+## keep columns with at least 10% expression
+lti_expressed <- names(which(Matrix::rowMeans(x = lti_obj@assays$RNA@data > 0) > 0.1))
+rm(lti_obj)
+
+
+## LTi eQTL Mean
+lti_mean <- fread(paste0(my_path, "results/qtl-plot-lods-Lti ILC3-mean.csv")) %>%
+  dplyr::left_join({ 
+    conseq %>% dplyr::select(marker, marker_pos = pos, ensembl_gene, conseq_clean) }) %>%
+  dplyr::left_join({ 
+    ensembl %>% dplyr::select(id = gene, gene_start = start, gene_end = end) }) %>%
+  dplyr::mutate(cis_effect = as.numeric(marker_chr == gene_chr & 
+                                   {marker_pos > (gene_start - 1e6) & 
+                                       marker_pos < (gene_end + 1e6)})) %>%
+  dplyr::mutate(value_adj = ifelse(cis_effect==1, value + 6, value), cell_type = "LTi") %>%
+  dplyr::filter(value_adj > 10)
+
+
+## LTi eQTL CV
+lti_cv <- fread(paste0(my_path, "results/qtl-plot-lods-Lti ILC3-cv.csv")) %>%
+  dplyr::left_join({ 
+    conseq %>% dplyr::select(marker, marker_pos = pos, ensembl_gene, conseq_clean) }) %>%
+  dplyr::left_join({ 
+    ensembl %>% dplyr::select(id = gene, gene_start = start, gene_end = end) }) %>%
+  dplyr::mutate(cis_effect = as.numeric(marker_chr == gene_chr & 
+                                   {marker_pos > (gene_start - 1e6) & 
+                                       marker_pos < (gene_end + 1e6)})) %>%
+  dplyr::mutate(value_adj = ifelse(cis_effect==1, value + 6, value), cell_type = "LTi") %>%
+  dplyr::filter(value_adj > 10)
+
+
+rm(obj)
+```
+
+
+```{r}
+ilc1_bygene <- group_by(gene, marker_chr)
+```
+
+
+
+
+### Make Gene Table
+
+Make a csv file containing all the genes in the dataset.  Adding this to the scanpy output vars.csv.  Have a column that indicates whether that gene is 
+
+  - expressed each specific cell type (used as phenotype in eQTL analysis)
+  - Has SNPs in the Giga MUGA array
+  - Was an eGene for each specific cell type
+  - had a eQTL for each specific cell type
+  - Was differentially expressed in each cell type / Marker gene identified for cell type
+  - QTL loci genes for each topic
+  - topic genes
+  - antibodyQTL loci genes
+  - cytokine QTL loci genes
+  - cell proportion composition QTL loci genes
+  
+```{r gene_table, eval = FALSE}
+## starting with all ensembl genes
+gene_table <- ensembl
+
+# ## identifyig which are in the 10x dataset
+# gene_table$in_10x <- 0
+# gene_table$in_10x[gene_table$symbol %in% obj@assays$RNA@data@Dimnames[[1]]] <- 1
+
+## Giga MUGA Array Genes with SNPs ######
+gene_table$in_gigamuga <- 0
+gene_table$in_gigamuga[gene_table$gene %in% conseq$ensembl_gene] <- 1
+
+
+## eQTL Genes #######
+
+## ILC1 expressed at 10% of the cell type
+gene_table$ilc1_expressed <- 0
+gene_table$ilc1_expressed[gene_table$symbol %in% names(ilc1_expressed)] <- 1
+
+## Mean #######
+## ILC1 eGenes
+gene_table$ilc1_egenes_mean <- 0
+gene_table$ilc1_egenes_mean[gene_table$symbol %in% unique(ilc1$gene)] <- 1
+
+## ILC1 eQTL Loci genes
+gene_table$ilc1_eqtl_loci_genes_mean <- 0
+gene_table$ilc1_eqtl_loci_genes_mean[gene_table$gene %in% unique(ilc1$ensembl_gene)] <- 1
+
+## ILC1 eQTL cis-effect associations
+gene_table$ilc1_ciseqtl_assoc_mean <- 0
+gene_table$ilc1_ciseqtl_assoc_mean[gene_table$symbol %in% unique(ilc1$gene[ilc1$cis_effect==1])] <- 1
+
+## CV #####
+## ILC1 eGenes
+gene_table$ilc1_egenes_cv <- 0
+gene_table$ilc1_egenes_cv[gene_table$symbol %in% unique(ilc1$gene)] <- 1
+
+## ILC1 eQTL Loci genes
+gene_table$ilc1_eqtl_loci_genes_cv <- 0
+gene_table$ilc1_eqtl_loci_genes_cv[gene_table$gene %in% unique(ilc1$ensembl_gene)] <- 1
+
+## ILC1 eQTL cis-effect associations
+gene_table$ilc1_ciseqtl_assoc_cv <- 0
+gene_table$ilc1_ciseqtl_assoc_cv[gene_table$symbol %in% unique(ilc1$gene[ilc1$cis_effect==1])] <- 1
+
+
+## ILC2 expressed at 10% of the cell type
+gene_table$ilc2_expressed <- 0
+gene_table$ilc2_expressed[gene_table$symbol %in% names(ilc2_expressed)] <- 1
+
+## Mean #######
+## ILC2 eGenes
+gene_table$ilc2_egenes_mean <- 0
+gene_table$ilc2_egenes_mean[gene_table$symbol %in% unique(ilc2$gene)] <- 1
+
+## ILC2 eQTL Loci genes
+gene_table$ilc2_eqtl_loci_genes_mean <- 0
+gene_table$ilc2_eqtl_loci_genes_mean[gene_table$gene %in% unique(ilc2$ensembl_gene)] <- 1
+
+## ILC2 eQTL cis-effect associations
+gene_table$ilc2_ciseqtl_assoc_mean <- 0
+gene_table$ilc2_ciseqtl_assoc_mean[gene_table$symbol %in% unique(ilc2$gene[ilc2$cis_effect==1])] <- 1
+
+## CV #####
+## ILC2 eGenes
+gene_table$ilc2_egenes_cv <- 0
+gene_table$ilc2_egenes_cv[gene_table$symbol %in% unique(ilc2$gene)] <- 1
+
+## ILC2 eQTL Loci genes
+gene_table$ilc2_eqtl_loci_genes_cv <- 0
+gene_table$ilc2_eqtl_loci_genes_cv[gene_table$gene %in% unique(ilc2$ensembl_gene)] <- 1
+
+## ILC2 eQTL cis-effect associations
+gene_table$ilc2_ciseqtl_assoc_cv <- 0
+gene_table$ilc2_ciseqtl_assoc_cv[gene_table$symbol %in% unique(ilc2$gene[ilc2$cis_effect==1])] <- 1
+
+
+## ILC3 expressed at 10% of the cell type
+gene_table$ilc3_expressed <- 0
+gene_table$ilc3_expressed[gene_table$symbol %in% names(ilc3_expressed)] <- 1
+
+## Mean #######
+## ILC3 eGenes
+gene_table$ilc3_egenes_mean <- 0
+gene_table$ilc3_egenes_mean[gene_table$symbol %in% unique(ilc3$gene)] <- 1
+
+## ILC3 eQTL Loci genes
+gene_table$ilc3_eqtl_loci_genes_mean <- 0
+gene_table$ilc3_eqtl_loci_genes_mean[gene_table$gene %in% unique(ilc3$ensembl_gene)] <- 1
+
+## ILC3 eQTL cis-effect associations
+gene_table$ilc3_ciseqtl_assoc_mean <- 0
+gene_table$ilc3_ciseqtl_assoc_mean[gene_table$symbol %in% unique(ilc3$gene[ilc3$cis_effect==1])] <- 1
+
+## CV #####
+## ILC3 eGenes
+gene_table$ilc3_egenes_cv <- 0
+gene_table$ilc3_egenes_cv[gene_table$symbol %in% unique(ilc3$gene)] <- 1
+
+## ILC3 eQTL Loci genes
+gene_table$ilc3_eqtl_loci_genes_cv <- 0
+gene_table$ilc3_eqtl_loci_genes_cv[gene_table$gene %in% unique(ilc3$ensembl_gene)] <- 1
+
+## ILC3 eQTL cis-effect associations
+gene_table$ilc3_ciseqtl_assoc_cv <- 0
+gene_table$ilc3_ciseqtl_assoc_cv[gene_table$symbol %in% unique(ilc3$gene[ilc3$cis_effect==1])] <- 1
+
+
+
+## LTi expressed at 10% of the cell type
+gene_table$lti_expressed <- 0
+gene_table$lti_expressed[gene_table$symbol %in% names(lti_expressed)] <- 1
+
+## Mean #######
+## LTi eGenes
+gene_table$lti_egenes_mean <- 0
+gene_table$lti_egenes_mean[gene_table$symbol %in% unique(lti$gene)] <- 1
+
+## LTi eQTL Loci genes
+gene_table$lti_eqtl_loci_genes_mean <- 0
+gene_table$lti_eqtl_loci_genes_mean[gene_table$gene %in% unique(lti$ensembl_gene)] <- 1
+
+## LTi eQTL cis-effect associations
+gene_table$lti_ciseqtl_assoc_mean <- 0
+gene_table$lti_ciseqtl_assoc_mean[gene_table$symbol %in% unique(lti$gene[lti$cis_effect==1])] <- 1
+
+## CV #####
+## LTi eGenes
+gene_table$lti_egenes_cv <- 0
+gene_table$lti_egenes_cv[gene_table$symbol %in% unique(lti$gene)] <- 1
+
+## LTi eQTL Loci genes
+gene_table$lti_eqtl_loci_genes_cv <- 0
+gene_table$lti_eqtl_loci_genes_cv[gene_table$gene %in% unique(lti$ensembl_gene)] <- 1
+
+## LTi eQTL cis-effect associations
+gene_table$lti_ciseqtl_assoc_cv <- 0
+gene_table$lti_ciseqtl_assoc_cv[gene_table$symbol %in% unique(lti$gene[lti$cis_effect==1])] <- 1 
+
+
+
+## Topic Genes ######
+
+topic_genes <- fread(paste0(my_path, "results/allchannels/gensim/outputs/allchannels-20-topics-top-genes.csv"))
+
+topic0_genes <- topic_genes$Gene[topic_genes$Topic == 0]
+vars$topic0_genes <- 0
+vars$topic0_genes[vars$index %in% topic0_genes] <- 1
+
+topic1_genes <- topic_genes$Gene[topic_genes$Topic == 1]
+vars$topic1_genes <- 0
+vars$topic1_genes[vars$index %in% topic1_genes] <- 1
+
+topic2_genes <- topic_genes$Gene[topic_genes$Topic == 2]
+vars$topic2_genes <- 0
+vars$topic2_genes[vars$index %in% topic2_genes] <- 1
+
+topic3_genes <- topic_genes$Gene[topic_genes$Topic == 3]
+vars$topic3_genes <- 0
+vars$topic3_genes[vars$index %in% topic3_genes] <- 1
+
+topic4_genes <- topic_genes$Gene[topic_genes$Topic == 4]
+vars$topic4_genes <- 0
+vars$topic4_genes[vars$index %in% topic4_genes] <- 1
+
+topic5_genes <- topic_genes$Gene[topic_genes$Topic == 5]
+vars$topic5_genes <- 0
+vars$topic5_genes[vars$index %in% topic5_genes] <- 1
+
+topic6_genes <- topic_genes$Gene[topic_genes$Topic == 6]
+vars$topic6_genes <- 0
+vars$topic6_genes[vars$index %in% topic6_genes] <- 1
+
+topic7_genes <- topic_genes$Gene[topic_genes$Topic == 7]
+vars$topic7_genes <- 0
+vars$topic7_genes[vars$index %in% topic7_genes] <- 1
+
+topic8_genes <- topic_genes$Gene[topic_genes$Topic == 8]
+vars$topic8_genes <- 0
+vars$topic8_genes[vars$index %in% topic8_genes] <- 1
+
+topic9_genes <- topic_genes$Gene[topic_genes$Topic == 9]
+vars$topic9_genes <- 0
+vars$topic9_genes[vars$index %in% topic9_genes] <- 1
+
+topic10_genes <- topic_genes$Gene[topic_genes$Topic == 10]
+vars$topic10_genes <- 0
+vars$topic10_genes[vars$index %in% topic10_genes] <- 1
+
+topic11_genes <- topic_genes$Gene[topic_genes$Topic == 11]
+vars$topic11_genes <- 0
+vars$topic11_genes[vars$index %in% topic11_genes] <- 1
+
+topic12_genes <- topic_genes$Gene[topic_genes$Topic == 12]
+vars$topic12_genes <- 0
+vars$topic12_genes[vars$index %in% topic12_genes] <- 1
+
+topic13_genes <- topic_genes$Gene[topic_genes$Topic == 13]
+vars$topic13_genes <- 0
+vars$topic13_genes[vars$index %in% topic13_genes] <- 1
+
+topic14_genes <- topic_genes$Gene[topic_genes$Topic == 14]
+vars$topic14_genes <- 0
+vars$topic14_genes[vars$index %in% topic14_genes] <- 1
+
+topic15_genes <- topic_genes$Gene[topic_genes$Topic == 15]
+vars$topic15_genes <- 0
+vars$topic15_genes[vars$index %in% topic15_genes] <- 1
+
+topic16_genes <- topic_genes$Gene[topic_genes$Topic == 16]
+vars$topic16_genes <- 0
+vars$topic16_genes[vars$index %in% topic16_genes] <- 1
+
+topic17_genes <- topic_genes$Gene[topic_genes$Topic == 17]
+vars$topic17_genes <- 0
+vars$topic17_genes[vars$index %in% topic17_genes] <- 1
+
+topic18_genes <- topic_genes$Gene[topic_genes$Topic == 18]
+vars$topic18_genes <- 0
+vars$topic18_genes[vars$index %in% topic18_genes] <- 1
+
+topic19_genes <- topic_genes$Gene[topic_genes$Topic == 19]
+vars$topic19_genes <- 0
+vars$topic19_genes[vars$index %in% topic19_genes] <- 1
+
+## Topic QTL Loci Genes ######
+
+topic_qtl <- fread(paste0(my_path, "results/topic-qtl-peak-lods.csv")) %>%
+  mutate(pos = pos * 1e6)
+
+
+topic_gene_list <- lapply(1 : NROW(topic_qtl), function(i) {
+  
+  na.omit(ensembl$symbol[ensembl$chr == topic_qtl$chr[i] & 
+                           {ensembl$start > topic_qtl$pos[i] - 500000 & 
+                               ensembl$start < topic_qtl$pos[i] + 500000} |
+                           {ensembl$end > topic_qtl$pos[i] - 500000 & 
+                               ensembl$end < topic_qtl$pos[i] + 500000}])
+  
+})
+
+  
+topic0_qtl_genes <- unlist(topic_gene_list[1:2])
+vars$topic0_qtl_genes <- 0
+vars$topic0_qtl_genes[vars$index %in% topic0_qtl_genes] <- 1
+
+topic1_qtl_genes <- c(unlist(topic_gene_list[3:5]), "Sstr4")
+vars$topic1_qtl_genes <- 0
+vars$topic1_qtl_genes[vars$index %in% topic1_qtl_genes] <- 1
+
+topic3_qtl_genes <- c(unlist(topic_gene_list[[6]]), "Sstr4")
+vars$topic3_qtl_genes <- 0
+vars$topic3_qtl_genes[vars$index %in% topic3_qtl_genes] <- 1
+
+topic4_qtl_genes <- unlist(topic_gene_list[7:8])
+vars$topic4_qtl_genes <- 0
+vars$topic4_qtl_genes[vars$index %in% topic4_qtl_genes] <- 1
+
+topic6_qtl_genes <- unlist(topic_gene_list[9:10])
+vars$topic6_qtl_genes <- 0
+vars$topic6_qtl_genes[vars$index %in% topic6_qtl_genes] <- 1
+
+topic8_qtl_genes <- unlist(topic_gene_list[11:13])
+vars$topic8_qtl_genes <- 0
+vars$topic8_qtl_genes[vars$index %in% topic8_qtl_genes] <- 1
+
+topic11_qtl_genes <- unlist(topic_gene_list[14])
+vars$topic11_qtl_genes <- 0
+vars$topic11_qtl_genes[vars$index %in% topic11_qtl_genes] <- 1
+
+topic13_qtl_genes <- unlist(topic_gene_list[15])
+vars$topic13_qtl_genes <- 0
+vars$topic13_qtl_genes[vars$index %in% topic13_qtl_genes] <- 1
+
+topic14_qtl_genes <- unlist(topic_gene_list[16])
+vars$topic14_qtl_genes <- 0
+vars$topic14_qtl_genes[vars$index %in% topic14_qtl_genes] <- 1
+
+topic15_qtl_genes <- unlist(topic_gene_list[17:19])
+vars$topic15_qtl_genes <- 0
+vars$topic15_qtl_genes[vars$index %in% topic15_qtl_genes] <- 1
+
+topic18_qtl_genes <- unlist(topic_gene_list[20:23])
+vars$topic18_qtl_genes <- 0
+vars$topic18_qtl_genes[vars$index %in% topic18_qtl_genes] <- 1
+
+topic19_qtl_genes <- unlist(topic_gene_list[24:28])
+vars$topic19_qtl_genes <- 0
+vars$topic19_qtl_genes[vars$index %in% topic19_qtl_genes] <- 1
+
+
+
+## ILC Cell Proportions ###############
+
+## ILC3 Activated vs Non-Activated
+ilc3_gwas <- fread(paste0(my_path, "results/ILC3_stressed_vs_non_qtl.csv")) %>%
+  filter(lods > 200)
+ilc3_gwas_genes <- unique(ilc3_gwas$ensembl_gene)
+vars$ilc3_activated_qtl_genes <- 0
+vars$ilc3_activated_qtl_genes[vars$gene_ids %in% ilc3_gwas_genes] <- 1
+
+## LTi Activated vs Non-Activated
+lti_gwas <- fread(paste0(my_path, "results/LTi_stressed_vs_non_qtl.csv")) %>%
+  filter(lods > 200)
+lti_gwas_genes <- unique(lti_gwas$ensembl_gene)
+vars$lti_activated_qtl_genes <- 0
+vars$lti_activated_qtl_genes[vars$gene_ids %in% lti_gwas_genes] <- 1
+
+
+## ILC1 vs ILC2 proportions
+ilc1_ilc2 <- fread(paste0(my_path, 'results/gwas-ilc1-ilc2-results.csv')) %>%
+  filter(lods > 100)
+ilc1_lic2_genes <- unique(ilc1_ilc2$ensembl_gene)
+vars$ilc1_ilc2_prop_qtl_genes <- 0
+vars$ilc1_ilc2_prop_qtl_genes[vars$gene_ids %in% ilc1_lic2_genes] <- 1
+
+
+## ILC1 vs ILC3 proportions
+ilc1_ilc3 <- fread(paste0(my_path, 'results/gwas-ilc1-ilc3-results.csv')) %>%
+  filter(lods > 100)
+ilc1_lic3_genes <- unique(ilc1_ilc3$ensembl_gene)
+vars$ilc1_ilc3_prop_qtl_genes <- 0
+vars$ilc1_ilc3_prop_qtl_genes[vars$gene_ids %in% ilc1_lic3_genes] <- 1
+
+
+## ILC1 vs LTi proportions
+ilc1_lti <- fread(paste0(my_path, 'results/gwas-ilc1-lti-results.csv')) %>%
+  filter(lods > 100)
+ilc1_lti_genes <- unique(ilc1_lti$ensembl_gene)
+vars$ilc1_lti_prop_qtl_genes <- 0
+vars$ilc1_lti_prop_qtl_genes[vars$gene_ids %in% ilc1_lti_genes] <- 1
+
+
+## ILC2 vs ILC3 proportions
+ilc2_ilc3 <- fread(paste0(my_path, 'results/gwas-ilc2-ilc3-results.csv')) %>%
+  filter(lods > 150)
+ilc2_lic3_genes <- unique(ilc2_ilc3$ensembl_gene)
+vars$ilc2_ilc3_prop_qtl_genes <- 0
+vars$ilc2_ilc3_prop_qtl_genes[vars$gene_ids %in% ilc2_lic3_genes] <- 1
+
+
+## ILC2 vs LTi proportions
+ilc2_lti <- fread(paste0(my_path, 'results/gwas-ilc2-lti-results.csv')) %>%
+  filter(lods > 150)
+ilc2_lti_genes <- unique(ilc2_lti$ensembl_gene)
+vars$ilc2_lti_prop_qtl_genes <- 0
+vars$ilc2_lti_prop_qtl_genes[vars$gene_ids %in% ilc2_lti_genes] <- 1
+
+
+## ILC3 vs LTi
+ilc3_lti <- fread(paste0(my_path, 'results/gwas-ilc3-lti-results.csv')) %>%
+  filter(lods > 100)
+ilc3_lti_genes <- unique(ilc3_lti$ensembl_gene)
+vars$ilc3_lti_prop_qtl_genes <- 0
+vars$ilc3_lti_prop_qtl_genes[vars$gene_ids %in% ilc3_lti_genes] <- 1
+
+
+## Antibody QTL #######################
+
+antibody <- fread(paste0(my_path, "results/antibody-qtl-output/Antibody_QTL_BwCorrectionCorrection.csv"))
+
+## IgA
+iga_markers <- antibody$V1[antibody$IgA_log > 5.5]
+iga_qtl_genes <- unique(conseq$ensembl_gene[conseq$marker %in% iga_markers])
+vars$iga_qtl_genes <- 0
+vars$iga_qtl_genes[vars$gene_ids %in% iga_qtl_genes] <- 1
+
+## IgE
+ige_markers <- antibody$V1[antibody$IgE_log > 5.5]
+ige_qtl_genes <- unique(conseq$ensembl_gene[conseq$marker %in% ige_markers])
+vars$ige_qtl_genes <- 0
+vars$ige_qtl_genes[vars$gene_ids %in% ige_qtl_genes] <- 1
+
+
+## IgG1
+igg1_markers <- antibody$V1[antibody$IgG1_log > 5.5]
+igg1_qtl_genes <- unique(conseq$ensembl_gene[conseq$marker %in% igg1_markers])
+vars$igg1_qtl_genes <- 0
+vars$igg1_qtl_genes[vars$gene_ids %in% igg1_qtl_genes] <- 1
+
+
+## IgG2
+igg2_markers <- antibody$V1[antibody$IgG2_log > 5.5]
+igg2_qtl_genes <- unique(conseq$ensembl_gene[conseq$marker %in% igg2_markers])
+vars$igg2_qtl_genes <- 0
+vars$igg2_qtl_genes[vars$gene_ids %in% igg2_qtl_genes] <- 1
+
+
+## IgM
+igm_markers <- antibody$V1[antibody$IgM_log > 5.5]
+igm_qtl_genes <- unique(conseq$ensembl_gene[conseq$marker %in% igm_markers])
+vars$igm_qtl_genes <- 0
+vars$igm_qtl_genes[vars$gene_ids %in% igm_qtl_genes] <- 1
+
+
+## Mmcp1
+mmcp1_markers <- antibody$V1[antibody$Mmcp1_log > 5.5]
+mmcp1_qtl_genes <- unique(conseq$ensembl_gene[conseq$marker %in% mmcp1_markers])
+vars$mmcp1_qtl_genes <- 0
+vars$mmcp1_qtl_genes[vars$gene_ids %in% mmcp1_qtl_genes] <- 1
+
+
+
+## Cytokines ###################
+
+## Steady State
+lods_steady <- read.csv(paste0(my_path, "results/qtl-steady-cytokines-lods.csv"))
+
+infg_markers_steady <- lods_steady$marker[lods_steady$IFNg > 5.5]
+infg_qtl_genes_steady_vec <- unique(conseq$ensembl_gene[conseq$marker %in% infg_markers_steady])
+il5_markers_steady <- lods_steady$marker[lods_steady$IL5 > 5.5]
+il5_qtl_genes_steady_vec <- unique(conseq$ensembl_gene[conseq$marker %in% il5_markers_steady])
+tnf_markers_steady <- lods_steady$marker[lods_steady$TNFa > 5.5]
+tnf_qtl_genes_steady_vec <- unique(conseq$ensembl_gene[conseq$marker %in% tnf_markers_steady])
+il2_markers_steady <- lods_steady$marker[lods_steady$IL2 > 5.5]
+il2_qtl_genes_steady_vec <- unique(conseq$ensembl_gene[conseq$marker %in% il2_markers_steady])
+il6_markers_steady <- lods_steady$marker[lods_steady$IL6 > 5.5]
+il6_qtl_genes_steady_vec <- unique(conseq$ensembl_gene[conseq$marker %in% il6_markers_steady])
+il4_markers_steady <- lods_steady$marker[lods_steady$IL4 > 5.5]
+il4_qtl_genes_steady_vec <- unique(conseq$ensembl_gene[conseq$marker %in% il4_markers_steady])
+il10_markers_steady <- lods_steady$marker[lods_steady$IL10 > 5.5]
+il10_qtl_genes_steady_vec <- unique(conseq$ensembl_gene[conseq$marker %in% il10_markers_steady])
+il9_markers_steady <- lods_steady$marker[lods_steady$IL9 > 5.5]
+il9_qtl_genes_steady_vec <- unique(conseq$ensembl_gene[conseq$marker %in% il9_markers_steady])
+il17a_markers_steady <- lods_steady$marker[lods_steady$IL17A > 5.5]
+il17a_qtl_genes_steady_vec <- unique(conseq$ensembl_gene[conseq$marker %in% il17a_markers_steady])
+il17f_markers_steady <- lods_steady$marker[lods_steady$IL17F > 5.5]
+il17f_qtl_genes_steady_vec <- unique(conseq$ensembl_gene[conseq$marker %in% il17f_markers_steady])
+il22_markers_steady <- lods_steady$marker[lods_steady$IL22 > 5.5]
+il22_qtl_genes_steady_vec <- unique(conseq$ensembl_gene[conseq$marker %in% il22_markers_steady])
+il13_markers_steady <- lods_steady$marker[lods_steady$IL13 > 5.5]
+il13_qtl_genes_steady_vec <- unique(conseq$ensembl_gene[conseq$marker %in% il13_markers_steady])
+
+
+
+vars <- vars %>%
+  mutate(infg_qtl_genes_steady = as.numeric(gene_ids %in% infg_qtl_genes_steady_vec),
+         il5_qtl_genes_steady = as.numeric(gene_ids %in% il5_qtl_genes_steady_vec),
+         tnf_qtl_genes_steady = as.numeric(gene_ids %in% tnf_qtl_genes_steady_vec),
+         il2_qtl_genes_steady = as.numeric(gene_ids %in% il2_qtl_genes_steady_vec),
+         il6_qtl_genes_steady = as.numeric(gene_ids %in% il6_qtl_genes_steady_vec),
+         il4_qtl_genes_steady = as.numeric(gene_ids %in% il4_qtl_genes_steady_vec),
+         il10_qtl_genes_steady = as.numeric(gene_ids %in% il10_qtl_genes_steady_vec),
+         il9_qtl_genes_steady = as.numeric(gene_ids %in% il9_qtl_genes_steady_vec),
+         il17a_qtl_genes_steady = as.numeric(gene_ids %in% il17a_qtl_genes_steady_vec),
+         il17f_qtl_genes_steady = as.numeric(gene_ids %in% il17f_qtl_genes_steady_vec),
+         il22_qtl_genes_steady = as.numeric(gene_ids %in% il22_qtl_genes_steady_vec),
+         il13_qtl_genes_steady = as.numeric(gene_ids %in% il13_qtl_genes_steady_vec)
+         )
+
+## Allergy
+lods_allergy <- read.csv(paste0(my_path, "results/qtl-allergy-cytokines-lods.csv"))
+
+infg_markers_allergy <- lods_allergy$marker[lods_allergy$IFNg > 5.5]
+infg_qtl_genes_allergy_vec <- unique(conseq$ensembl_gene[conseq$marker %in% infg_markers_allergy])
+il5_markers_allergy <- lods_allergy$marker[lods_allergy$IL5 > 5.5]
+il5_qtl_genes_allergy_vec <- unique(conseq$ensembl_gene[conseq$marker %in% il5_markers_allergy])
+tnf_markers_allergy <- lods_allergy$marker[lods_allergy$TNFa > 5.5]
+tnf_qtl_genes_allergy_vec <- unique(conseq$ensembl_gene[conseq$marker %in% tnf_markers_allergy])
+il2_markers_allergy <- lods_allergy$marker[lods_allergy$IL2 > 5.5]
+il2_qtl_genes_allergy_vec <- unique(conseq$ensembl_gene[conseq$marker %in% il2_markers_allergy])
+il6_markers_allergy <- lods_allergy$marker[lods_allergy$IL6 > 5.5]
+il6_qtl_genes_allergy_vec <- unique(conseq$ensembl_gene[conseq$marker %in% il6_markers_allergy])
+il4_markers_allergy <- lods_allergy$marker[lods_allergy$IL4 > 5.5]
+il4_qtl_genes_allergy_vec <- unique(conseq$ensembl_gene[conseq$marker %in% il4_markers_allergy])
+il10_markers_allergy <- lods_allergy$marker[lods_allergy$IL10 > 5.5]
+il10_qtl_genes_allergy_vec <- unique(conseq$ensembl_gene[conseq$marker %in% il10_markers_allergy])
+il9_markers_allergy <- lods_allergy$marker[lods_allergy$IL9 > 5.5]
+il9_qtl_genes_allergy_vec <- unique(conseq$ensembl_gene[conseq$marker %in% il9_markers_allergy])
+il17a_markers_allergy <- lods_allergy$marker[lods_allergy$IL17A > 5.5]
+il17a_qtl_genes_allergy_vec <- unique(conseq$ensembl_gene[conseq$marker %in% il17a_markers_allergy])
+il17f_markers_allergy <- lods_allergy$marker[lods_allergy$IL17F > 5.5]
+il17f_qtl_genes_allergy_vec <- unique(conseq$ensembl_gene[conseq$marker %in% il17f_markers_allergy])
+il22_markers_allergy <- lods_allergy$marker[lods_allergy$IL22 > 5.5]
+il22_qtl_genes_allergy_vec <- unique(conseq$ensembl_gene[conseq$marker %in% il22_markers_allergy])
+il13_markers_allergy <- lods_allergy$marker[lods_allergy$IL13 > 5.5]
+il13_qtl_genes_allergy_vec <- unique(conseq$ensembl_gene[conseq$marker %in% il13_markers_allergy])
+
+
+
+vars <- vars %>%
+  mutate(infg_qtl_genes_allergy = as.numeric(gene_ids %in% infg_qtl_genes_allergy_vec),
+         il5_qtl_genes_allergy = as.numeric(gene_ids %in% il5_qtl_genes_allergy_vec),
+         tnf_qtl_genes_allergy = as.numeric(gene_ids %in% tnf_qtl_genes_allergy_vec),
+         il2_qtl_genes_allergy = as.numeric(gene_ids %in% il2_qtl_genes_allergy_vec),
+         il6_qtl_genes_allergy = as.numeric(gene_ids %in% il6_qtl_genes_allergy_vec),
+         il4_qtl_genes_allergy = as.numeric(gene_ids %in% il4_qtl_genes_allergy_vec),
+         il10_qtl_genes_allergy = as.numeric(gene_ids %in% il10_qtl_genes_allergy_vec),
+         il9_qtl_genes_allergy = as.numeric(gene_ids %in% il9_qtl_genes_allergy_vec),
+         il17a_qtl_genes_allergy = as.numeric(gene_ids %in% il17a_qtl_genes_allergy_vec),
+         il17f_qtl_genes_allergy = as.numeric(gene_ids %in% il17f_qtl_genes_allergy_vec),
+         il22_qtl_genes_allergy = as.numeric(gene_ids %in% il22_qtl_genes_allergy_vec),
+         il13_qtl_genes_allergy = as.numeric(gene_ids %in% il13_qtl_genes_allergy_vec)
+         )
+
+
+write_csv(vars, paste0(my_path, "data/scanpy/allchannels/vars.csv"))
+```
+
+
+```{r}
+intersect_list <- combn(colnames(vars)[c(240:283,287:288,292:315)], 2, function(x) {
+
+  vars$index[((vars[[x[[1]]]] == 1) & (vars[[x[[2]]]] == 1))]
+  
+}, simplify = FALSE)
+
+names_list <- combn(colnames(vars)[c(240:283,287:288,292:315)], 2, paste0, collapse = "_by_")
+names(intersect_list) <- names_list
+
+out_list <- Filter(function(x) length(x) > 0, intersect_list)
+
+mat <- matrix(NA, nrow = 179, ncol = 661)
+for( i in seq_along(out_list) ) {
+  
+  mat[1:length(out_list[[i]]), i] <- out_list[[i]]
+  
+}
+
+colnames(mat) <- names(out_list)
+write.csv(mat, "qtl-genes-overlap.csv")
+
+getwd()
+```
+
+
+### Make Consequence Table
+
+Make a csv file containing all the genes in the dataset.  Have a column that indicates whether that gene is 
+
+  - expressed each specific cell type (used as phenotype in eQTL analysis)
+  - Has SNPs in the Giga MUGA array
+  - Was an eGene for each specific cell type
+  - had a eQTL for each specific cell type
+  - Was differentially expressed in each cell type / Marker gene identified for cell type
+  - QTL loci genes for each topic
+  - topic genes
+  - antibodyQTL loci genes
+  - cytokine QTL loci genes
+  - cell proportion composition QTL loci genes
+  
+```{r ccre_table, eval = FALSE}
+## starting with all ensembl genes
+ccre <- conseq
+
+## eQTL Genes #######
+
+## Mean #######
+## ILC1 eQTL Loci
+ilc1_markers <- unique(ilc1_mean$marker)
+ccre <- ccre %>%
+  mutate(ilc1_eqtl_loci_mean = as.numeric(marker %in% ilc1_markers))
+
+## ILC1 eQTL cis-effect associations
+ilc1_markers_cis <- unique(ilc1_mean$marker[ilc1_mean$cis_effect==1])
+ccre <- ccre %>%
+  mutate(ilc1_ciseqtl_assoc_mean = as.numeric(marker %in% ilc1_markers_cis))
+
+## CV #####
+## ILC1 eQTL Loci
+ilc1_markers <- unique(ilc1_cv$marker)
+ccre <- ccre %>%
+  mutate(ilc1_eqtl_loci_cv = as.numeric(marker %in% ilc1_markers))
+
+## ILC1 eQTL cis-effect associations
+ilc1_markers_cis <- unique(ilc1_cv$marker[ilc1_cv$cis_effect==1])
+ccre <- ccre %>%
+  mutate(ilc1_ciseqtl_assoc_cv = as.numeric(marker %in% ilc1_markers_cis))
+
+
+## Mean #######
+## ILC2 eQTL Loci
+ilc2_markers <- unique(ilc2_mean$marker)
+ccre <- ccre %>%
+  mutate(ilc2_eqtl_loci_mean = as.numeric(marker %in% ilc2_markers))
+
+## ILC2 eQTL cis-effect associations
+ilc2_markers_cis <- unique(ilc2_mean$marker[ilc2_mean$cis_effect==1])
+ccre <- ccre %>%
+  mutate(ilc2_ciseqtl_assoc_mean = as.numeric(marker %in% ilc2_markers_cis))
+
+## CV #####
+## ILC2 eQTL Loci
+ilc2_markers <- unique(ilc2_cv$marker)
+ccre <- ccre %>%
+  mutate(ilc2_eqtl_loci_cv = as.numeric(marker %in% ilc2_markers))
+
+## ILC2 eQTL cis-effect associations
+ilc2_markers_cis <- unique(ilc2_cv$marker[ilc2_cv$cis_effect==1])
+ccre <- ccre %>%
+  mutate(ilc2_ciseqtl_assoc_cv = as.numeric(marker %in% ilc2_markers_cis))
+
+
+
+## Mean #######
+## ILC3 eQTL Loci
+ilc3_markers <- unique(ilc3_mean$marker)
+ccre <- ccre %>%
+  mutate(ilc3_eqtl_loci_mean = as.numeric(marker %in% ilc3_markers))
+
+## ILC3 eQTL cis-effect associations
+ilc3_markers_cis <- unique(ilc3_mean$marker[ilc3_mean$cis_effect==1])
+ccre <- ccre %>%
+  mutate(ilc3_ciseqtl_assoc_mean = as.numeric(marker %in% ilc3_markers_cis))
+
+## CV #####
+## ILC3 eQTL Loci
+ilc3_markers <- unique(ilc3_cv$marker)
+ccre <- ccre %>%
+  mutate(ilc3_eqtl_loci_cv = as.numeric(marker %in% ilc3_markers))
+
+## ILC3 eQTL cis-effect associations
+ilc3_markers_cis <- unique(ilc3_cv$marker[ilc3_cv$cis_effect==1])
+ccre <- ccre %>%
+  mutate(ilc3_ciseqtl_assoc_cv = as.numeric(marker %in% ilc3_markers_cis))
+
+
+
+## Mean #######
+## LTi eQTL Loci
+lti_markers <- unique(lti_mean$marker)
+ccre <- ccre %>%
+  mutate(lti_eqtl_loci_mean = as.numeric(marker %in% lti_markers))
+
+## LTi eQTL cis-effect associations
+lti_markers_cis <- unique(lti_mean$marker[lti_mean$cis_effect==1])
+ccre <- ccre %>%
+  mutate(lti_ciseqtl_assoc_mean = as.numeric(marker %in% lti_markers_cis))
+
+## CV #####
+## LTi eQTL Loci
+lti_markers <- unique(lti_cv$marker)
+ccre <- ccre %>%
+  mutate(lti_eqtl_loci_cv = as.numeric(marker %in% lti_markers))
+
+## LTi eQTL cis-effect associations
+lti_markers_cis <- unique(lti_cv$marker[lti_cv$cis_effect==1])
+ccre <- ccre %>%
+  mutate(lti_ciseqtl_assoc_cv = as.numeric(marker %in% lti_markers_cis))
+
+
+
+## Topic QTL Loci Genes ######
+
+topic_qtl <- fread(paste0(my_path, "results/topic-qtl-lods.csv"), data.table = FALSE)
+
+topic0_markers <- topic_qtl$marker[topic_qtl$topic0 > 5.5]
+topic1_markers <- topic_qtl$marker[topic_qtl$topic1 > 5.5]
+topic2_markers <- topic_qtl$marker[topic_qtl$topic2 > 5.5]
+topic3_markers <- topic_qtl$marker[topic_qtl$topic3 > 5.5]
+topic4_markers <- topic_qtl$marker[topic_qtl$topic4 > 5.5]
+topic5_markers <- topic_qtl$marker[topic_qtl$topic5 > 5.5]
+topic6_markers <- topic_qtl$marker[topic_qtl$topic6 > 5.5]
+topic7_markers <- topic_qtl$marker[topic_qtl$topic7 > 5.5]
+topic8_markers <- topic_qtl$marker[topic_qtl$topic8 > 5.5]
+topic9_markers <- topic_qtl$marker[topic_qtl$topic9 > 5.5]
+topic10_markers <- topic_qtl$marker[topic_qtl$topic10 > 5.5]
+topic11_markers <- topic_qtl$marker[topic_qtl$topic11 > 5.5]
+topic12_markers <- topic_qtl$marker[topic_qtl$topic12 > 5.5]
+topic13_markers <- topic_qtl$marker[topic_qtl$topic13 > 5.5]
+topic14_markers <- topic_qtl$marker[topic_qtl$topic14 > 5.5]
+topic15_markers <- topic_qtl$marker[topic_qtl$topic15 > 5.5]
+topic16_markers <- topic_qtl$marker[topic_qtl$topic16 > 5.5]
+topic17_markers <- topic_qtl$marker[topic_qtl$topic17 > 5.5]
+topic18_markers <- topic_qtl$marker[topic_qtl$topic18 > 5.5]
+topic19_markers <- topic_qtl$marker[topic_qtl$topic19 > 5.5]
+
+ccre <- ccre %>%
+  mutate(topic0_qtl = as.numeric(marker %in% topic0_markers),
+         topic1_qtl = as.numeric(marker %in% topic1_markers),
+         topic2_qtl = as.numeric(marker %in% topic2_markers),
+         topic3_qtl = as.numeric(marker %in% topic3_markers),
+         topic4_qtl = as.numeric(marker %in% topic4_markers),
+         topic5_qtl = as.numeric(marker %in% topic5_markers),
+         topic6_qtl = as.numeric(marker %in% topic6_markers),
+         topic7_qtl = as.numeric(marker %in% topic7_markers),
+         topic8_qtl = as.numeric(marker %in% topic8_markers),
+         topic9_qtl = as.numeric(marker %in% topic9_markers),
+         topic10_qtl = as.numeric(marker %in% topic10_markers),
+         topic11_qtl = as.numeric(marker %in% topic11_markers),
+         topic12_qtl = as.numeric(marker %in% topic12_markers),
+         topic13_qtl = as.numeric(marker %in% topic13_markers),
+         topic14_qtl = as.numeric(marker %in% topic14_markers),
+         topic15_qtl = as.numeric(marker %in% topic15_markers),
+         topic16_qtl = as.numeric(marker %in% topic16_markers),
+         topic17_qtl = as.numeric(marker %in% topic17_markers),
+         topic18_qtl = as.numeric(marker %in% topic18_markers),
+         topic19_qtl = as.numeric(marker %in% topic19_markers))
+
+
+
+## ILC Cell Proportions ###############
+
+## ILC3 Activated vs Non-Activated
+ilc3_gwas <- fread(paste0(my_path, "results/ILC3_stressed_vs_non_qtl.csv")) %>%
+  filter(lods > 200)
+ilc3_gwas_markers <- unique(ilc3_gwas$marker)
+
+
+## LTi Activated vs Non-Activated
+lti_gwas <- fread(paste0(my_path, "results/LTi_stressed_vs_non_qtl.csv")) %>%
+  filter(lods > 200)
+lti_gwas_markers <- unique(lti_gwas$marker)
+
+
+## ILC1 vs ILC2 proportions
+ilc1_ilc2 <- fread(paste0(my_path, 'results/gwas-ilc1-ilc2-results.csv')) %>%
+  filter(lods > 100)
+ilc1_lic2_markers <- unique(ilc1_ilc2$marker)
+
+
+## ILC1 vs ILC3 proportions
+ilc1_ilc3 <- fread(paste0(my_path, 'results/gwas-ilc1-ilc3-results.csv')) %>%
+  filter(lods > 100)
+ilc1_lic3_markers <- unique(ilc1_ilc3$marker)
+
+
+## ILC2 vs ILC3 proportions
+ilc2_ilc3 <- fread(paste0(my_path, 'results/gwas-ilc2-ilc3-results.csv')) %>%
+  filter(lods > 100)
+ilc2_lic3_markers <- unique(ilc2_ilc3$marker)
+
+
+## ILC2 vs LTi proportions
+ilc2_lti <- fread(paste0(my_path, 'results/gwas-ilc2-lti-results.csv')) %>%
+  filter(lods > 100)
+ilc2_lti_markers <- unique(ilc2_lti$marker)
+
+
+## ILC3 vs LTi
+ilc3_lti <- fread(paste0(my_path, 'results/gwas-ilc3-lti-results.csv')) %>%
+  filter(lods > 100)
+ilc3_lti_markers <- unique(ilc3_lti$marker)
+
+
+ccre <- ccre %>%
+  mutate(ilc3_activated_qtl = as.numeric(marker %in% ilc3_gwas_markers),
+         lti_activated_qtl = as.numeric(marker %in% lti_gwas_markers),
+         ilc1_ilc2_prop_qtl = as.numeric(marker %in% ilc1_lic2_markers),
+         ilc1_lic3_prop_qtl = as.numeric(marker %in% ilc1_lic3_markers),
+         ilc2_ilc3_prop_qtl = as.numeric(marker %in% ilc2_lic3_markers),
+         ilc3_lti_prop_qtl = as.numeric(marker %in% ilc3_lti_markers))
+
+## Antibody QTL #######################
+
+antibody <- fread(paste0(my_path, "results/antibody-qtl-output/Antibody_QTL_BwCorrectionCorrection.csv"))
+
+## IgA
+iga_markers <- antibody$V1[antibody$IgA_log > 5.5]
+
+## IgE
+ige_markers <- antibody$V1[antibody$IgE_log > 5.5]
+
+## IgG1
+igg1_markers <- antibody$V1[antibody$IgG1_log > 5.5]
+
+## IgG2
+igg2_markers <- antibody$V1[antibody$IgG2_log > 5.5]
+
+## IgM
+igm_markers <- antibody$V1[antibody$IgM_log > 5.5]
+
+## Mmcp1
+mmcp1_markers <- antibody$V1[antibody$Mmcp1_log > 5.5]
+
+ccre <- ccre %>%
+  mutate(iga_qtl = as.numeric(marker %in% iga_markers),
+         ige_qtl = as.numeric(marker %in% ige_markers),
+         igg1_qtl = as.numeric(marker %in% igg1_markers),
+         igg2_qtl = as.numeric(marker %in% igg2_markers),
+         igm_qtl = as.numeric(marker %in% igm_markers),
+         mmcp1_qtl = as.numeric(marker %in% mmcp1_markers))
+
+## Cytokines ###################
+## Steady State
+lods_steady <- read.csv(paste0(my_path, "results/qtl-cytokines-steady-lods.csv"))
+
+ifng_markers_steady <- lods_steady$marker[lods_steady$IFNg > 5.5]
+il5_markers_steady <- lods_steady$marker[lods_steady$IL5 > 5.5]
+tnf_markers_steady <- lods_steady$marker[lods_steady$TNFa > 5.5]
+il2_markers_steady <- lods_steady$marker[lods_steady$IL2 > 5.5]
+il6_markers_steady <- lods_steady$marker[lods_steady$IL6 > 5.5]
+il4_markers_steady <- lods_steady$marker[lods_steady$IL4 > 5.5]
+il10_markers_steady <- lods_steady$marker[lods_steady$IL10 > 5.5]
+il9_markers_steady <- lods_steady$marker[lods_steady$IL9 > 5.5]
+il17a_markers_steady <- lods_steady$marker[lods_steady$IL17A > 5.5]
+il17f_markers_steady <- lods_steady$marker[lods_steady$IL17F > 5.5]
+il22_markers_steady <- lods_steady$marker[lods_steady$IL22 > 5.5]
+il13_markers_steady <- lods_steady$marker[lods_steady$IL13 > 5.5]
+
+
+
+ccre <- ccre %>%
+  mutate(
+    ifng_qtl_steady = as.numeric(marker %in% ifng_markers_steady),
+    il5_qtl_steady = as.numeric(marker %in% il5_markers_steady),
+    tnf_qtl_steady = as.numeric(marker %in% tnf_markers_steady),
+    il2_qtl_steady = as.numeric(marker %in% il2_markers_steady),
+    il6_qtl_steady = as.numeric(marker %in% il6_markers_steady),
+    il4_qtl_steady = as.numeric(marker %in% il4_markers_steady),
+    il10_qtl_steady = as.numeric(marker %in% il10_markers_steady),
+    il9_qtl_steady = as.numeric(marker %in% il9_markers_steady),
+    il17a_qtl_steady = as.numeric(marker %in% il17a_markers_steady),
+    il17f_qtl_steady = as.numeric(marker %in% il17f_markers_steady),
+    il22_qtl_steady = as.numeric(marker %in% il22_markers_steady),
+    il13_qtl_steady = as.numeric(marker %in% il13_markers_steady)
+  )
+
+
+## Allergy State
+lods_allergy <- read.csv(paste0(my_path, "results/qtl-cytokines-allergy-lods.csv"))
+
+ifng_markers_allergy <- lods_allergy$marker[lods_allergy$IFNg > 5.5]
+il5_markers_allergy <- lods_allergy$marker[lods_allergy$IL5 > 5.5]
+tnf_markers_allergy <- lods_allergy$marker[lods_allergy$TNFa > 5.5]
+il2_markers_allergy <- lods_allergy$marker[lods_allergy$IL2 > 5.5]
+il6_markers_allergy <- lods_allergy$marker[lods_allergy$IL6 > 5.5]
+il4_markers_allergy <- lods_allergy$marker[lods_allergy$IL4 > 5.5]
+il10_markers_allergy <- lods_allergy$marker[lods_allergy$IL10 > 5.5]
+il9_markers_allergy <- lods_allergy$marker[lods_allergy$IL9 > 5.5]
+il17a_markers_allergy <- lods_allergy$marker[lods_allergy$IL17A > 5.5]
+il17f_markers_allergy <- lods_allergy$marker[lods_allergy$IL17F > 5.5]
+il22_markers_allergy <- lods_allergy$marker[lods_allergy$IL22 > 5.5]
+il13_markers_allergy <- lods_allergy$marker[lods_allergy$IL13 > 5.5]
+
+
+
+ccre <- ccre %>%
+  mutate(
+    ifng_qtl_allergy = as.numeric(marker %in% ifng_markers_allergy),
+    il5_qtl_allergy = as.numeric(marker %in% il5_markers_allergy),
+    tnf_qtl_allergy = as.numeric(marker %in% tnf_markers_allergy),
+    il2_qtl_allergy = as.numeric(marker %in% il2_markers_allergy),
+    il6_qtl_allergy = as.numeric(marker %in% il6_markers_allergy),
+    il4_qtl_allergy = as.numeric(marker %in% il4_markers_allergy),
+    il10_qtl_allergy = as.numeric(marker %in% il10_markers_allergy),
+    il9_qtl_allergy = as.numeric(marker %in% il9_markers_allergy),
+    il17a_qtl_allergy = as.numeric(marker %in% il17a_markers_allergy),
+    il17f_qtl_allergy = as.numeric(marker %in% il17f_markers_allergy),
+    il22_qtl_allergy = as.numeric(marker %in% il22_markers_allergy),
+    il13_qtl_allergy = as.numeric(marker %in% il13_markers_allergy)
+  )
+
+write_csv(ccre, paste0(my_path, "data/GM_SNPS_Consequence_cCRE.csv"))
+```
+
+
+## Figure 1
+
+### Figure 1A
+
+
+```{r fig1a}
+fig1a_plot <- plot_df %>%
+  filter(louvain_labels %in% c(1,2,3,4,5,8)) %>%
+  ggplot(., aes(x = X_tsne1, y = X_tsne2, color = called_cell_types)) + 
+           geom_point(shape = 46)
+```
+
+
+### Figure 1B
+
+### Ven Diagram eQTL Genes in loci
+
+Common and cell type specific eQTLs identification
+
+Overlaps of genes located within .5 Mb of significant eQTL loci accross the major lineages of innnate lymphoid cells.
+
+```{r fig1b_eqtl}
+myCol <- RColorBrewer::brewer.pal(4, "Pastel2")
+# Chart
+venn.diagram(
+        x = list(na.omit(vars$index[vars$ilc1_eqtl_loci_genes_cv == 1]),
+                 na.omit(vars$index[vars$ilc2_eqtl_loci_genes_cv == 1]),
+                 na.omit(vars$index[vars$ilc3_eqtl_loci_genes_cv == 1]),
+                 na.omit(vars$index[vars$lti_eqtl_loci_genes_cv == 1])),
+        category.names = c("ILC1" , "ILC2 " , "ILC3", "LTi"),
+        filename = 'eqtl-loci-genes-venn-diagramm.png',
+        output=TRUE,
+        main = "eQTL Genes in Significant Loci by Cell Type",
+        main.cex = 0.5,
+        
+        # Output features
+        imagetype="png" ,
+        height = 480 , 
+        width = 480 , 
+        resolution = 300,
+        compression = "lzw",
+        
+        # Circles
+        lwd = 2,
+        lty = 'blank',
+        fill = myCol,
+        
+        # Numbers
+        cex = .5,
+        fontface = "bold",
+        fontfamily = "sans",
+        cat.cex = .5
+        
+)
+```
+
+
+### Ven Diagram eGenes
+
+Common and cell type specific eGenes identification
+
+Overlaps of significant eGenes accross the major lineages of innnate lymphoid cells.
+
+```{r fig1c_egenes}
+myCol <- RColorBrewer::brewer.pal(4, "Pastel2")
+# Chart
+venn.diagram(
+        x = list(na.omit(vars$index[vars$ilc1_egenes_cv == 1]),
+                 na.omit(vars$index[vars$ilc2_egenes_cv == 1]),
+                 na.omit(vars$index[vars$ilc3_egenes_cv == 1]),
+                 na.omit(vars$index[vars$lti_egenes_cv == 1])),
+        category.names = c("ILC1" , "ILC2 " , "ILC3", "LTi"),
+        filename = 'eGenes-genes-venn-diagramm.png',
+        output=TRUE,
+        main = "eGenes by Cell Type",
+        main.cex = 0.5,
+        
+        # Output features
+        imagetype="png" ,
+        height = 480 , 
+        width = 480 , 
+        resolution = 300,
+        compression = "lzw",
+        
+        # Circles
+        lwd = 2,
+        lty = 'blank',
+        fill = myCol,
+        
+        # Numbers
+        cex = .5,
+        fontface = "bold",
+        fontfamily = "sans",
+        cat.cex = .5
+        
+)
+```
+
+
+### Figure 1D
+
+```{r fig1d}
+## Plot file list
+plot_files <- c(
+  paste0(my_path, "results/qtl-plot-lods-ILC1-cv.csv"),
+  paste0(my_path, "results/qtl-plot-lods-ILC2-cv.csv"),
+  paste0(my_path, "results/qtl-plot-lods-NCR1+ ILC3-cv.csv"),
+  paste0(my_path, "results/qtl-plot-lods-Lti ILC3-cv.csv")
+)
+
+
+## Loading Marker Map
+cat("Loading SNPs...", "\n")
+# load(paste0(geno_path, "GM_snps.Rdata"))
+GM_snps <- fread(paste0(my_path, "data/reference/GM_SNPS_Consequence.csv"))
+marker_map <- readRDS(paste0(geno_path, "Regev_map_20171221.rds"))
+xpos <- qtl2:::map_to_xpos(marker_map, gap = 25)
+xchrbound <- qtl2:::map_to_boundaries(marker_map, gap = 25)
+
+cat("Loading Genes...", "\n")
+ensembl2 <- fread(paste0(my_path, "data/reference/ensembl.Mus_musculus.GRCm38.93.csv"))
+ensembl2 <- ensembl2[chr %in% c(as.character(1:19), "X"), ]
+geneids <- fread(paste0(my_path, "data/reference/GeneID.csv"), col.names = c("symbol", "gene"))
+  
+
+## Creating Gene Map
+gene_map <- split(ensembl2, f = ensembl2$chr)
+for( nm in names(gene_map) ) {
+  vec <- gene_map[[nm]]$start
+  names(vec) <- gene_map[[nm]]$gene
+  gene_map[[nm]] <- vec
+}
+gene_map <- gene_map[c(as.character(1:19), "X")]
+ypos <- qtl2:::map_to_xpos(gene_map, gap = 25)
+ychrbound <- qtl2:::map_to_boundaries(gene_map, gap = 25)
+
+i <- 1
+out <- list()
+out_lods <- list()
+df <- NULL
+plot_title <- c("ILC1", "ILC2", "LTi", "ILC3")
+## CoefVar: c(36:38,40)
+## Mean: c(65:67,69)
+for( f in plot_files ) {
+  
+  cat('Loading file: ', f, '\n')
+  lods <- fread(f)
+  
+  cat('Identifying Cis-effects \n')
+  lods <- lods %>%
+    left_join(
+      {GM_snps %>% 
+          mutate(marker_pos = pos) %>% 
+          select(marker = marker, 
+                 marker_pos, 
+                 conseq_clean,
+                 type,
+                 ensembl_gene)}
+    ) %>%
+    left_join(
+      {ensembl2 %>% select(gene_start = start, gene_end = end, gene = gene)}
+    ) %>%
+    mutate(cis_effect = as.numeric(marker_chr == gene_chr & 
+             {marker_pos > (gene_start - 1e6) & marker_pos < (gene_end + 1e6)})) %>%
+    mutate(value_adj = ifelse(cis_effect==1, value + 6, value), 
+           cell_type = plot_title[i]) %>%
+    left_join(geneids) %>%
+    filter(value_adj > 10)
+
+  cat('Plot File: ', plot_title[i], '\n')
+  out_lods[[i]] <- lods
+  i <- i + 1
+
+}
+
+out_df <- do.call(rbind, out_lods)
+table(out_df$symbol[out_df$cis_effect==1], out_df$cell_type[out_df$cis_effect==1])
+
+
+cat("Plotting LODs...", "\n")
+p <- ggplot(out_lods[[1]], aes(x = xpos, y = ypos, color = cis_effect)) +
+    # labs(x = "Chromosome of SNP", y = "Chromosome of Gene") +
+    labs(x = "Chromosome of SNP", y = "Chromosome of Gene", title = plot_title[i]) + # title = paste0(plot_title, " (", data_subset[i], ")")) +
+    geom_point(shape = 20) +
+    scale_x_continuous(breaks = apply(xchrbound, 2, median), label = c(as.character(1:19), "X")) + 
+    scale_y_continuous(breaks = apply(ychrbound, 2, median), label = c(as.character(1:19), "X")) + 
+    scale_color_continuous(low="lightgrey", high="black") +
+    theme_bw() + 
+    theme(panel.border = element_blank(), 
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(), 
+          axis.title.x=element_blank(),
+          axis.title.y=element_blank(),
+          axis.line = element_line(colour = "black"),
+          legend.position="none")
+
+
+
+# conseq_clean, 
+p <- ggplot(lods, aes(x = xpos, y = ypos, color=ctcf)) +
+  labs(x = "Chromosome of SNP", y = "Chromosome of Gene", title = paste0(plot_title, " (", data_subset, ") ", geneset_name)) +
+  # geom_point(shape = c(46, 8)[(lods$geneset=="Yes") + 1]) +
+  geom_point(shape = 20) +
+  scale_x_continuous(breaks = apply(xchrbound, 2, median), label = c(as.character(1:19), "X")) +
+  scale_y_continuous(breaks = apply(ychrbound, 2, median), label = c(as.character(1:19), "X")) +
+  theme_bw() +
+  theme(panel.border = element_blank(), 
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), 
+        axis.line = element_line(colour = "black"))
+
+```
+
+```{r}
+ccre %>% group_by(type.y) %>% summarise_at(vars(ilc1_eqtl_loci_mean:mmcp1_qtl), sum)
+
+```
+
+
+```{r}
+ccre_cor <- round(cor(ccre[,37:84], use = "pairwise.complete.obs"), 3)
+ccre_cor[is.na(ccre_cor)] <- 0
+ccre_cor[abs(ccre_cor) < 0.15] <- 0
+net <- graph_from_adjacency_matrix(ccre_cor, mode = "undirected", diag = FALSE, weighted = TRUE)
+visNetwork::visIgraph(net)
+
+```
+
+
+### Figure 1E
+
+```{r}
+
+```
+
+
+### Figure 1F
+
+Tbet + Nrc1(NKp46) + Rorc
+
+```{r}
+ncr1 <- my_plot(plot_df, "Ncr1") + my_theme
+tbet <- my_plot(plot_df, "Tbet") + my_theme
+rorc <- my_plot(plot_df, "Rorc") + my_theme
+ccr6 <- my_plot(plot_df, "Ccr6") + my_theme
+
+ggsave("tsne-nrc1.png", ncr1, dpi = 300)
+ggsave("tsne-tbet.png", tbet, dpi = 300)
+ggsave("tsne-rorc.png", rorc, dpi = 300)
+ggsave("tsne-ccr6.png", ccr6, dpi = 300)
+```
+
+
+```{r}
+## triple positive cells
+plot_df$triple_pos <- as.numeric(plot_df$Tbet > 0 & plot_df$Ncr1 > 0 & plot_df$Rorc > 0)
+
+triple_pos <- plot_df %>%
+    dplyr::filter(louvain_labels %in% c(1,2,3,4,5,8)) %>%
+  my_plot(., "triple_pos", "tsne") +
+  my_theme +
+  labs(title = "Tbet + Nrc1(NKp46) + Rorc")
+ggsave("tsne-ilcs-tbet-nrc1-rorc.png", triple_pos, dpi = 300)
+```
+
+
+```{r}
+triple_pos_df <- df[df$triple_pos == 1,]
+```
+
+```{r}
+triple_pos_obj <- subset(obj, cells = triple_pos_df$index)
+Idents(triple_pos_obj) <- "louvain_labels"
+triple_pos_de <- FindMarkers(triple_pos_obj, ident.1 = 4, ident.2 = 8)
+```
+
+
+### Figure 1G
+
+```{r}
+conseq %>% group_by(conseq_clean) %>% summarise(count = n())
+```
+
+
+### Figure 1: Supplementary Figures
+
+
+```{r}
+plot_df$Mhc2 <- apply(plot_df[,grep("^H2\\.", colnames(plot_df))], 1, mean)
+## making topics and pathways a different color
+plotgenes <- colnames(plot_df)[c(2:84, 158:246)]
+plotpathways <- colnames(plot_df)[c(97:111, 121:140)]
+
+for( g in plotgenes ) {
+  
+  pout <- plot_df %>%
+    dplyr::filter(louvain_labels %in% c(1,2,3,4,5,8)) %>%
+    my_plot(., g) + my_blank_theme
+  
+  ggsave(filename = paste0(my_path, "results/figures/tsne-ilcs-", g, ".png"), 
+         plot = pout, 
+         dpi = 300)
+  
+}
+
+
+for( t in plotpathways ) {
+  
+  # my_plot(plot_df, "topic3") + scale_color_gradient(low="lightgrey", high="darkgreen")
+  pout <- plot_df %>%
+    dplyr::filter(louvain_labels %in% c(1,2,3,4,5,8)) %>%
+    my_plot(., t) + 
+    scale_color_gradient(low = "darkblue", high = "lightgreen") + 
+    my_blank_theme
+  
+  ggsave(filename = paste0(my_path, "results/figures/tsne-ilcs-", t, ".png"), 
+         plot = pout, 
+         dpi = 300)
+}
+```
+
+
+
+```{r colorcompare}
+p1 <- plot_df %>%
+    dplyr::filter(louvain_labels %in% c(1,2,3,4,5,8)) %>%
+    my_plot(., t) + 
+    scale_color_gradient(low = "lightgrey", high = "darkgreen") + 
+    my_blank_theme +
+  labs(title = paste("low = lightgrey, high = darkgreen"))
+
+p2 <- plot_df %>%
+    dplyr::filter(louvain_labels %in% c(1,2,3,4,5,8)) %>%
+    my_plot(., t) + 
+    scale_color_gradient(low = "lightblue", high = "lightgreen") + 
+    my_blank_theme +
+  labs(title = paste("low = lightblue, high = lightgreen"))
+
+p3 <- plot_df %>%
+    dplyr::filter(louvain_labels %in% c(1,2,3,4,5,8)) %>%
+    my_plot(., t) + 
+    scale_color_gradient(low = "lightblue", high = "darkgreen") + 
+    my_blank_theme +
+  labs(title = paste("low = lightblue, high = darkgreen"))
+
+p4 <- plot_df %>%
+    dplyr::filter(louvain_labels %in% c(1,2,3,4,5,8)) %>%
+    my_plot(., t) + 
+    scale_color_gradient(low = "blue", high = "lightgreen") + 
+    my_blank_theme +
+  labs(title = paste("low = blue, high = lightgreen"))
+
+p5 <- plot_df %>%
+    dplyr::filter(louvain_labels %in% c(1,2,3,4,5,8)) %>%
+    my_plot(., t) + 
+    scale_color_gradient(low = "blue", high = "darkgreen") + 
+    my_blank_theme +
+  labs(title = paste("low = blue, high = darkgreen"))
+
+p6 <- plot_df %>%
+    dplyr::filter(louvain_labels %in% c(1,2,3,4,5,8)) %>%
+    my_plot(., t) + 
+    scale_color_gradient(low = "darkblue", high = "lightgreen") + 
+    my_blank_theme +
+  labs(title = paste("low = darkblue, high = lightgreen"))
+
+
+out <- plot_grid(p1,p2,p3,p4,p5,p6, nrow = 2)
+```
+
+
+#### Supplementary Figure 1d
+
+```{r supfig1d_table}
+
+## ILC1
+ilc1_genes <- sum(vars$ilc1_expressed == 1, na.rm = TRUE)
+ilc1_degenes <- sum(vars$t_qval_8[vars$selected] == 0)
+ilc1_egenes <- sum(vars$ilc1_egenes_cv == 1, na.rm = TRUE)
+ilc1_eqtl_genes <- sum(vars$ilc1_eqtl_loci_genes_cv == 1, na.rm = TRUE)
+ilc1_cis_eqtl_genes <- sum(vars$ilc1_ciseqtl_assoc_cv == 1, na.rm = TRUE)
+ilc1_genes_w_snps <- sum(vars$ilc1_expressed == 1 & vars$in_gigamuga == 1, na.rm = TRUE)
+
+## ILC2
+ilc2_genes <- sum(vars$ilc2_expressed == 1, na.rm = TRUE)
+ilc2_degenes <- sum(vars$t_qval_3[vars$selected] == 0)
+ilc2_egenes <- sum(vars$ilc2_egenes_cv == 1, na.rm = TRUE)
+ilc2_eqtl_genes <- sum(vars$ilc2_eqtl_loci_genes_cv == 1, na.rm = TRUE)
+ilc2_cis_eqtl_genes <- sum(vars$ilc2_ciseqtl_assoc_cv == 1, na.rm = TRUE)
+ilc2_genes_w_snps <- sum(vars$ilc2_expressed == 1 & vars$in_gigamuga == 1, na.rm = TRUE)
+
+
+## ILC3
+ilc3_genes <- sum(vars$ilc3_expressed == 1, na.rm = TRUE)
+ilc3_degenes <- sum(vars$t_qval_2[vars$selected] == 0 | vars$t_qval_4[vars$selected] == 0)
+ilc3_egenes <- sum(vars$ilc3_egenes_cv == 1, na.rm = TRUE)
+ilc3_eqtl_genes <- sum(vars$ilc3_eqtl_loci_genes_cv == 1, na.rm = TRUE)
+ilc3_cis_eqtl_genes <- sum(vars$ilc3_ciseqtl_assoc_cv == 1, na.rm = TRUE)
+ilc3_genes_w_snps <- sum(vars$ilc3_expressed == 1 & vars$in_gigamuga == 1, na.rm = TRUE)
+
+
+## LTi-Like
+lti_genes <- sum(vars$lti_expressed == 1, na.rm = TRUE)
+lti_degenes <- sum(vars$t_qval_1[vars$selected] == 0 | vars$t_qval_5[vars$selected] == 0)
+lti_egenes <- sum(vars$lti_egenes_cv == 1, na.rm = TRUE)
+lti_eqtl_genes <- sum(vars$lti_eqtl_loci_genes_cv == 1, na.rm = TRUE)
+lti_cis_eqtl_genes <- sum(vars$lti_ciseqtl_assoc_cv == 1, na.rm = TRUE)
+lti_genes_w_snps <- sum(vars$lti_expressed == 1 & vars$in_gigamuga == 1, na.rm = TRUE)
+
+
+## All ILCs
+all_ilcs_genes <- sum({vars$ilc1_expressed == 1 | 
+    vars$ilc2_expressed == 1 | 
+    vars$ilc3_expressed == 1 | 
+    vars$lti_expressed == 1}, na.rm = TRUE)
+
+all_ilcs_degenes <- sum({vars$t_qval_1[vars$selected] == 0 |
+    vars$t_qval_2[vars$selected] == 0 |
+    vars$t_qval_3[vars$selected] == 0 |
+    vars$t_qval_4[vars$selected] == 0 |
+    vars$t_qval_5[vars$selected] == 0 |
+    vars$t_qval_8[vars$selected] == 0})
+
+all_ilcs_egenes <- sum({vars$ilc1_egenes_cv == 1 | 
+    vars$ilc2_egenes_cv == 1 | 
+    vars$ilc3_egenes_cv == 1 | 
+    vars$lti_egenes_cv == 1}, na.rm = TRUE)
+
+all_ilcs_eqtl_genes <- sum({vars$ilc1_eqtl_loci_genes_cv == 1 |
+    vars$ilc2_eqtl_loci_genes_cv == 1 |
+    vars$ilc3_eqtl_loci_genes_cv == 1 |
+    vars$lti_eqtl_loci_genes_cv == 1}, na.rm = TRUE)
+
+all_ilcs_cis_eqtl_genes <- sum({vars$ilc1_ciseqtl_assoc_cv == 1 |
+    vars$ilc2_ciseqtl_assoc_cv == 1 |
+    vars$ilc3_ciseqtl_assoc_cv == 1 |
+    vars$lti_ciseqtl_assoc_cv == 1}, na.rm = TRUE)
+
+all_ilcs_genes_w_snps <- sum({{vars$ilc1_expressed == 1 & vars$in_gigamuga == 1} |
+    {vars$ilc2_expressed == 1 & vars$in_gigamuga == 1} |
+    {vars$ilc3_expressed == 1 & vars$in_gigamuga == 1} |
+    {vars$lti_expressed == 1 & vars$in_gigamuga == 1}}, na.rm = TRUE)
+
+
+summary_df <- data.frame(
+  genes = c(ilc1_genes, ilc2_genes, ilc3_genes, lti_genes, all_ilcs_genes),
+  de_genes = c(ilc1_degenes, ilc2_degenes, ilc3_degenes, lti_degenes, all_ilcs_degenes),
+  egenes = c(ilc1_egenes, ilc2_egenes, ilc3_egenes, lti_egenes, all_ilcs_egenes),
+  eqtl_genes = c(ilc1_eqtl_genes, ilc2_eqtl_genes, ilc3_eqtl_genes, lti_eqtl_genes, all_ilcs_eqtl_genes),
+  cis_eqtl_genes = c(ilc1_cis_eqtl_genes, ilc2_cis_eqtl_genes, ilc3_cis_eqtl_genes, lti_cis_eqtl_genes, all_ilcs_cis_eqtl_genes),
+  genes_w_snps = c(ilc1_genes_w_snps, ilc2_genes_w_snps, ilc3_genes_w_snps, lti_genes_w_snps, all_ilcs_genes_w_snps)
+  )
+```
+
+
+## Figure 2
+
+### Figure 2A
+
+SNP/eQTL classification into cCRE, enhancer promoter etc
+
+
+```{r fig2a}
+
+## Pie ggplot function
+#Create a custom color scale
+# library(RColorBrewer)
+myColors <- brewer.pal(9,"Set1")
+names(myColors) <- unique(na.omit(ccre$type.y))
+# colScale <- scale_colour_manual(name = "grp",values = myColors)
+pie_ggplot <- function( data ) {
+  
+  ggplot(data, aes(x="", y = value, fill = group)) + 
+    geom_bar(stat="identity", width=1) +
+    coord_polar("y", start = 0) +
+    theme_void() +
+    scale_colour_manual(name = "group", values = myColors, aesthetics = "fill")
+    # geom_text(aes(y = ypos, label = prop), color = "white", size = 6) +
+    # scale_fill_brewer(palette = "Set1", values = myColors)
+  
+}
+
+
+# # Create Data ILC1 ccre
+ilc1_eqtl_ccre <- table(ccre$type.y[ccre$ilc1_eqtl_loci_mean==1]) %>%
+  as.data.frame() %>%
+  dplyr::rename(value = Freq, group = Var1) %>%
+  dplyr::arrange(desc(group)) %>%
+  dplyr::mutate(prop = round(value / sum(value) * 100, 1)) %>%
+  dplyr::mutate(ypos = cumsum(prop) - 0.5 * prop )
+
+ilc1_ccre_plot <- pie_ggplot(ilc1_eqtl_ccre)
+ggsave(filename = paste0(my_path, "results/figures/pie-ccre-ilc1-eqtl.png"), 
+       plot = ilc1_ccre_plot, 
+       dpi = 320)
+
+
+## cis-eQTL
+ilc1_cis_eqtl_ccre <- table(ccre$type.y[ccre$ilc1_ciseqtl_assoc_mean == 1]) %>%
+  as.data.frame() %>%
+  dplyr::rename(value = Freq, group = Var1) %>%
+  dplyr::arrange(desc(group)) %>%
+  dplyr::mutate(prop = round(value / sum(value) * 100, 1)) %>%
+  dplyr::mutate(ypos = cumsum(prop) - 0.5 * prop )
+
+ilc1_cis_ccre_plot <- pie_ggplot(ilc1_cis_eqtl_ccre)
+ggsave(filename = paste0(my_path, "results/figures/pie-ccre-ilc1-cis-eqtl.png"), 
+       plot = ilc1_cis_ccre_plot,
+       dpi = 320)
+
+
+## trans-eQTL
+ilc1_trans_eqtl_ccre <- table(ccre$type.y[ccre$ilc1_ciseqtl_assoc_mean == 0 & ccre$ilc1_eqtl_loci_mean == 1]) %>%
+  as.data.frame() %>%
+  dplyr::rename(value = Freq, group = Var1) %>%
+  dplyr::arrange(desc(group)) %>%
+  dplyr::mutate(prop = round(value / sum(value) * 100, 1)) %>%
+  dplyr::mutate(ypos = cumsum(prop) - 0.5 * prop )
+
+ilc1_trans_ccre_plot <- pie_ggplot(ilc1_trans_eqtl_ccre)
+ggsave(filename = paste0(my_path, "results/figures/pie-ccre-ilc1-trans-eqtl.png"),
+       plot = ilc1_trans_ccre_plot,
+       dpi = 320)
+
+
+
+# # Create Data ILC2 ccre
+ilc2_eqtl_ccre <- table(ccre$type.y[ccre$ilc2_eqtl_loci_mean==1]) %>%
+  as.data.frame() %>%
+  dplyr::rename(value = Freq, group = Var1) %>%
+  dplyr::arrange(desc(group)) %>%
+  dplyr::mutate(prop = round(value / sum(value) * 100, 1)) %>%
+  dplyr::mutate(ypos = cumsum(prop) - 0.5 * prop )
+
+ilc2_ccre_plot <- pie_ggplot(ilc2_eqtl_ccre)
+ggsave(filename = paste0(my_path, "results/figures/pie-ccre-ilc2-eqtl.png"), 
+       plot = ilc2_ccre_plot,
+       dpi = 320)
+
+
+## cis-eQTL
+ilc2_cis_eqtl_ccre <- table(ccre$type.y[ccre$ilc2_ciseqtl_assoc_mean == 1]) %>%
+  as.data.frame() %>%
+  dplyr::rename(value = Freq, group = Var1) %>%
+  dplyr::arrange(desc(group)) %>%
+  dplyr::mutate(prop = round(value / sum(value) * 100, 1)) %>%
+  dplyr::mutate(ypos = cumsum(prop) - 0.5 * prop )
+
+ilc2_ccre_plot <- pie_ggplot(ilc2_cis_eqtl_ccre)
+ggsave(filename = paste0(my_path, "results/figures/pie-ccre-ilc2-cis-eqtl.png"), 
+       plot = ilc2_ccre_plot,
+       dpi = 320)
+
+
+## trans-eQTL
+ilc2_trans_eqtl_ccre <- table(ccre$type.y[ccre$ilc2_ciseqtl_assoc_mean == 0 & ccre$ilc2_eqtl_loci_mean == 1]) %>%
+  as.data.frame() %>%
+  dplyr::rename(value = Freq, group = Var1) %>%
+  dplyr::arrange(desc(group)) %>%
+  dplyr::mutate(prop = round(value / sum(value) * 100, 1)) %>%
+  dplyr::mutate(ypos = cumsum(prop) - 0.5 * prop )
+
+ilc2_ccre_plot <- pie_ggplot(ilc2_trans_eqtl_ccre)
+ggsave(filename = paste0(my_path, "results/figures/pie-ccre-ilc2-trans-eqtl.png"), 
+       plot = ilc2_ccre_plot,
+       dpi = 320)
+
+
+# # Create Data ILC3 ccre
+ilc3_eqtl_ccre <- table(ccre$type.y[ccre$ilc3_eqtl_loci_mean==1]) %>%
+  as.data.frame() %>%
+  dplyr::rename(value = Freq, group = Var1) %>%
+  dplyr::arrange(desc(group)) %>%
+  dplyr::mutate(prop = round(value / sum(value) * 100, 1)) %>%
+  dplyr::mutate(ypos = cumsum(prop) - 0.5 * prop )
+
+ilc3_ccre_plot <- pie_ggplot(ilc3_eqtl_ccre)
+ggsave(filename = paste0(my_path, "results/figures/pie-ccre-ilc3-eqtl.png"), 
+       plot = ilc3_ccre_plot,
+       dpi = 320)
+
+
+## cis-eQTL
+ilc3_cis_eqtl_ccre <- table(ccre$type.y[ccre$ilc3_ciseqtl_assoc_mean == 1]) %>%
+  as.data.frame() %>%
+  dplyr::rename(value = Freq, group = Var1) %>%
+  dplyr::arrange(desc(group)) %>%
+  dplyr::mutate(prop = round(value / sum(value) * 100, 1)) %>%
+  dplyr::mutate(ypos = cumsum(prop) - 0.5 * prop )
+
+ilc3_ccre_plot <- pie_ggplot(ilc3_cis_eqtl_ccre)
+ggsave(filename = paste0(my_path, "results/figures/pie-ccre-ilc3-cis-eqtl.png"), 
+       plot = ilc3_ccre_plot,
+       dpi = 320)
+
+
+## trans-eQTL
+ilc3_trans_eqtl_ccre <- table(ccre$type.y[ccre$ilc3_ciseqtl_assoc_mean == 0 & ccre$ilc3_eqtl_loci_mean == 1]) %>%
+  as.data.frame() %>%
+  dplyr::rename(value = Freq, group = Var1) %>%
+  dplyr::arrange(desc(group)) %>%
+  dplyr::mutate(prop = round(value / sum(value) * 100, 1)) %>%
+  dplyr::mutate(ypos = cumsum(prop) - 0.5 * prop )
+
+ilc3_ccre_plot <- pie_ggplot(ilc3_trans_eqtl_ccre)
+ggsave(filename = paste0(my_path, "results/figures/pie-ccre-ilc3-trans-eqtl.png"), 
+       plot = ilc3_ccre_plot,
+       dpi = 320)
+
+
+# # Create Data LTi ccre
+lti_eqtl_ccre <- table(ccre$type.y[ccre$lti_eqtl_loci_mean==1]) %>%
+  as.data.frame() %>%
+  dplyr::rename(value = Freq, group = Var1) %>%
+  dplyr::arrange(desc(group)) %>%
+  dplyr::mutate(prop = round(value / sum(value) * 100, 1)) %>%
+  dplyr::mutate(ypos = cumsum(prop) - 0.5 * prop )
+
+lti_ccre_plot <- pie_ggplot(lti_eqtl_ccre)
+ggsave(filename = paste0(my_path, "results/figures/pie-ccre-lti-eqtl.png"), 
+       plot = lti_ccre_plot,
+       dpi = 320)
+
+
+## cis-eQTL
+lti_cis_eqtl_ccre <- table(ccre$type.y[ccre$lti_ciseqtl_assoc_mean == 1]) %>%
+  as.data.frame() %>%
+  dplyr::rename(value = Freq, group = Var1) %>%
+  dplyr::arrange(desc(group)) %>%
+  dplyr::mutate(prop = round(value / sum(value) * 100, 1)) %>%
+  dplyr::mutate(ypos = cumsum(prop) - 0.5 * prop )
+
+lti_ccre_plot <- pie_ggplot(lti_cis_eqtl_ccre)
+ggsave(filename = paste0(my_path, "results/figures/pie-ccre-lti-cis-eqtl.png"), 
+       plot = lti_ccre_plot,
+       dpi = 320)
+
+
+## trans-eQTL
+lti_trans_eqtl_ccre <- table(ccre$type.y[ccre$lti_ciseqtl_assoc_mean == 0 & ccre$lti_eqtl_loci_mean == 1]) %>%
+  as.data.frame() %>%
+  dplyr::rename(value = Freq, group = Var1) %>%
+  dplyr::arrange(desc(group)) %>%
+  dplyr::mutate(prop = round(value / sum(value) * 100, 1)) %>%
+  dplyr::mutate(ypos = cumsum(prop) - 0.5 * prop )
+
+lti_ccre_plot <- pie_ggplot(lti_trans_eqtl_ccre)
+ggsave(filename = paste0(my_path, "results/figures/pie-ccre-lti-trans-eqtl.png"),
+       plot = lti_ccre_plot,
+       dpi = 320)
+
+```
+
+
+### Figure 2B
+
+
+### Polygenic score?
+```{r fig2b_prepqtl}
+## CRTH2 = Ptgdr2,  TCF-1 = Tcf7, CKIT = KIT, CGRP = Calca
+key_genes <- c("Tbx21", "Gata3", "Rorc", "Ncr1", "Areg", 
+               "Ptgdr2", "Gfi1", "Tcf7", "Ahr", "Kit", "Calca")
+
+tf_df <- data.frame(index = obj@assays$RNA@data@Dimnames[[2]],
+           t(as.matrix(obj@assays$RNA@data[key_genes,]))) %>%
+  # mutate(Tbet_rankz = DOQTL::rankZ(Tbx21),
+  #        Gata3_rankz = DOQTL::rankZ(Gata3),
+  #        Rorc_rankz = DOQTL::rankZ(Rorc),
+  #        Ncr1_rankz = DOQTL::rankZ(Ncr1)) %>%
+  left_join({ 
+    obs %>% dplyr::select( index,
+                           louvain_labels, 
+                           called_cell_types, 
+                           called_cell_types_new, 
+                           BestCall,
+                           filtered_set )
+    })
+
+
+pheno <- tf_df %>%
+  dplyr::filter(called_cell_types %in% c("Lti ILC3", "ILC1", "ILC2", "NCR1+ ILC3")) %>%
+  dplyr::filter(filtered_set == 1, BestCall !="AMB", BestCall != "") %>%
+  dplyr::select(BestCall, called_cell_types, Tbx21:Kit) %>%
+  dplyr::group_by(BestCall, called_cell_types) %>%
+  dplyr::summarise_all(mean) %>%
+  tidyr::pivot_longer(Tbx21:Kit) %>%
+  tidyr::unite("name", called_cell_types:name, remove = TRUE) %>%
+  tidyr::pivot_wider( names_from =  name, 
+                      values_from = value) %>%
+  as.data.frame
+
+
+
+marker_file <- paste0(project_path, "genotype/GM_snps.Rdata")
+marker_map_file <- paste0(project_path, "genotype/Regev_map_20171221.rds")
+gene_map_file <- paste0(my_path, "data/reference/ensembl.Mus_musculus.GRCm38.93.csv")
+cores <- 2
+
+## Load Genotypes (Allele Probs)
+cat("Reading allele probs data ...", "\n")
+load(paste0(geno_path, "alleleprobs.Rdata"))
+cat("Loaded allele probs data ...", "\n")
+nms <- rownames(aprobs[[1]])
+
+## subbset to DO mice for single cell data
+samples <- grep("20180706", nms, value = T)
+for( chr in names(aprobs) ) {
+  aprobs[[chr]] <- aprobs[[chr]][samples, , ]
+}
+
+
+nms <- rownames(aprobs[[1]])
+nms <- str_extract(nms, "C[0-9]{1,2}_[0-9]")
+
+## rename sample ids to match phenotype data
+for( chr in names(aprobs) ) {
+  rownames(aprobs[[chr]]) <- nms
+}
+
+## pheno <- ilc2 %>% group_by(BestCall)  %>% summarise_all(funs(mean)) %>% as.data.frame()
+## pheno <- topics %>% group_by(BestCall)  %>% summarise_all(funs(mean)) %>% as.data.frame()
+## Load Phenotypes (all females)
+cat("Reading phenotype data ...", "\n")
+# pheno <- fread(pheno_file, data.table = FALSE)
+rownames(pheno) <- pheno[,1]
+pheno <- pheno[,-1]
+
+
+## Sync sample names
+cat("Sync sample names ...", "\n")
+samples <- intersect(rownames(pheno), rownames(aprobs[[1]]))
+
+pheno <- pheno[samples, ,drop = FALSE]
+for( chr in names(aprobs) ) {
+  aprobs[[chr]] <- aprobs[[chr]][samples, , ]
+}
+
+
+# Creating kinship matrix
+cat("Creating kinship matrix ... \n")
+K <- calc_kinship(probs = aprobs, type = "loco", cores = cores)
+
+
+```
+
+```{r fig2b_runqtl}
+cat("Running QTL analysis...", "\n")
+qtl <- scan1(genoprobs = aprobs,
+             pheno = pheno, # [, var_col, drop = FALSE],
+             kinship = K,
+             cores = cores)
+```
+
+```{r fig2b_perm_test}
+var_col <- "Tbet_rankz"
+operm <- scan1perm(genoprobs = aprobs[, '2'],
+             pheno = pheno[, var_col, drop = FALSE],
+             kinship = K[['2']],
+             cores = cores,
+             n_perm = 100)
+```
+
+
+
+```{r plot_perm}
+
+for( gene in colnames(qtl) ) {
+  png(paste0("qtl-eqtl-", gene, "-gwa.png"))
+
+  ## var_col <- paste0("topic", topic_num)
+  ## thr <- quantile(operm, 0.95)
+  thr <- 6
+  plot(x = qtl, map = marker_map, lodcolumn = gene, main = gene)
+  abline(h = thr, col = 'red')
+
+  dev.off()
+
+}
+
+lods <- as.data.frame(qtl)
+lods$marker <- rownames(lods)
+write.csv(lods, "lods-eqtl-ilc-tfgenes.csv")
+```
+
+
+
+```{r fig2b_varex}
+library(QTLRel)
+
+# pheno
+AA <- calc_kinship(probs = aprobs, type = "overall", cores = cores)
+v <- list(A = AA)
+
+gdtmp <- geno[,-1] + 1
+rownames(gdtmp) <- geno[,1]
+gdtmp <- replace(gdtmp, is.na(gdtmp), 0)
+ii <- match(rownames(pheno), rownames(gdtmp))
+gdtmp <- gdtmp[ii, ]
+
+
+gmap <- GM_snps %>% 
+  dplyr::select(snp = marker, chr = chr, dist = cM, pos = pos) %>%
+  dplyr::mutate(pos = pos * 1e6)
+gmap <- gmap[!{duplicated(gmap$pos)}, ]
+gmap <- gmap[!{duplicated(gmap$dist)}, ]
+
+keep_markers <- intersect(colnames(gdtmp), gmap$snp)
+gdtmp <- gdtmp[, keep_markers]
+gmap <- gmap %>% dplyr::filter(snp %in% keep_markers)
+
+# rung 'genoProb'
+prDat<- genoProb(gdat = gdtmp, 
+                 gmap = gmap, 
+                 step = Inf,
+                 gr = 8,
+                 pos = NULL,
+                 method = "Haldane", 
+                 msg = TRUE)
+
+
+scanone_list <- sapply( colnames(pheno), function(gene) {
+  
+  # estimate variance components
+  o <- tryCatch({
+    estVC(y = pheno[[gene]], v = v)
+    }, error = function(e) NULL)
+  
+  if( !is.null(o) ) {
+    
+    # genome scan
+    out <- scanOne(y = pheno[[gene]], prdat = prDat, vc = o, test = "LRT")
+# }, error = function(e) list(parameters = data.frame(Intercept=0,a=0,d=0), pval = 0, v = 0))
+      
+    data.frame(out$parameters, 
+               pval = out$pval, 
+               lod = out$pval/(2*log(10)),
+               v = out$v) %>%
+      dplyr::rename_all( .funs = list(~paste0(., "_", gene))) %>%
+      tibble::rownames_to_column(var = "marker")
+    }
+    
+}, USE.NAMES = TRUE, simplify = FALSE)
+
+
+# Get the LOD scores and the proportion of variance explained by each SNP. 
+# gwscan$lod <- out$p/(2*log(10))
+# gwscan$pve <- out$v/100
+  
+# run 'qtlVar'
+qtlvar_out <- Map(function(l) {
+  
+  qef <- as.data.frame(l$parameters[, c("a", "d")])
+  qtlVar(qef, prDat$pr)
+
+}, scanone_list)
+# ## End(Not run)
+
+qtlvar_df <- Reduce(merge, scanone_list)
+write.csv(qtlvar_df, paste0(my_path, "results/variance-explained-rel-eqtl.csv"))
+```
+
+
+```{r}
+tf_lods <- read_csv(paste0(my_path, "results/lods-eqtl-ilc-tfgenes.csv"))
+tf_var_explained <- read_csv(paste0(my_path, "results/variance-explained-eqtl.csv"))
+```
+
+```{r}
+
+## a: -1, 0, 1    d: 0, 1
+check <- as.matrix(gdtmp) %*% as.matrix(qtlvar_df[, 3:4])
+
+phenonames <- colnames(pheno)
+
+polygenic_effect <- sapply(phenonames, function(p) {
+  
+  sapply(colnames(gdtmp), function(g) {
+    
+    (gdtmp[,g] - 2) * qtlvar_df[g, paste0("a_", p)] + 
+      as.numeric(gdtmp[, g] == 2) * qtlvar_df[g, paste0("d_", p)]
+    
+    }, USE.NAMES = TRUE, simplify = FALSE)
+  
+}, USE.NAMES = TRUE, simplify = FALSE)
+```
+
+
+```{r}
+
+## a: -1, 0, 1    d: 0, 1
+check <- as.matrix(gdtmp) %*% as.matrix(qtlvar_df[, 3:4])
+
+phenonames <- colnames(pheno)
+
+polygenic_effect <- sapply(phenonames, function(p) {
+  
+  lapply(rownames(gdtmp), function(m) {
+    
+    aeffect <- qtlvar_df[, paste0("a_", p), drop = FALSE] %*% as.numeric(gdtmp[m, ] - 2)
+    deffect <- qtlvar_df[, paste0("d_", p), drop = FALSE] %*% as.numeric(gdtmp[m, ] == 2)
+    
+    }) %>%
+    do.call(., rbind)
+  
+}, USE.NAMES = TRUE, simplify = FALSE)
+```
+
+
+```{r}
+## ILC1
+# number of eQTLs per gene
+ilc1_eqtl_gene_count <- sort(sapply(split(ilc1_mean, ilc1_mean$gene), function(d) length(unique(d$ensembl_gene))))
+ilc1_eqtl_gene_count <- sort(sapply(split(ilc1_cv, ilc1_cv$gene), function(d) length(unique(d$ensembl_gene))))
+
+
+## ILC2
+ilc2_eqtl_gene_count <- sort(sapply(split(ilc2_mean, ilc2_mean$gene), function(d) length(unique(d$ensembl_gene))))
+ilc2_eqtl_gene_count <- sort(sapply(split(ilc2_cv, ilc2_cv$gene), function(d) length(unique(d$ensembl_gene))))
+
+
+## ILC3
+ilc3_eqtl_gene_count <- sort(sapply(split(ilc3_mean, ilc3_mean$gene), function(d) length(unique(d$ensembl_gene))))
+ilc3_eqtl_gene_count <- sort(sapply(split(ilc3_cv, ilc3_cv$gene), function(d) length(unique(d$ensembl_gene))))
+
+
+## LTi
+lti_eqtl_gene_count <- sort(sapply(split(lti_mean, lti_mean$gene), function(d) length(unique(d$ensembl_gene))))
+lti_eqtl_gene_count <- sort(sapply(split(lti_cv, lti_cv$gene), function(d) length(unique(d$ensembl_gene))))
+
+
+ilc1_eqtl_genecount_df <- data.frame(ilc1_eqtl_gene_count) %>% 
+  tibble::rownames_to_column(var = "gene")
+ilc2_eqtl_genecount_df <- data.frame(ilc2_eqtl_gene_count) %>% 
+  tibble::rownames_to_column(var = "gene")
+ilc3_eqtl_genecount_df <- data.frame(ilc3_eqtl_gene_count) %>% 
+  tibble::rownames_to_column(var = "gene")
+lti_eqtl_genecount_df <- data.frame(lti_eqtl_gene_count) %>% 
+  tibble::rownames_to_column(var = "gene")
+
+
+eqtl_genecount_df <- ilc1_eqtl_genecount_df %>%
+  dplyr::full_join(ilc2_eqtl_genecount_df) %>%
+  dplyr::full_join(ilc3_eqtl_genecount_df) %>%
+  dplyr::full_join(lti_eqtl_genecount_df) %>%
+  tidyr::replace_na(replace = list(ilc1_eqtl_genecount_df = 0,
+                                   ilc2_eqtl_genecount_df = 0,
+                                   ilc3_eqtl_genecount_df = 0,
+                                   lti_eqtl_genecount_df = 0))
+
+```
+
+
+```{r}
+## ILC1
+# number of eGenes per eQTL gene
+ilc1_egene_count <- sort(sapply(split(ilc1_mean, ilc1_mean$ensembl_gene), function(d) length(unique(d$gene))))
+ilc1_egene_count <- sort(sapply(split(ilc1_cv, ilc1_cv$ensembl_gene), function(d) length(unique(d$gene))))
+
+
+## ILC2
+ilc2_egene_count <- sort(sapply(split(ilc2_mean, ilc2_mean$ensembl_gene), function(d) length(unique(d$gene))))
+ilc2_egene_count <- sort(sapply(split(ilc2_cv, ilc2_cv$ensembl_gene), function(d) length(unique(d$gene))))
+
+
+## ILC3
+ilc3_egene_count <- sort(sapply(split(ilc3_mean, ilc3_mean$ensembl_gene), function(d) length(unique(d$gene))))
+ilc3_egene_count <- sort(sapply(split(ilc3_cv, ilc3_cv$ensembl_gene), function(d) length(unique(d$gene))))
+
+
+## LTi
+lti_egene_count <- sort(sapply(split(lti_mean, lti_mean$ensembl_gene), function(d) length(unique(d$gene))))
+lti_egene_count <- sort(sapply(split(lti_cv, lti_cv$ensembl_gene), function(d) length(unique(d$gene))))
+
+
+ilc1_egenecount_df <- data.frame(ilc1_egene_count) %>% 
+  tibble::rownames_to_column(var = "gene")
+ilc2_egenecount_df <- data.frame(ilc2_egene_count) %>% 
+  tibble::rownames_to_column(var = "gene")
+ilc3_egenecount_df <- data.frame(ilc3_egene_count) %>% 
+  tibble::rownames_to_column(var = "gene")
+lti_egenecount_df <- data.frame(lti_egene_count) %>% 
+  tibble::rownames_to_column(var = "gene")
+
+
+egenecount_df <- ilc1_egenecount_df %>%
+  dplyr::full_join(ilc2_egenecount_df) %>%
+  dplyr::full_join(ilc3_egenecount_df) %>%
+  dplyr::full_join(lti_egenecount_df) %>%
+  tidyr::replace_na(replace = list(ilc1_egene_count = 0,
+                                   ilc2_egene_count = 0,
+                                   ilc3_egene_count = 0,
+                                   lti_egene_count = 0))
+
+```
+
+
+### Figure 2C
+
+
+#### Ven Diagram
+
+
+```{r}
+myCol <- RColorBrewer::brewer.pal(4, "Pastel2")
+# Chart
+venn.diagram(
+        x = list(na.omit(vars$index[vars$ilc1_egenes_cv == 1]),
+                 na.omit(vars$index[vars$ilc3_egenes_cv == 1]),
+                 na.omit(vars$index[vars$ilc1_se == 1]),
+                 na.omit(vars$index[vars$ilc3_se == 1])),
+        category.names = c("ILC1 eGenes" , "ILC3 eGenes" , "ILC1 SE", "ILC3 SE"),
+        filename = 'egenes-overlap-segenes-venn-diagramm.png',
+        output=TRUE,
+        main = "Super Enhancer Overlap with eGenes",
+        main.cex = 0.5,
+        
+        # Output features
+        imagetype="png" ,
+        height = 480 , 
+        width = 480 , 
+        resolution = 300,
+        compression = "lzw",
+        
+        # Circles
+        lwd = 2,
+        lty = 'blank',
+        fill = myCol,
+        
+        # Numbers
+        cex = .5,
+        fontface = "bold",
+        fontfamily = "sans",
+        cat.cex = .25
+        
+)
+```
+
+
+Overlap with ILC genes found in this paper (Figure 4D)
+https://pubmed.ncbi.nlm.nih.gov/27156452/
+
+
+```{r fig2c}
+library(ggseqlogo)
+library(Gviz)
+library(GenomicRanges)
+library(GenomicFeatures)
+library(TxDb.Mmusculus.UCSC.mm10.knownGene)
+library(BSgenome.Mmusculus.UCSC.mm10)
+library(RMariaDB)
+
+## Rbpj SNPs - chr5 53553396 - 53661165
+start_irange <- 53000000
+end_irange <- 54000000
+chr_str <- "chr5"
+chr_num <- "5"
+gen <- "mm10"
+
+strack <- SequenceTrack(Mmusculus, chromosome = chr_str)
+
+txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+keepStandardChromosomes(txdb, pruning.mode = "coarse")
+
+gff_file <- paste0(my_path, "data/reference/Mus_musculus.GRCm38.100.gff3.gz")
+gff <- readGFF(gff_file)
+rbpj <- subset(gff, Parent=="gene:ENSMUSG00000039191")
+gff_gr <- readGFFAsGRanges(gff_file)
+txdb <- makeTxDbFromGFF(gff_file, format="gff3")
+byexons <- exonsBy(txdb, by="gene")
+
+# txdb <- makeTxDbFromBiomart(biomart="ensembl", dataset = "mmusculus_gene_ensembl")
+# keepStandardChromosomes(txdb, pruning.mode="coarse")
+# 
+# txdb <- makeTxDbFromEnsembl("Mus musculus", server="useastdb.ensembl.org")
+
+pos_snps <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+names_snps <-  ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% marker
+
+snps_atrack <- AnnotationTrack(start = pos_snps,
+                               width = rep(1, length(pos_snps)),
+                               chromosome = chr_str,
+                               group = names_snps,
+                               genome = gen,
+                               name = "SNPs")
+
+start_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% start
+end_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% end
+names_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% type.y
+
+ccre_atrack <- AnnotationTrack(start = start_ccre,
+                               width = end_ccre - start_ccre,
+                               chromosome = chr_str,
+                               group = names_ccre,
+                               genome = gen,
+                               name = "cCREs")
+
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(genome = gen, chromosome = chr_str)
+
+
+grtrack <- GeneRegionTrack(txdb, 
+                           genome = gen,
+                           chromosome = chr_str, 
+                           name = "Gene Model",
+                           geneAnnotation = "symbol")
+
+start_lti_gwas <- end_lti_gwas <- lti_gwas %>%
+  arrange(pos) %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+
+data_lti_gwas <- lti_gwas %>%
+  arrange(pos) %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% lods
+
+lti_gwas_gr <- GRanges(
+  seqnames = Rle(chr_str),
+  ranges = IRanges(start = start_lti_gwas,
+                   end = end_lti_gwas)
+  )
+##data track
+dtrack <- DataTrack(data = data_lti_gwas, 
+                    start = start_lti_gwas,
+                    end = end_lti_gwas+1, 
+                    chromosome = chr, 
+                    genome = gen,
+                    name = "Uniform")
+
+#highlight
+# ht <- HighlightTrack(trackList = list(atrack, grtrack,dtrack),
+#                      start = c(26705000, 26720000), width = 7000, chromosome = 7)
+
+
+plotTracks(list(itrack, gtrack, snps_atrack, grtrack, strack, ccre_atrack),
+           from = start_irange, to = end_irange, cex = 0.8)
+
+
+plotTracks(list(itrack, gtrack, snps_atrack, grtrack, strack, dtrack),
+           from = start_irange, to = end_irange, cex = 0.8, type = "b")
+```
+
+
+### Rbpj
+
+```{r}
+## Rbpj SNPs - chr5 53553396 - 53661165
+start_irange <- 53000000
+end_irange <- 54000000
+chr_str <- "chr5"
+chr_num <- "5"
+gen <- "mm10"
+
+lti_gwas <- fread(paste0(my_path, "results/LTi_stressed_vs_non_qtl.csv"))
+ilc2_ilc3_gwas <- fread(paste0(my_path, 'results/gwas-ilc2-ilc3-results.csv'))
+ilc2_lti_gwas <- fread(paste0(my_path, 'results/gwas-ilc2-lti-results.csv'))
+
+
+start_lti_gwas <- end_lti_gwas <- lti_gwas %>%
+  arrange(pos) %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+
+data_lti_gwas <- lti_gwas %>%
+  arrange(pos) %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% lods
+
+lti_dtrack <- DataTrack(data = data_lti_gwas, 
+                    start = start_lti_gwas,
+                    end = end_lti_gwas+1, 
+                    chromosome = chr_num, 
+                    genome = gen,
+                    name = "LTi Activated")
+
+
+start_ilc2_ilc3_gwas <- end_ilc2_ilc3_gwas <- ilc2_ilc3_gwas %>%
+  arrange(pos) %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+
+data_ilc2_ilc3_gwas <- ilc2_ilc3_gwas %>%
+  arrange(pos) %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% lods
+
+ilc2_ilc3_dtrack <- DataTrack(data = data_ilc2_ilc3_gwas, 
+                    start = start_ilc2_ilc3_gwas,
+                    end = end_ilc2_ilc3_gwas, 
+                    chromosome = chr_num, 
+                    genome = gen,
+                    name = "ILC2 vs ILC3")
+
+
+
+start_ilc2_lti_gwas <- end_ilc2_lti_gwas <- ilc2_lti_gwas %>%
+  arrange(pos) %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+
+data_ilc2_lti_gwas <- ilc2_lti_gwas %>%
+  arrange(pos) %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% lods
+
+ilc2_lti_dtrack <- DataTrack(data = data_ilc2_lti_gwas, 
+                    start = start_ilc2_lti_gwas,
+                    end = end_ilc2_lti_gwas, 
+                    chromosome = chr_num, 
+                    genome = gen,
+                    name = "ILC2 vs LTi-Like")
+
+plotTracks(list(itrack, gtrack, snps_atrack, grtrack, strack, ccre_atrack,
+                lti_dtrack, ilc2_ilc3_dtrack, ilc2_lti_dtrack),
+           from = start_irange, to = end_irange, cex = 0.8, type = "b")
+```
+
+
+
+### STIM2
+
+```{r stim2_gviz}
+# LTi Activated
+## Stim2 SNPs - chr5 53553396 - 53661165
+start_irange <- 53500000
+end_irange <- 54500000
+chr_str <- "chr5"
+chr_num <- "5"
+gen <- "mm10"
+
+## Sequence and Ideogram
+strack <- SequenceTrack(Mmusculus, chromosome = chr_str)
+txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+keepStandardChromosomes(txdb, pruning.mode="coarse")
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(genome = gen, chromosome = chr_str)
+
+## Genome Track
+grtrack <- GeneRegionTrack(txdb, 
+                           genome = gen,
+                           chromosome = chr_str, 
+                           name = "Gene Model",
+                           geneAnnotation = "symbol")
+
+pos_snps <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+names_snps <-  ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% marker
+
+snps_atrack <- AnnotationTrack(start = pos_snps,
+                               width = rep(1, length(pos_snps)),
+                               chromosome = chr_str,
+                               group = names_snps,
+                               genome = gen,
+                               name = "SNPs")
+
+start_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% start
+end_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% end
+names_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% type.y
+
+ccre_atrack <- AnnotationTrack(start = start_ccre,
+                               width = end_ccre - start_ccre,
+                               chromosome = chr_str,
+                               group = names_ccre,
+                               genome = gen,
+                               name = "cCREs")
+
+lti_gwas <- fread(paste0(my_path, "results/LTi_stressed_vs_non_qtl.csv"))
+ilc2_ilc3_gwas <- fread(paste0(my_path, 'results/gwas-ilc2-ilc3-results.csv'))
+ilc2_lti_gwas <- fread(paste0(my_path, 'results/gwas-ilc2-lti-results.csv'))
+
+start_lti_gwas <- end_lti_gwas <- lti_gwas %>%
+  dplyr::arrange(pos) %>%
+  dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+
+data_lti_gwas <- lti_gwas %>%
+  dplyr::arrange(pos) %>%
+  dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% lods
+
+lti_dtrack <- DataTrack(data = data_lti_gwas, 
+                    start = start_lti_gwas,
+                    end = end_lti_gwas+1, 
+                    chromosome = chr_num, 
+                    genome = gen,
+                    name = "LTi Activated")
+
+
+start_ilc2_ilc3_gwas <- end_ilc2_ilc3_gwas <- ilc2_ilc3_gwas %>%
+  dplyr::arrange(pos) %>%
+  dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+
+data_ilc2_ilc3_gwas <- ilc2_ilc3_gwas %>%
+  dplyr::arrange(pos) %>%
+  dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% lods
+
+ilc2_ilc3_dtrack <- DataTrack(data = data_ilc2_ilc3_gwas, 
+                    start = start_ilc2_ilc3_gwas,
+                    end = end_ilc2_ilc3_gwas, 
+                    chromosome = chr_num, 
+                    genome = gen,
+                    name = "ILC2 vs ILC3")
+
+
+
+start_ilc2_lti_gwas <- end_ilc2_lti_gwas <- ilc2_lti_gwas %>%
+  dplyr::arrange(pos) %>%
+  dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+
+data_ilc2_lti_gwas <- ilc2_lti_gwas %>%
+  dplyr::arrange(pos) %>%
+  dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% lods
+
+ilc2_lti_dtrack <- DataTrack(data = data_ilc2_lti_gwas, 
+                    start = start_ilc2_lti_gwas,
+                    end = end_ilc2_lti_gwas, 
+                    chromosome = chr_num, 
+                    genome = gen,
+                    name = "ILC2 vs LTi-Like")
+
+plotTracks(list(itrack, gtrack, snps_atrack, grtrack, strack, ccre_atrack,
+                lti_dtrack, ilc2_ilc3_dtrack, ilc2_lti_dtrack),
+           from = start_irange, to = end_irange, cex = 0.8, type = "b")
+
+```
+
+
+
+
+### Slc39a10
+
+
+```{r slc39a10_gviz}
+# ILC3 Activated
+## Slc39a10 SNPs - chr1 46807544 - 46892852
+start_irange <- 46500000
+end_irange <- 47500000
+chr_str <- "chr1"
+chr_num <- "1"
+gen <- "mm10"
+
+## Sequence and Ideogram
+strack <- SequenceTrack(Mmusculus, chromosome = chr_str)
+txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+keepStandardChromosomes(txdb, pruning.mode="coarse")
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(genome = gen, chromosome = chr_str)
+
+## Genome Track
+grtrack <- GeneRegionTrack(txdb, 
+                           genome = gen,
+                           chromosome = chr_str, 
+                           name = "Gene Model",
+                           geneAnnotation = "symbol")
+
+pos_snps <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+names_snps <-  ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% marker
+
+snps_atrack <- AnnotationTrack(start = pos_snps,
+                               width = rep(1, length(pos_snps)),
+                               chromosome = chr_str,
+                               group = names_snps,
+                               genome = gen,
+                               name = "SNPs")
+
+start_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% start
+end_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% end
+names_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% type.y
+
+ccre_atrack <- AnnotationTrack(start = start_ccre,
+                               width = end_ccre - start_ccre,
+                               chromosome = chr_str,
+                               group = names_ccre,
+                               genome = gen,
+                               name = "cCREs")
+
+ilc3_gwas <- fread(paste0(my_path, "results/ILC3_stressed_vs_non_qtl.csv"))
+topics <- fread(paste0(my_path, "results/topic-qtl-lods.csv")) 
+
+start_ilc3_gwas <- end_ilc3_gwas <- ilc3_gwas %>%
+  dplyr::arrange(pos) %>%
+  dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+
+data_ilc3_gwas <- ilc3_gwas %>%
+  dplyr::arrange(pos) %>%
+  dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% lods
+
+ilc3_dtrack <- DataTrack(data = data_ilc3_gwas, 
+                    start = start_ilc3_gwas,
+                    end = end_ilc3_gwas+1, 
+                    chromosome = chr_num, 
+                    genome = gen,
+                    name = "ILC3 Activated")
+
+
+
+plotTracks(list(itrack, gtrack, snps_atrack, grtrack, strack, ccre_atrack, ilc3_dtrack),
+           from = start_irange, to = end_irange, cex = 0.8, type = "b")
+
+```
+
+### Sstr4
+
+```{r sstr_gviz}
+## topic 3
+# topics <- fread(paste0(my_path, "results/topic-qtl-lods.csv"))
+## Sstr4 - Chr2:148395377-148396764
+start_irange <- 148000000
+end_irange <- 149000000
+chr_str <- "chr2"
+chr_num <- "2"
+gen <- "mm10"
+
+
+## Sequence and Ideogram
+strack <- SequenceTrack(Mmusculus, chromosome = chr_str)
+txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+keepStandardChromosomes(txdb, pruning.mode="coarse")
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(genome = gen, chromosome = chr_str)
+
+## Genome Track
+grtrack <- GeneRegionTrack(txdb, 
+                           genome = gen,
+                           chromosome = chr_str, 
+                           name = "Gene Model",
+                           geneAnnotation = "symbol")
+
+pos_snps <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+names_snps <-  ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% marker
+
+snps_atrack <- AnnotationTrack(start = pos_snps,
+                               width = rep(1, length(pos_snps)),
+                               chromosome = chr_str,
+                               group = names_snps,
+                               genome = gen,
+                               name = "SNPs")
+
+start_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% start
+end_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% end
+names_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% type.y
+
+ccre_atrack <- AnnotationTrack(start = start_ccre,
+                               width = end_ccre - start_ccre,
+                               chromosome = chr_str,
+                               group = names_ccre,
+                               genome = gen,
+                               name = "cCREs")
+
+## topic1, topic3, topic6
+topics <- fread(paste0(my_path, "results/topic-qtl-lods.csv"))
+
+start_topic3 <- end_topic3 <- topics %>%
+  dplyr::left_join(ccre, by = "marker") %>%
+  dplyr::arrange(pos) %>%
+  dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+
+data_topic3 <- topics %>%
+  dplyr::left_join(ccre, by = "marker") %>%
+  dplyr::arrange(pos) %>% 
+  dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %>%
+  dplyr::select(topic1, topic3) 
+  # dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% topic3
+
+topic3_dtrack <- DataTrack(data = data_topic3,
+                    start = start_topic3,
+                    end = end_topic3,
+                    chromosome = chr_num,
+                    groups = c("Topic 1", "Topic 3"),
+                    genome = gen,
+                    name = "Topic")
+
+
+plotTracks(list(itrack, gtrack, snps_atrack, grtrack, strack, ccre_atrack, 
+                topic3_dtrack),
+           from = start_irange, to = end_irange, cex = 0.8, type = "b")
+
+```
+
+
+### Sox9
+
+```{r sox9_gviz}
+## topic 8
+# topics <- fread(paste0(my_path, "results/topic-qtl-lods.csv"))
+## Sox9 - Chr11:112782224-112787760
+start_irange <- 112500000
+end_irange <- 113250000
+chr_str <- "chr11"
+chr_num <- "11"
+gen <- "mm10"
+
+
+## Sequence and Ideogram
+strack <- SequenceTrack(Mmusculus, chromosome = chr_str)
+txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+keepStandardChromosomes(txdb, pruning.mode="coarse")
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(genome = gen, chromosome = chr_str)
+
+## Genome Track
+grtrack <- GeneRegionTrack(txdb, 
+                           genome = gen,
+                           chromosome = chr_str, 
+                           name = "Gene Model",
+                           geneAnnotation = "symbol")
+
+pos_snps <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+names_snps <-  ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% marker
+
+snps_atrack <- AnnotationTrack(start = pos_snps,
+                               width = rep(1, length(pos_snps)),
+                               chromosome = chr_str,
+                               group = names_snps,
+                               genome = gen,
+                               name = "SNPs")
+
+start_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% start
+end_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% end
+names_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% type.y
+
+ccre_atrack <- AnnotationTrack(start = start_ccre,
+                               width = end_ccre - start_ccre,
+                               chromosome = chr_str,
+                               group = names_ccre,
+                               genome = gen,
+                               name = "cCREs")
+
+## topic8
+topics <- fread(paste0(my_path, "results/topic-qtl-lods.csv"))
+
+start_topic <- end_topic <- topics %>%
+  dplyr::left_join(ccre, by = "marker") %>%
+  dplyr::arrange(pos) %>%
+  dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+
+data_topic8 <- topics %>%
+  dplyr::left_join(ccre, by = "marker") %>%
+  dplyr::arrange(pos) %>% 
+  dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% topic8
+
+topic_dtrack <- DataTrack(data = data_topic8,
+                    start = start_topic,
+                    end = end_topic,
+                    chromosome = chr_num,
+                    genome = gen,
+                    name = "Topic 8")
+
+
+plotTracks(list(itrack, gtrack, snps_atrack, grtrack, strack, ccre_atrack, 
+                topic_dtrack),
+           from = start_irange, to = end_irange, cex = 0.8, type = "b")
+
+
+```
+
+
+
+### NLRP12
+(ILC1-topic0)
+
+Many NLRs play inhibitory roles in regulating the signaling of TLRs including NLRP12 which targets MAPK and NF-κB activation contribute to a cross-linked and finely tuned network of PRR signaling in response to the large repertoire of PAMPs and ensures the most effective and proper outcomes of innate immune responses(Liu and Cao, 2016). NLRP12 is a checkpoint of noncanonical NF-κB, inflammation and tumorigenesis suppressing Colon Inflammation and Tumorigenesis through the Negative Regulation of Non-canonical NF-κB(Allen et al., 2012). Heightened inflammatory response of IECs was associated with significant intrinsic activation of NF-κB in IECs and increased frequency of ILC1, ILC3, and myeloid osteoclast progenitors. IEC-specific NF-κB activation plays the central role in the cellular, inflammatory, and osteolytic phenotypes observed in the chemically induced colitis and conditional deletion of IKK2 from IECs significantly attenuated inflammation and bone loss in DSS-induced colitis(Ke et al., 2019). Further, while the dysregulation of IEC could influence ILC1 directly or  promote phagocytes to produce cytokines like IFNg to stimulate ILC1 development and function(n.d.). Our observation pinpoints the IEC-ILC1 axis in intestinal inflammation
+
+```{r nlrp12_gviz}
+## cis-eQTL for all major lineages
+## Nlrp12 - Chr7:3218784-3249740  ENSMUSG00000078817 
+start_irange <- 3218784
+end_irange <- 3249740
+chr_str <- "chr7"
+chr_num <- "7"
+gen <- "mm10"
+
+
+## Sequence and Ideogram
+strack <- SequenceTrack(Mmusculus, chromosome = chr_str)
+txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+keepStandardChromosomes(txdb, pruning.mode="coarse")
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(genome = gen, chromosome = chr_str)
+
+## Genome Track
+grtrack <- GeneRegionTrack(txdb, 
+                           genome = gen,
+                           chromosome = chr_str, 
+                           name = "Gene Model",
+                           geneAnnotation = "symbol")
+
+pos_snps <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+names_snps <-  ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% marker
+
+snps_atrack <- AnnotationTrack(start = pos_snps,
+                               width = rep(1, length(pos_snps)),
+                               chromosome = chr_str,
+                               group = names_snps,
+                               genome = gen,
+                               name = "SNPs")
+
+start_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% start
+end_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% end
+names_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% type.y
+
+ccre_atrack <- AnnotationTrack(start = start_ccre,
+                               width = end_ccre - start_ccre,
+                               chromosome = chr_str,
+                               group = names_ccre,
+                               genome = gen,
+                               name = "cCREs")
+
+# ## topic8
+# topics <- fread(paste0(my_path, "results/topic-qtl-lods.csv"))
+# 
+# start_topic <- end_topic <- topics %>%
+#   dplyr::left_join(ccre, by = "marker") %>%
+#   dplyr::arrange(pos) %>%
+#   dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+# 
+# data_topic8 <- topics %>%
+#   dplyr::left_join(ccre, by = "marker") %>%
+#   dplyr::arrange(pos) %>% 
+#   dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% topic8
+# 
+# topic_dtrack <- DataTrack(data = data_topic8,
+#                     start = start_topic,
+#                     end = end_topic,
+#                     chromosome = chr_num,
+#                     genome = gen,
+#                     name = "Topic 8")
+
+
+plotTracks(list(itrack, gtrack, snps_atrack, grtrack, strack, ccre_atrack, 
+                topic_dtrack),
+           from = start_irange, to = end_irange, cex = 0.8, type = "b")
+
+
+```
+
+
+### SOCS2
+
+
+### CERS6
+
+
+### TMEM132c
+
+5 proteins of the human TMEM132 family (TMEM132A, B, C, D and E). These are genes in which variants are enriched for individuals with hearing loss, panic disorder or cancer. Common variants within the TMEM132E gene are associated with insomnia symptoms(Li et al., 2014) common and rare variants near TMEM132D gene are robustly associated with panic disorder(Haaker et al., 2014); and variants near TMEM132B are associated with excessive daytime sleepiness (Lane et al., 2017). In healthy individuals, some of the TMEM132D non-coding variants exhibit higher anxiety scores and larger volumetric estimates of the amygdala and hippocampus, key neural structures associated with fear and anxiety(Haaker et al., 2014). In the mouse, anterior cingulate cortex TMEM132D expression correlates with anxiety-related behavior (Erhardt et al., 2010). Finally, mutations in TMEM132D are unusually frequent in small-cell lung cancer(Iwakawa et al., 2015)and in pancreatic cancer(Forbes et al., 2014). Disease mutations near, or functions of, TMEM132A or C have yet to be identified. Recent study has shown TMEM132c is highly expressed in human colorectal cancer. Here we found TEME132c is a SNP-gene with eQTL effect associated with ILC1/ILC3 relative composition in mouse and its expression correlates with…
+Suggest the potential involvement of TEME protein in mediating the disease susceptibility to host defense and inflammation.
+
+
+```{r tmem132c_gviz}
+## cis-eQTL for all major lineages
+## Tmem132c Chr5:127241826-127565790  ENSMUSG00000034324 
+start_irange <- 127000000
+end_irange <- 128000000
+chr_str <- "chr5"
+chr_num <- "5"
+gen <- "mm10"
+
+ilc1_ilc3_gwas <- fread(paste0(my_path, 'results/gwas-ilc2-ilc3-results.csv'))
+
+## Sequence and Ideogram
+strack <- SequenceTrack(Mmusculus, chromosome = chr_str)
+txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+keepStandardChromosomes(txdb, pruning.mode="coarse")
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(genome = gen, chromosome = chr_str)
+
+## Genome Track
+grtrack <- GeneRegionTrack(txdb, 
+                           genome = gen,
+                           chromosome = chr_str, 
+                           name = "Gene Model",
+                           geneAnnotation = "symbol")
+
+pos_snps <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+names_snps <-  ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% marker
+
+snps_atrack <- AnnotationTrack(start = pos_snps,
+                               width = rep(1, length(pos_snps)),
+                               chromosome = chr_str,
+                               group = names_snps,
+                               genome = gen,
+                               name = "SNPs")
+
+start_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% start
+end_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% end
+names_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% type.y
+
+ccre_atrack <- AnnotationTrack(start = start_ccre,
+                               width = end_ccre - start_ccre,
+                               chromosome = chr_str,
+                               group = names_ccre,
+                               genome = gen,
+                               name = "cCREs")
+
+# ## topic8
+# topics <- fread(paste0(my_path, "results/topic-qtl-lods.csv"))
+# 
+# start_topic <- end_topic <- topics %>%
+#   dplyr::left_join(ccre, by = "marker") %>%
+#   dplyr::arrange(pos) %>%
+#   dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+# 
+# data_topic8 <- topics %>%
+#   dplyr::left_join(ccre, by = "marker") %>%
+#   dplyr::arrange(pos) %>% 
+#   dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% topic8
+# 
+# topic_dtrack <- DataTrack(data = data_topic8,
+#                     start = start_topic,
+#                     end = end_topic,
+#                     chromosome = chr_num,
+#                     genome = gen,
+#                     name = "Topic 8")
+
+
+plotTracks(list(itrack, gtrack, snps_atrack, grtrack, strack, ccre_atrack, 
+                topic_dtrack),
+           from = start_irange, to = end_irange, cex = 0.8, type = "b")
+
+
+```
+
+
+
+### Lgr6
+
+the 7-transmembrane receptor, Lgr5 has recently gained prominence as a marker of Wnt-regulated adult stem cell populations in the hair-follicle, intestine and stomach. A closely-related protein, Lgr6 marks adult stem cells responsible for fueling the renewal of the sebaceous gland and skin(Leushacke and Barker, 2011). Lgr6 as a marker of adult stem cells in the skin(Barker et al., 2013). Lgr6 is expressed by airway smooth muscle cells (aSMCs) lining the bronchiolar epithelium. Secretion of Fgf10 by Lgr6 + aSMCs promotes differentiation of airway epithelial cells(Leung et al., 2018).While Igr6 is well implicated in colon cancer as an intestinal stem cell marker. We found the eQTL for this gene implicated here with the relative proportion of ILC1/ILC3 which further emphasize the importance of epithelium cell for the development of ILCs.
+
+
+```{r lgr6_gviz}
+## cis-eQTL for all major lineages
+## Lgr6 Chr1:134983301-135105276  ENSMUSG00000042793 
+start_irange <- 134983301
+end_irange <- 135105276
+chr_str <- "chr1"
+chr_num <- "1"
+gen <- "mm10"
+
+
+## Sequence and Ideogram
+strack <- SequenceTrack(Mmusculus, chromosome = chr_str)
+txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+keepStandardChromosomes(txdb, pruning.mode="coarse")
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(genome = gen, chromosome = chr_str)
+
+## Genome Track
+grtrack <- GeneRegionTrack(txdb, 
+                           genome = gen,
+                           chromosome = chr_str, 
+                           name = "Gene Model",
+                           geneAnnotation = "symbol")
+
+pos_snps <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+names_snps <-  ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% marker
+
+snps_atrack <- AnnotationTrack(start = pos_snps,
+                               width = rep(1, length(pos_snps)),
+                               chromosome = chr_str,
+                               group = names_snps,
+                               genome = gen,
+                               name = "SNPs")
+
+start_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% start
+end_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% end
+names_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% type.y
+
+ccre_atrack <- AnnotationTrack(start = start_ccre,
+                               width = end_ccre - start_ccre,
+                               chromosome = chr_str,
+                               group = names_ccre,
+                               genome = gen,
+                               name = "cCREs")
+
+# ## topic8
+# topics <- fread(paste0(my_path, "results/topic-qtl-lods.csv"))
+# 
+# start_topic <- end_topic <- topics %>%
+#   dplyr::left_join(ccre, by = "marker") %>%
+#   dplyr::arrange(pos) %>%
+#   dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+# 
+# data_topic8 <- topics %>%
+#   dplyr::left_join(ccre, by = "marker") %>%
+#   dplyr::arrange(pos) %>% 
+#   dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% topic8
+# 
+# topic_dtrack <- DataTrack(data = data_topic8,
+#                     start = start_topic,
+#                     end = end_topic,
+#                     chromosome = chr_num,
+#                     genome = gen,
+#                     name = "Topic 8")
+
+
+plotTracks(list(itrack, gtrack, snps_atrack, grtrack, strack, ccre_atrack, 
+                topic_dtrack),
+           from = start_irange, to = end_irange, cex = 0.8, type = "b")
+
+
+```
+
+
+
+### Rrbp1
+
+Rrbp1 is highly expressed in epithelium cells in small intestine. Ribosome-binding protein 1 (RRBP1) has been implicated in the regulation of unfolded protein response, which is involved in almost every aspect of cancer development. Further, Endoplasmic reticulum ribosome-binding protein 1, RRBP1, promotes progression of colorectal cancer and predicts an unfavourable prognosis(Pan et al., 2015). over the last decade have shown that the UPR plays a critical role in shaping immunity and inflammation, resulting in the recognition of the UPR as a key player in pathological
+processes including complex inflammatory, autoimmune and neoplastic diseases. Intestinal epithelium, with its many highly secretory cells, forms an important barrier and
+messenger between the luminal environment and the host immune system. It is not
+surprising, that numerous studies have associated ER stress and the UPR with intestinal diseases such as inflammatory bowel disease (IBD) and colorectal cancer (CRC). The UPR in immune cells including B cell, T cells, macrophage and epithelium cells, all of which has great crosstalk with innate lymphoid cells(Coleman and Haller, 2019). We detected the eQTLs for Rrbp1 gene which accounts for ILC1/ILC3 composition. Our observation again emphasized the significance of UPR in regulating innate immune response in terms of ILC1 and ILC3 composition in small intestine.
+
+
+```{r rrbp1_gviz}
+## cis-eQTL for all major lineages
+## Rrbp1 Chr2:143947395-144011263  ENSMUSG00000027422 
+start_irange <- 143947395
+end_irange <- 144011263
+chr_str <- "chr2"
+chr_num <- "2"
+gen <- "mm10"
+
+
+## Sequence and Ideogram
+strack <- SequenceTrack(Mmusculus, chromosome = chr_str)
+txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+keepStandardChromosomes(txdb, pruning.mode="coarse")
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(genome = gen, chromosome = chr_str)
+
+## Genome Track
+grtrack <- GeneRegionTrack(txdb, 
+                           genome = gen,
+                           chromosome = chr_str, 
+                           name = "Gene Model",
+                           geneAnnotation = "symbol")
+
+pos_snps <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+names_snps <-  ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% marker
+
+snps_atrack <- AnnotationTrack(start = pos_snps,
+                               width = rep(1, length(pos_snps)),
+                               chromosome = chr_str,
+                               group = names_snps,
+                               genome = gen,
+                               name = "SNPs")
+
+start_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% start
+end_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% end
+names_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% type.y
+
+ccre_atrack <- AnnotationTrack(start = start_ccre,
+                               width = end_ccre - start_ccre,
+                               chromosome = chr_str,
+                               group = names_ccre,
+                               genome = gen,
+                               name = "cCREs")
+
+# ## topic8
+# topics <- fread(paste0(my_path, "results/topic-qtl-lods.csv"))
+# 
+# start_topic <- end_topic <- topics %>%
+#   dplyr::left_join(ccre, by = "marker") %>%
+#   dplyr::arrange(pos) %>%
+#   dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+# 
+# data_topic8 <- topics %>%
+#   dplyr::left_join(ccre, by = "marker") %>%
+#   dplyr::arrange(pos) %>% 
+#   dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% topic8
+# 
+# topic_dtrack <- DataTrack(data = data_topic8,
+#                     start = start_topic,
+#                     end = end_topic,
+#                     chromosome = chr_num,
+#                     genome = gen,
+#                     name = "Topic 8")
+
+
+plotTracks(list(itrack, gtrack, snps_atrack, grtrack, strack, ccre_atrack, 
+                topic_dtrack),
+           from = start_irange, to = end_irange, cex = 0.8, type = "b")
+
+
+```
+
+
+
+### IL-20RA
+
+The interleukin-20-receptor I complex (IL-20-RI) is composed of two chains, IL20RA and IL20RB. Its ligands are the three members of the IL19 subfamily of cytokines, IL-19, IL-20 and IL-24. These cytokines are important in the manifestation of psoriatic lesions and, recently, an association of polymorphisms of IL20 with psoriasis has been described(Kingo et al., 2008). Capture Hi-C Identifies a Novel Causal Gene, IL20RA, in the Pan-Autoimmune Genetic Susceptibility Region 6q23. Interleukin 20 receptor, alpha subunit is a subunit for the interleukin-20 receptor. The risk allele of the most likely causal SNP, rs6927172, is correlated with both a higher frequency of interactions and increased expression of IL20RA, along with a stronger binding of both the NFκB transcription factor and chromatin marks characteristic of active enhancers in T-cells(McGovern et al., 2016). Here, we found the eQTL for IL-20RA is responsible for distinguish between ILC3 and LTi-like ILC3.
+
+```{r il20ra_gviz}
+## cis-eQTL for all major lineages
+## Il20RA Chr10:19712570-19760053  ENSMUSG00000020007 
+start_irange <- 19712570
+end_irange <- 19760053
+chr_str <- "chr10"
+chr_num <- "10"
+gen <- "mm10"
+
+
+## Sequence and Ideogram
+strack <- SequenceTrack(Mmusculus, chromosome = chr_str)
+txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+keepStandardChromosomes(txdb, pruning.mode="coarse")
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(genome = gen, chromosome = chr_str)
+
+## Genome Track
+grtrack <- GeneRegionTrack(txdb, 
+                           genome = gen,
+                           chromosome = chr_str, 
+                           name = "Gene Model",
+                           geneAnnotation = "symbol")
+
+pos_snps <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+names_snps <-  ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% marker
+
+snps_atrack <- AnnotationTrack(start = pos_snps,
+                               width = rep(1, length(pos_snps)),
+                               chromosome = chr_str,
+                               group = names_snps,
+                               genome = gen,
+                               name = "SNPs")
+
+start_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% start
+end_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% end
+names_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% type.y
+
+ccre_atrack <- AnnotationTrack(start = start_ccre,
+                               width = end_ccre - start_ccre,
+                               chromosome = chr_str,
+                               group = names_ccre,
+                               genome = gen,
+                               name = "cCREs")
+
+# ## topic8
+# topics <- fread(paste0(my_path, "results/topic-qtl-lods.csv"))
+# 
+# start_topic <- end_topic <- topics %>%
+#   dplyr::left_join(ccre, by = "marker") %>%
+#   dplyr::arrange(pos) %>%
+#   dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+# 
+# data_topic8 <- topics %>%
+#   dplyr::left_join(ccre, by = "marker") %>%
+#   dplyr::arrange(pos) %>% 
+#   dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% topic8
+# 
+# topic_dtrack <- DataTrack(data = data_topic8,
+#                     start = start_topic,
+#                     end = end_topic,
+#                     chromosome = chr_num,
+#                     genome = gen,
+#                     name = "Topic 8")
+
+
+plotTracks(list(itrack, gtrack, snps_atrack, grtrack, strack, ccre_atrack, 
+                topic_dtrack),
+           from = start_irange, to = end_irange, cex = 0.8, type = "b")
+
+
+```
+
+
+
+### Fam21
+
+WASH exists in a multiprotein complex containing FAM21, which links WASH to endosomes and is required for WASH-dependent retromer-mediated sorting(Gomez and Billadeau, 2009; Jia et al., 2012). WASH deletion impairs the cell pool of NKp46+ILC3s. In NKp46+ ILC3s, WASH recruits Arid1a to the Ahr promoter thus activating AHR expression, indicating WASH-mediated AHR expression has a critical function in the maintenance of NKp46+ILC3s(Xia et al., 2017). While NKp46+ is also expressed in ILC1 and here in our data we found eQTLs for FAM21 tips the balance of relative proportion of IL1/ILC2 indicating its role in regulating ILC development.
+
+```{r fam21_gviz}
+## cis-eQTL for all major lineages
+## Washc2 (Fam21) Chr6:116208038-116262686  ENSMUSG00000024104 
+start_irange <- 116208038
+end_irange <- 116262686
+chr_str <- "chr6"
+chr_num <- "6"
+gen <- "mm10"
+
+
+## Sequence and Ideogram
+strack <- SequenceTrack(Mmusculus, chromosome = chr_str)
+txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+keepStandardChromosomes(txdb, pruning.mode="coarse")
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(genome = gen, chromosome = chr_str)
+
+## Genome Track
+grtrack <- GeneRegionTrack(txdb, 
+                           genome = gen,
+                           chromosome = chr_str, 
+                           name = "Gene Model",
+                           geneAnnotation = "symbol")
+
+pos_snps <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+names_snps <-  ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% marker
+
+snps_atrack <- AnnotationTrack(start = pos_snps,
+                               width = rep(1, length(pos_snps)),
+                               chromosome = chr_str,
+                               group = names_snps,
+                               genome = gen,
+                               name = "SNPs")
+
+start_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% start
+end_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% end
+names_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% type.y
+
+ccre_atrack <- AnnotationTrack(start = start_ccre,
+                               width = end_ccre - start_ccre,
+                               chromosome = chr_str,
+                               group = names_ccre,
+                               genome = gen,
+                               name = "cCREs")
+
+# ## topic8
+# topics <- fread(paste0(my_path, "results/topic-qtl-lods.csv"))
+# 
+# start_topic <- end_topic <- topics %>%
+#   dplyr::left_join(ccre, by = "marker") %>%
+#   dplyr::arrange(pos) %>%
+#   dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+# 
+# data_topic8 <- topics %>%
+#   dplyr::left_join(ccre, by = "marker") %>%
+#   dplyr::arrange(pos) %>% 
+#   dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% topic8
+# 
+# topic_dtrack <- DataTrack(data = data_topic8,
+#                     start = start_topic,
+#                     end = end_topic,
+#                     chromosome = chr_num,
+#                     genome = gen,
+#                     name = "Topic 8")
+
+
+plotTracks(list(itrack, gtrack, snps_atrack, grtrack, strack, ccre_atrack, 
+                topic_dtrack),
+           from = start_irange, to = end_irange, cex = 0.8, type = "b")
+
+
+```
+
+
+
+
+### BANF2
+
+BANF2 is termed for Barrier to autointegration factor 2, which has been associated with the abnormality of immune system physiology phenotype in GWAS datasets from the GWASdb SNP-Phenotype Associations dataset. This immune disease implicated SNP-gene is here to identified to be a eQTL-gene which influence the ILC development by tipping the balance of ILC2/ILC3 relative proportion.
+
+```{r banf2_gviz}
+## cis-eQTL for all major lineages
+## Banf2 Chr2:144033102-144073979  ENSMUSG00000037307 
+start_irange <- 144033102
+end_irange <- 144073979
+chr_str <- "chr2"
+chr_num <- "2"
+gen <- "mm10"
+
+
+## Sequence and Ideogram
+strack <- SequenceTrack(Mmusculus, chromosome = chr_str)
+txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+keepStandardChromosomes(txdb, pruning.mode="coarse")
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(genome = gen, chromosome = chr_str)
+
+## Genome Track
+grtrack <- GeneRegionTrack(txdb, 
+                           genome = gen,
+                           chromosome = chr_str, 
+                           name = "Gene Model",
+                           geneAnnotation = "symbol")
+
+pos_snps <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+names_snps <-  ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% marker
+
+snps_atrack <- AnnotationTrack(start = pos_snps,
+                               width = rep(1, length(pos_snps)),
+                               chromosome = chr_str,
+                               group = names_snps,
+                               genome = gen,
+                               name = "SNPs")
+
+start_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% start
+end_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% end
+names_ccre <- ccre %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% type.y
+
+ccre_atrack <- AnnotationTrack(start = start_ccre,
+                               width = end_ccre - start_ccre,
+                               chromosome = chr_str,
+                               group = names_ccre,
+                               genome = gen,
+                               name = "cCREs")
+
+# ## topic8
+# topics <- fread(paste0(my_path, "results/topic-qtl-lods.csv"))
+# 
+# start_topic <- end_topic <- topics %>%
+#   dplyr::left_join(ccre, by = "marker") %>%
+#   dplyr::arrange(pos) %>%
+#   dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+# 
+# data_topic8 <- topics %>%
+#   dplyr::left_join(ccre, by = "marker") %>%
+#   dplyr::arrange(pos) %>% 
+#   dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% topic8
+# 
+# topic_dtrack <- DataTrack(data = data_topic8,
+#                     start = start_topic,
+#                     end = end_topic,
+#                     chromosome = chr_num,
+#                     genome = gen,
+#                     name = "Topic 8")
+
+
+plotTracks(list(itrack, gtrack, snps_atrack, grtrack, strack, ccre_atrack, 
+                topic_dtrack),
+           from = start_irange, to = end_irange, cex = 0.8, type = "b")
+
+
+```
+
+
+
+### GVIZ Function
+
+```{r}
+
+txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+keepStandardChromosomes(txdb, pruning.mode="coarse")
+
+
+gene_gviz <- function( chr, start, end, genome = "mm10" ) {
+  
+  ## Reference Sequence Track
+  strack <- SequenceTrack(Mmusculus, chromosome = chr)
+  ## Genome Axis
+  gtrack <- GenomeAxisTrack()
+  ## ideogram
+  itrack <- IdeogramTrack(genome = genome, chromosome = chr)
+  
+  ## SNPs
+  pos_snps <- ccre$pos[ccre$pos >= start_irange & ccre$pos <= start]
+  names_snps <- ccre$marker[ccre$pos >= start_irange & ccre$pos <= end]
+  snps_gr <- GRanges(
+    seqnames = Rle("chr5"),
+    ranges = IRanges(start = pos_snps, 
+                     end = pos_snps,
+                     names = names_snps)
+    )
+  snps_atrack <- AnnotationTrack(snps_gr, name = "SNPs")
+    
+  ## cCREs
+  start_ccre <- na.omit(ccre$start[ccre$pos >= start & ccre$pos <= end])
+  end_ccre <- na.omit(ccre$end[ccre$pos >= start & ccre$pos <= end])
+  names_ccre <- na.omit(ccre$type.y[ccre$pos >= start & ccre$pos <= end])
+  ccre_gr <- GRanges(
+    seqnames = Rle("chr5"),
+    ranges = IRanges(start = start_ccre, 
+                     end = end_ccre,
+                     names = names_ccre)
+    )
+  ccre_atrack <- AnnotationTrack(ccre_gr, name = "cCREs")
+
+  
+#   start_lti_gwas <- end_lti_gwas <- lti_gwas %>%
+#   arrange(pos) %>%
+#   filter(chr == "5", between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+# 
+# data_lti_gwas <- lti_gwas %>%
+#   arrange(pos) %>%
+#   filter(chr == "5", between(pos, start_irange, end_irange), !is.na(pos)) %$% lods
+# 
+# lti_gwas_gr <- GRanges(
+#   seqnames = Rle("chr5"),
+#   ranges = IRanges(start = start_lti_gwas,
+#                    end = end_lti_gwas)
+#   )
+# ##data track
+# dtrack <- DataTrack(data = data_lti_gwas, 
+#                     start = start_lti_gwas,
+#                     end = end_lti_gwas+1, 
+#                     chromosome = chr, 
+#                     genome = gen,
+#                     name = "Uniform")
+}
+```
+
+
+### Figure 2D
+
+Gata3 QTL comparison
+Do similar for TBET (Tbx21)
+DO Similar for Ror gamma-t (Rorc)
+
+```{r}
+gata3 <- my_plot(plot_df, "Gata3") + my_theme
+tbet <- my_plot(plot_df, "Tbet") + my_theme
+rorc <- my_plot(plot_df, "Rorc") + my_theme
+eomes <- my_plot(plot_df, "Eomes") + my_theme
+
+ggsave("tsne-gata3.png", gata3, dpi = 300)
+ggsave("tsne-tbet.png", tbet, dpi = 300)
+ggsave("tsne-rorc.png", rorc, dpi = 300)
+ggsave("tsne-eomes.png", eomes, dpi = 300)
+```
+
+
+
+```{r fig2d}
+df <- df %>%
+  left_join({
+    geno %>% 
+      select(BestCall = SampleID, 
+             UNC20336327, UNCHS036777, UNCHS014430, UNCHS022710, UNC20419420)
+  })
+
+## Gata3 most significant eQTL for Gata3 - UNCHS036777
+## UNCHS014430 - topic11 
+gata3 <- my_plot(df, "Gata3")
+topic3 <- my_plot(df, "topic11")
+gata3_biocarta <- my_plot(df, "BIOCARTA_GATA3_PATHWAY")
+
+biocarta_gata3_quant <- plot_quantile(df, "BIOCARTA_GATA3_PATHWAY", "UNCHS014430")
+topic11_quant <- plot_quantile(df, "topic11", "UNCHS014430")
+gata3_quant <- plot_quantile(df, "Gata3", "UNCHS014430")
+
+## Tbet significant eQTL - UNC20336327
+tbet <- my_plot(df, "Tbx21")
+plot_quantile(df, "Tbet", "UNC20336327")
+
+
+## Rorc most significant eQTL - UNCHS022710, UNC20419420
+rorc <- my_plot(df, "Rorc")
+plot_quantile(df, "Rorc", "UNCHS022710")
+## need cumplot by SNP level for significant eQTL/topic QTL 
+```
+
+
+
+## Figure 3
+
+Ex: ILC3 contribute to the progression and aggravation of IBD while both IL-22 and IL-17, along with IFN-γ, are overexpressed by the dysregulation of NCR− ILC3 or NCR+ ILC3 function and the bias of NCR+ ILC3 towards ILC1 as well as regulatory ILC dysfunction in the pathological state
+ IL-25 has been reported to have the capability to give rise to ILC3-like IL-17 producers, although in naïve mice or upon helminth infection, they appear to default to a more conventional and less plastic ILC2 phenotype
+Ex: The genetic makeup of the host is an important determinant of the pattern of T cell differentiation. Some inbred strains of mice develop Th2 responses to the same microbes that stimulate Th1 differentiation in most other strains. Strains of mice that develop Th2-dominant responses are susceptible to infections by intracellular microbes. It is possible, although not proven, that people differ in their propensity to mount Th1, Th2, or Th17 responses based on inherited genes
+ILC2s and NKp44− ILC3s but not NKp44+ ILC3s are present in the peripheral blood and skin of healthy people, whereas the blood and inflamed skin of those with psoriasis contained NKp44+ ILC3s, indicating that dynamic changes in ILC population structure are associated with psoriatic inflammation
+In the setting of malnutrition elicited by vitamin A deficiency in mice, an imbalance in ILC2 and ILC3 responses was evident, resulting in defective ILC3dependent antibacterial immunity but enhanced ILC2-dependent antihelminth immunity
+
+Based on their transcriptional regulation and cytokine profiles, ILCs can be categorized into five subsets with defined phenotypes and functional profiles, but they also have the ability to adapt to local environmental cues by changing these profiles.
+
+
+### Figure 3A
+
+#### Cell Proportion Significant Loci
+#### Ven Diagram Cell Proportion Significant Loci Genes
+
+
+```{r fig3a_cellcomp_venn}
+myCol <- RColorBrewer::brewer.pal(6, "Pastel2")
+# Chart
+# x = list(na.omit(vars$index[vars$ilc1_ilc2_prop_qtl_genes==1]),
+#                  na.omit(vars$index[vars$ilc1_ilc3_prop_qtl_genes==1]),
+#                  na.omit(vars$index[vars$ilc1_lti_prop_qtl_genes==1]),
+#                  na.omit(vars$index[vars$ilc2_ilc3_prop_qtl_genes==1]),
+#                  na.omit(vars$index[vars$ilc2_lti_prop_qtl_genes==1]),
+#                  na.omit(vars$index[vars$ilc3_lti_prop_qtl_genes==1]))[1:5],
+#         category.names = c("ILC1 vs ILC2" , "ILC1 vs ILC3 " , "ILC1 vs LTi", 
+#                            "ILC2 vs ILC3", "ILC2 vs LTi", "ILC3 vs LTi")[1:5],
+#         filename = 'cellcomposition-loci-genes-venn-diagramm.png',
+#         main = "Cell Type Composition QTL",
+
+upset(data = vars, 
+      sets = c("ilc1_ilc2_prop_qtl_genes", "ilc1_ilc3_prop_qtl_genes", 
+               "ilc1_lti_prop_qtl_genes", "ilc2_ilc3_prop_qtl_genes", 
+               "ilc2_lti_prop_qtl_genes", "ilc3_lti_prop_qtl_genes"), 
+      sets.bar.color = "#56B4E9",
+      order.by = "freq", 
+      empty.intersections = "on")
+```
+
+
+```{r}
+upset(data = ccre, 
+      sets = c("ilc3_activated_qtl", "lti_activated_qtl",
+               "ilc1_ilc2_prop_qtl", "ilc1_lic3_prop_qtl",
+               "ilc2_ilc3_prop_qtl", "ilc3_lti_prop_qtl"), 
+      sets.bar.color = "#56B4E9",
+      order.by = "freq", 
+      empty.intersections = "on")
+#      boxplot.summary = c("recomb_rate"))
+```
+
+
+
+Need to create a founder genotype data frame containing the significant marker genotypes for the significant loci affecting ILC proportions.  
+
+```{r}
+load(paste0(geno_path, 'genoprobs_rename.Rdata'))
+
+## get significant markers here
+prop_markers <- unique(c(ccre$marker[ccre$ilc1_ilc2_prop_qtl == 1],
+                  ccre$marker[ccre$ilc1_ilc3_prop_qtl == 1],
+                  ccre$marker[ccre$ilc1_lti_prop_qtl == 1],
+                  ccre$marker[ccre$ilc2_ilc3_prop_qtl == 1],
+                  ccre$marker[ccre$ilc2_lti_prop_qtl == 1],
+                  ccre$marker[ccre$ilc3_lti_prop_qtl == 1]))
+
+probs_markers <- sapply(names(probs), function(i) dimnames(probs[[i]])[[3]], simplify = T)
+probs_markers <- unique(unlist(probs_markers))
+
+prop_markers <- intersect(prop_markers, probs_markers)
+
+samples <- grep("20180706", rownames(probs[[1]]), value = T)
+nms <- str_extract(samples, "C[0-9]{1,2}_[0-9]")
+cell_prop_geno_df <- data.frame(BestCall = nms)
+
+
+for( m in prop_markers[4312:4586] ) {
+  # i <- 1
+  
+  chr <- as.character(ccre$chr[ccre$marker == m])[1]
+  
+  cell_prop_geno <- round(apply(probs[[ chr ]][samples, , m], c(1,2), mean), 3)
+  cell_prop_geno_df[[ m ]] <- colnames(cell_prop_geno)[apply(cell_prop_geno, 1, which.max)]
+  # i <- i+1
+  
+}
+
+write.csv(cell_prop_geno_df, "cell-proportions-qtl-genotypes.csv")
+```
+
+
+```{r}
+## look at cCRE and cell_prop_geno_df to make plots for different proportions
+
+# ccre
+# plot_df
+
+## get significant markers here
+# prop_markers <- unique(c(ccre$marker[ccre$ilc1_ilc2_prop_qtl == 1],
+#                   ccre$marker[ccre$ilc1_ilc3_prop_qtl == 1],
+#                   ccre$marker[ccre$ilc1_lti_prop_qtl == 1],
+#                   ccre$marker[ccre$ilc2_ilc3_prop_qtl == 1],
+#                   ccre$marker[ccre$ilc2_lti_prop_qtl == 1],
+#                   ccre$marker[ccre$ilc3_lti_prop_qtl == 1]))
+
+cell_prop_geno_df <- read.csv(paste0(my_path, "results/cell-proportions-qtl-genotypes.csv"))
+
+
+## Rbpj significant marker - UNCHS014402
+## Stim2 significant marker - UNCHS014413
+## Fam21 (Washc2) significant marker - UNCHS018751
+## Rrbp1 significant marker - UNCHS007079
+## Tmem132c - significant marker - UNCHS015849
+## Il20ra - significant marker - UNC17535571
+
+cell_prop_order <- plot_df %>%
+  dplyr::left_join({ 
+    cell_prop_geno_df %>% dplyr::select(BestCall, founder_genotype = UNCHS014413)
+    }) %>%
+  filter(louvain_labels %in% c(1,2,3,4,5,8), !is.na(founder_genotype)) %>% 
+  group_by(founder_genotype, called_cell_types_new) %>% 
+  summarise(n = n()) %>% 
+  mutate(total = sum(n), prop = n / sum(n)) %>%
+  filter(called_cell_types_new == "ILC3(LTi-like)") %>%
+  arrange(prop) %$%
+  # filter(called_cell_types_new == "ILC1") %>%
+  # arrange(desc(prop)) %$%
+  founder_genotype %>%
+  as.character()
+
+celltype_order <- c("NK", "ILC1", "ILC2", "ILC3", "ILC3(LTi-like)")
+plot_df <- plot_df %>%
+  dplyr::left_join({ 
+    cell_prop_geno_df %>% dplyr::select(BestCall, founder_genotype = UNCHS014413)
+    }) %>%
+  dplyr::mutate(founder_genotype = factor(founder_genotype, levels = cell_prop_order),
+         called_cell_types_new = factor(called_cell_types_new, levels = celltype_order))
+
+
+plot_df %>% 
+  filter(louvain_labels %in% c(1,2,3,4,5,8), !is.na(founder_genotype)) %>% 
+  ggplot(., aes(founder_genotype, 
+                color = called_cell_types_new, 
+                fill = called_cell_types_new)) + 
+  geom_bar(position = "fill") + 
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(title = "Cell Proportion at Marker UNCHS014413 (Stim2)")
+```
+
+
+
+### Figure 3B
+
+```{r}
+
+```
+
+
+### Figure 3C
+
+Super Enhancer Genes and relation to the eQTLs.
+
+```{r ilc_se}
+ilc_se <- read_csv(paste0(my_path, "ILC1-vs-ILC3-SE-NIHMS776743-supplement-9.csv"))
+cnames <-  c("chr", "start", "end", "Symbol")
+ilc1_se <- read_csv(paste0(my_path, "ilc1-se-genelist.csv"), 
+                      col_names = cnames)
+ilc3_se <- read_csv(paste0(my_path, "ilc3-se-genelist.csv"), 
+                      col_names = cnames)
+
+homologs <- read_delim(file = paste0(my_path, "data/reference/HOM_MouseHumanSequence.txt"), 
+                       delim = "\t") %>%
+  dplyr::select(`HomoloGene ID`, `Common Organism Name`, `Symbol`)
+  # dplyr::distinct() %>%
+  # pivot_wider(id_cols = "HomoloGene ID", 
+  #             names_from = "Common Organism Name", 
+  #             values_from = "Symbol")
+mouse_hom <- homologs %>% dplyr::filter(`Common Organism Name` == "mouse, laboratory")
+human_hom <- homologs %>% dplyr::filter(`Common Organism Name` == "human")
+
+homologs_tab <- mouse_hom %>% left_join(human_hom, by = "HomoloGene ID")
+
+ilc_se <- ilc_se %>%
+  left_join({ homologs_tab %>% dplyr::select(Symbol = Symbol.y, index = Symbol.x) })
+
+ilc1_se <- ilc1_se %>%
+  left_join({ homologs_tab %>% dplyr::select(Symbol = Symbol.y, index = Symbol.x) })
+
+ilc3_se <- ilc3_se %>%
+  left_join({ homologs_tab %>% dplyr::select(Symbol = Symbol.y, index = Symbol.x) })
+
+vars <- vars %>%
+  dplyr::left_join({ ilc_se %>% select(index, ilc_se = `Cell Type`) }) %>%
+  dplyr::mutate(ilc1_se = as.numeric(index %in% ilc1_se$index),
+                ilc3_se = as.numeric(index %in% ilc3_se$index))
+
+
+write.csv(vars, paste0(my_path, "data/scanpy/allchannels/vars.csv"))
+```
+
+
+```{r}
+
+ilc1_se_egenes <- vars$index[vars$ilc1_egenes_cv == 1 & vars$ilc1_se==1]
+ilc1_se_egenes <- vars$index[vars$ilc1_egenes_mean == 1 & vars$ilc1_se==1]
+
+ilc3_se_egenes <- vars$index[vars$ilc3_egenes_cv == 1 & vars$ilc3_se==1]
+ilc3_se_egenes <- vars$index[vars$ilc3_egenes_mean == 1 & vars$ilc3_se==1]
+
+```
+
+#### GO Enrichment
+
+```{r go_enrich}
+library(topGO)
+library(GO.db)
+library(biomaRt)
+library(Rgraphviz)
+
+bg_genes <- ensembl$gene
+
+# create GO db for genes to be used using biomaRt - please note that this takes a while
+# mmusculus_gene_ensembl, hsapiens_gene_ensembl
+db <- useMart('ENSEMBL_MART_ENSEMBL', 
+              dataset='mmusculus_gene_ensembl', 
+              host="www.ensembl.org")
+go_ids <- getBM(attributes=c('go_id', 
+                             'external_gene_name', 
+                             'ensembl_gene_id'), 
+                filters='ensembl_gene_id', 
+                values = bg_genes, 
+                mart = db)
+
+## candidate_list <- grep(pattern = "ENSMUSG", net_groups[[6]], value = TRUE)
+## candidate_list <- vars$gene_ids[vars$ilc1_egenes_cv == 1 & vars$ilc1_se==1]
+candidate_list <- vars$gene_ids[vars$ilc1_ilc2_prop_qtl_genes == 1]
+
+
+# build the gene 2 GO annotation list (needed to create topGO object)
+gene_2_GO <- unstack(go_ids[,c(1,4)])
+affyLib <- 
+# remove any candidate genes without GO annotation
+keep <- candidate_list %in% go_ids[,4]
+keep <- which(keep == TRUE)
+candidate_list <- candidate_list[keep]
+ 
+# make named factor showing which genes are of interest
+geneList = factor(as.integer(bg_genes %in% candidate_list))
+names(geneList) <- bg_genes
+
+GOdata <- new("topGOdata", 
+              description = "Simple session", 
+              ontology = "BP",
+              allGenes = geneList, 
+              geneSel = topDiffGenes,
+              nodeSize = 10,
+              annot = annFUN.db, 
+              affyLib = gene_2_GO)
+
+classic_fisher_result <- runTest(GOdata, algorithm='classic', statistic='fisher')
+# define test using the weight01 algorithm (default) with fisher
+weight_fisher_result <- runTest(GOdata, algorithm='weight01', statistic='fisher') 
+ 
+# generate a table of results: we can use the GenTable function to generate a summary table with the results from tests applied to the topGOdata object.
+allGO <- usedGO(GOdata)
+all_res <- GenTable(GOdata, 
+                    weightFisher = weight_fisher_result, 
+                    orderBy = 'weightFisher', 
+                    topNodes = length(allGO))
+
+```
+
+
+```{r gsea_enrich}
+# https://bioconductor.org/packages/release/bioc/vignettes/fgsea/inst/doc/fgsea-tutorial.html
+library(fgsea) 
+library(msigdbr)
+
+# markers <- read.csv("tbet-nrc1-rorc-de-genes-ilc1-ilc3.csv")
+# ranks <- -log10(markers$p_val_adj)[1:100]
+# names(ranks) <- markers$X[1:100]
+
+ranks <- rep(1, length(ilc1_se_egenes))
+names(ranks) <- ilc1_se_egenes
+
+m_df <- msigdbr(species = "Mus musculus", category = "H")
+pathways <- m_df %>% split(x = .$gene_symbol, f = .$gs_name)
+# pathways <- reactomePathways(names(exampleRanks))
+# fgseaRes <- fgsea(pathways, exampleRanks, maxSize=500)
+# head(fgseaRes)
+# Run GSEA.
+fgseaRes <- fgsea(pathways = pathways, 
+                  stats = ranks, 
+                  minSize = 10, maxSize = 500, nperm = 1000)
+# Visualize GSEA results.
+head(fgseaRes[order(pval), ])
+sum(fgseaRes[, padj < 0.01])
+plotEnrichment(examplePathways[["5990980_Cell_Cycle"]],
+               exampleRanks) + labs(title="Cell Cycle")
+topPathwaysUp <- fgseaRes[ES > 0][head(order(pval), n=10), pathway]
+topPathwaysDown <- fgseaRes[ES < 0][head(order(pval), n=10), pathway]
+topPathways <- c(topPathwaysUp, rev(topPathwaysDown))
+plotGseaTable(examplePathways[topPathways], exampleRanks, fgseaRes, 
+              gseaParam = 0.5)
+```
+
+
+```{r se_venn}
+myCol <- RColorBrewer::brewer.pal(4, "Pastel2")
+# Chart
+venn.diagram(
+        x = list(na.omit(vars$index[vars$ilc1_egenes_cv==1]),
+                 na.omit(vars$index[vars$ilc1_se==1]),
+                 na.omit(vars$index[vars$ilc3_egenes_cv==1]),
+                 na.omit(vars$index[vars$ilc3_se==1])),
+        category.names = c("ILC1 eGenes" , "ILC1 SE " , "ILC3 eGenes", "ILC3 SE"),
+        filename = 'ilc1-ilc3-se-genes-venn-diagramm.png',
+        output=TRUE,
+        
+        # Output features
+        imagetype="png" ,
+        height = 480 , 
+        width = 480 , 
+        resolution = 300,
+        compression = "lzw",
+        
+        # Circles
+        lwd = 2,
+        lty = 'blank',
+        fill = myCol,
+        
+        # Numbers
+        cex = .5,
+        fontface = "bold",
+        fontfamily = "sans",
+        cat.cex = .5
+        
+)
+```
+
+
+### Figure 3D
+
+```{r}
+marker_map <- readRDS(paste0(geno_path, "Regev_map_20171221.rds"))
+xpos <- qtl2:::map_to_xpos(marker_map, gap = 25)
+xchrbound <- qtl2:::map_to_boundaries(marker_map, gap = 25)
+
+chr_breaks <- apply(xchrbound, 2, median)
+
+rectangles <- data.frame(
+  xmin = apply(xchrbound, 2, min),
+  xmax = apply(xchrbound, 2, max),
+  ymin = 0,
+  ymax = max(lti_gwas$plot_lods) 
+)[seq(2,20,2), ]
+
+markers_df <- lti_gwas[chr == "5" & pos > 53000000 & pos < 54000000 & plot_lods > 10,]
+
+
+gwas_plot <- ggplot() + 
+  geom_rect(data = rectangles, 
+            mapping = aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), 
+            fill='gray80', alpha=0.8) +
+  geom_point(data = lti_gwas, 
+            mapping = aes(x = xpos, y = plot_lods), shape = 46) +
+  geom_hline(yintercept = 11, color = "red", linetype = "dashed") + 
+  geom_label(data = markers_df, aes(x = xpos, y = plot_lods, label = marker), size = 2) +
+  scale_x_continuous(breaks = chr_breaks, label = c(as.character(1:19), "X")) + 
+  labs(x = "Chromosome of SNP", y = "P-value(-log10 scale)", title = "Activated/Non-Activated LTi GWAS") +
+  theme(
+    axis.line=element_blank(),
+    axis.ticks=element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+    )
+
+ggsave("plot-gwas-lti-stressed.png", gwas_plot, dpi = 300)
+```
+
+
+
+## Figure 4
+
+### Figure 4A
+
+```{r}
+
+```
+
+
+
+### Figure 4B
+
+```{r}
+
+```
+
+
+### Figure 4C
+
+```{r}
+
+```
+
+
+### Figure 4D
+
+```{r}
+ccr6 <- my_plot(plot_df, "Ccr6") + my_theme
+gata3 <- my_plot(plot_df, "Gata3") + my_theme
+tbet <- my_plot(plot_df, "Tbet") + my_theme
+rorc <- my_plot(plot_df, "Rorc") + my_theme
+
+topic3 <- my_plot(plot_df, "topic3") + my_theme + labs(title = "Topic 3")
+topic8 <- my_plot(plot_df, "topic8") + my_theme + labs(title = "Topic 8")
+topic10 <- my_plot(plot_df, "topic10") + my_theme + labs(title = "Topic 10")
+topic11 <- my_plot(plot_df, "topic11") + my_theme + labs(title = "Topic 11")
+
+ggsave("tsne-topic3.png", topic3, dpi = 300)
+ggsave("tsne-topic8.png", topic8, dpi = 300)
+ggsave("tsne-topic10.png", topic10, dpi = 300)
+ggsave("tsne-topic11.png", topic11, dpi = 300)
+
+## need to replot
+topic3_qtl
+topic8_qtl
+topic10_qtl
+topic11_qtl
+
+
+```
+
+```{r}
+marker_map <- readRDS(paste0(geno_path, "Regev_map_20171221.rds"))
+xpos <- qtl2:::map_to_xpos(marker_map, gap = 25)
+xchrbound <- qtl2:::map_to_boundaries(marker_map, gap = 25)
+
+## Make Marker Reference Dataset
+MarkerRef <- data.frame(marker = names(xpos), xpos = xpos, stringsAsFactors = FALSE) %>%
+  left_join(
+    {conseq %>% select(marker, chr)}
+  )
+
+topic_lods <- lods %>% left_join(conseq) %>% left_join(MarkerRef)
+
+rectangles <- data.frame(
+  xmin = apply(xchrbound, 2, min),
+  xmax = apply(xchrbound, 2, max),
+  ymin = 0,
+  ymax = 10 
+)[seq(2,20,2), ]
+
+
+chr2_markers <- conseq$marker[conseq$chr == "2"]
+chr5_markers <- conseq$marker[conseq$chr == "5"]
+chr11_markers <- conseq$marker[conseq$chr == "11"]
+
+p1 <- ggplot() + 
+  geom_rect(data = rectangles, 
+            mapping = aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), 
+            fill='gray80', alpha=0.8) +
+  geom_line(data = topic_lods, 
+            mapping = aes(x = xpos, y = topic3)) +
+  geom_hline(yintercept = 6, color = "red", linetype = "dashed") + 
+  scale_x_continuous(breaks = apply(xchrbound, 2, median), label = c(as.character(1:19), "X")) + labs(x = "Chromosome of SNP", y = "LOD", title = "Topic 3", ymin = 0, ymax = 8) +
+  theme(
+    axis.line=element_blank(),
+    axis.ticks=element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+    )
+
+
+p2 <- ggplot() +
+  geom_line(data = topic_lods[topic_lods$marker %in% chr2_markers,], 
+            mapping = aes(x = xpos, y = topic3)) +
+  geom_hline(yintercept = 6, color = "red", linetype = "dashed") + 
+  scale_x_continuous(breaks = apply(xchrbound, 2, median), label = c(as.character(1:19), "X")) + 
+  labs(x = "Chromosome of SNP", y = "LOD", title = "Topic 3") +
+  ylim(ymin = 0, ymax = 8) + 
+  theme(
+    axis.line=element_blank(),
+    axis.ticks=element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+    )
+
+ggsave("qtl-plot-topic3-chr2.png", p2, dpi = 300)
+
+```
+
+
+
+## Figure 5
+
+### Figure 5A
+
+```{r}
+ilc1_cis_markers <- ilc1_cv %>% 
+  dplyr::filter(cis_effect==1, value > 8) %>% 
+  dplyr::arrange(desc(value_adj)) %>%
+  dplyr::group_by(gene) %>%
+  dplyr::arrange(desc(value_adj)) %>%
+  dplyr::slice(1) %>%
+  ungroup
+
+ilc1_trans_markers <- ilc1_cv %>% 
+  dplyr::filter(cis_effect!=1, value > 16) %>% 
+  dplyr::arrange(desc(value_adj)) %>%
+  dplyr::group_by(gene) %>%
+  dplyr::arrange(desc(value_adj)) %>%
+  dplyr::slice(1) %>%
+  ungroup
+
+
+ilc2_cis_markers <- ilc2_cv %>%
+  dplyr::filter(cis_effect==1, value > 7) %>% 
+  dplyr::arrange(desc(value_adj)) %>%
+  dplyr::group_by(gene) %>%
+  dplyr::arrange(desc(value_adj)) %>%
+  dplyr::slice(1) %>%
+  ungroup
+
+ilc2_trans_markers <- ilc2_cv %>%
+  dplyr::filter(cis_effect!=1, value > 16) %>% 
+  dplyr::arrange(desc(value_adj)) %>%
+  dplyr::group_by(gene) %>%
+  dplyr::arrange(desc(value_adj)) %>%
+  dplyr::slice(1) %>%
+  ungroup
+
+
+
+ilc3_cis_markers <- ilc3_cv %>% 
+  dplyr::filter(cis_effect==1, value > 8) %>% 
+  dplyr::arrange(desc(value_adj)) %>%
+  dplyr::group_by(gene) %>%
+  dplyr::arrange(desc(value_adj)) %>%
+  dplyr::slice(1) %>%
+  ungroup
+
+ilc3_trans_markers <- ilc3_cv %>% 
+  dplyr::filter(cis_effect!=1, value > 16) %>% 
+  dplyr::arrange(desc(value_adj)) %>%
+  dplyr::group_by(gene) %>%
+  dplyr::arrange(desc(value_adj)) %>%
+  dplyr::slice(1) %>%
+  ungroup
+
+
+
+lti_cis_markers <- lti_cv %>% 
+  dplyr::filter(cis_effect==1, value > 8) %>% 
+  dplyr::arrange(desc(value_adj)) %>%
+  dplyr::group_by(gene) %>%
+  dplyr::arrange(desc(value_adj)) %>%
+  dplyr::slice(1) %>%
+  ungroup
+
+lti_trans_markers <- lti_cv %>% 
+  dplyr::filter(cis_effect!=1, value > 16) %>% 
+  dplyr::arrange(desc(value_adj)) %>%
+  dplyr::group_by(gene) %>%
+  dplyr::arrange(desc(value_adj)) %>%
+  dplyr::slice(1) %>%
+  ungroup
+
+eqtl_peaks <- do.call(rbind, 
+                      list(ilc1_cis_markers, ilc2_cis_markers, 
+                           ilc3_cis_markers, lti_cis_markers,
+                           ilc1_trans_markers, ilc2_trans_markers, 
+                           ilc3_trans_markers, lti_trans_markers))
+
+write.csv(eqtl_peaks, "eqtl-peaks.csv")
+```
+
+
+
+```{r}
+
+load(paste0(geno_path, 'genoprobs_rename.Rdata'))
+eqtl_peaks <- read.csv(paste0(my_path, "eqtl-peaks.csv"))
+
+samples <- grep("20180706", rownames(probs[[1]]), value = T)
+nms <- str_extract(samples, "C[0-9]{1,2}_[0-9]")
+eqtl_geno_df <- data.frame(BestCall = nms)
+
+for( i in 1 : NROW(eqtl_peaks) ) {
+  # i <- 1
+  
+  chr <- eqtl_peaks$marker_chr[i]
+  marker <- eqtl_peaks$marker[i]
+  celltype <- eqtl_peaks$cell_type[i]
+  lodcol <- paste0(celltype, "_", eqtl_peaks$gene[i])
+  
+  eqtl_geno <- round(apply(probs[[chr]][samples,, marker], c(1,2), mean), 3)
+  eqtl_geno_df[[paste0(lodcol, "_", marker)]] <- colnames(eqtl_geno)[apply(eqtl_geno, 1, which.max)]
+  # i <- i+1
+  
+}
+
+write.csv(eqtl_geno_df, paste0(my_path, "results/eqtl-genotypes.csv"))
+```
+
+
+```{r}
+eqtl_peaks <- read.csv(paste0(my_path, "eqtl-peaks.csv"))
+eqtl_geno_df <- read.csv(paste0(my_path, "results/eqtl-genotypes.csv"))
+plot_df <- plot_df %>%
+  dplyr::left_join(eqtl_geno_df, by = "BestCall")
+
+plotgenes <- eqtl_peaks$gene[eqtl_peaks$cis_effect==1]
+plotgenes <- as.character(gsub("-", ".", plotgenes))
+
+for( g in plotgenes ) {
+  
+  eqtl_markers <- grep(g, colnames(eqtl_geno_df), value = TRUE)
+  
+  if( !is.null(eqtl_markers) ) {
+    
+    for( m in eqtl_markers ) {
+      plot_out <- plot_df %>%
+        dplyr::filter(!is.na(.data[[ m ]]),
+                      !grepl("Y", .data[[ m ]]),
+                      louvain_labels %in% c(1,2,3,4,5,8)) %>%
+        ggplot(., aes_string("X_tsne1", "X_tsne2", color = g)) + 
+          geom_point(shape = 46) + 
+          scale_color_gradient(low = "lightgrey", high = "darkblue") +
+          my_theme +
+          facet_wrap( m ) + 
+        labs(title = m)
+      
+      ggsave(filename = paste0(my_path, "results/figures/tsne-ilcs-bygenotype-", m, ".png"), 
+             plot = plot_out, 
+             dpi = 300)
+    }
+    
+  }
+  
+}
+```
+
+
+
+```{r}
+
+plotgenes <- eqtl_peaks$gene[eqtl_peaks$cis_effect==1]
+plotgenes <- as.character(gsub("-", ".", plotgenes))
+
+for( g in plotgenes ) {
+  
+  eqtl_markers <- grep(g, colnames(eqtl_geno_df), value = TRUE)
+  
+  if( !is.null(eqtl_markers) ) {
+    
+    for( m in eqtl_markers ) {
+      
+      genotype_order <- plot_df %>%
+        dplyr::filter(!is.na(.data[[ m ]]),
+                      !grepl("Y", .data[[ m ]])) %>%
+        dplyr::group_by( BestCall, .data[[ m ]] ) %>%
+        dplyr::summarise( topic = mean(.data[[ g ]] )) %>% 
+        dplyr::group_by( .data[[ m ]] ) %>% 
+        dplyr::summarise( topic = max(topic) ) %>% 
+        dplyr::arrange(topic) %>% 
+        .[[ m ]] %>%
+        as.character
+      
+      plot_df <- plot_df %>%
+        dplyr::mutate(founder_genotype = factor(.data[[ m ]], levels = genotype_order))
+      
+      plot_out <- plot_df %>%
+        dplyr::filter(!is.na(.data[[ m ]]),
+                      !grepl("Y", .data[[ m ]])) %>%
+        dplyr::group_by(BestCall, founder_genotype) %>% 
+        dplyr::summarise(topic_score = mean(.data[[ g ]])) %>%
+        ggplot(., aes(founder_genotype, topic_score)) + 
+          geom_point() +
+          theme(
+            panel.grid.minor=element_blank()
+            ) +
+          labs(title = paste(toupper(g), "at marker", strsplit(m, "_")[[1]][2]))
+      
+      ggsave(filename = paste0(my_path, "results/figures/scatter-egene-bygenotype-", m, ".png"), 
+             plot = plot_out, 
+             dpi = 300)
+
+    }
+    
+  }
+  
+}
+```
+
+
+### Figure 5C
+
+topic0 founder plot
+
+```{r}
+
+## 
+
+```
+
+
+### Figure 5D
+
+topic3 founder plot
+
+```{r}
+
+```
+
+
+
+## Figure 6
+
+### Figure 6A
+
+Cytokine heatmap
+
+```{r cytokine_heatmap_prep}
+cnames <- c("batch", "cage", "well", "IFNg", "IL5", "TNFa", "IL2", "IL6", "IL4", "IL10",
+            "IL9", "IL17A", "IL17F", "IL22", "IL13", "coding", "mouse_id", "remove")
+pheno_v1 <- lapply(1:4, function(i) {
+  read_excel(path = paste0(pheno_path, "cytokine detection (version 1).xlsx"),
+             sheet = i) %>% 
+    na.omit
+}) %>%
+  do.call(rbind, .)
+colnames(pheno_v1) <- cnames
+
+# sample_map_df <- NULL
+# ## batch3 - Broad_Inst_Xu_MURGIGV01_20180510 or Broad_Inst_Xu_MURGIGV01_20180607
+batch3_samples <- pheno_v1$mouse_id[pheno_v1$batch == "Batch 3"]
+
+# ## batch4 - Broad_Inst_Xu_MURGIGV01_20180706
+batch4_samples <- pheno_v1$mouse_id[pheno_v1$batch == "Batch 4"]
+
+pheno_bw <- read.csv(paste0(pheno_path, "pheno_bodyweight_processed.csv")) %>%
+  dplyr::filter({ ID %in% batch3_samples & 
+      genotyping_date %in% c("Broad_Inst_Xu_MURGIGV01_20180510", "Broad_Inst_Xu_MURGIGV01_20180607") } |
+                {ID %in% batch4_samples & 
+                    genotyping_date %in% c("Broad_Inst_Xu_MURGIGV01_20180706")}) %>%
+  dplyr::rename(mouse_id = ID)
+
+
+sample_map_df <- readr::read_csv(paste0(geno_path, "reference-data/DODB_GM_inventory_20180816.csv")) 
+sample_map_df_batch3 <- sample_map_df %>% 
+  filter(Project == 'XBI_Set3', Original.Mouse.ID %in% batch3_samples)
+sample_map_df_batch4 <- sample_map_df  %>% 
+  filter(Original.Mouse.ID %in% batch4_samples)
+
+sample_df <- rbind(sample_map_df_batch3, sample_map_df_batch4) %>%
+  dplyr::select(mouse_id = Original.Mouse.ID, aprobs_sample = Unique.Sample.ID) %>%
+  dplyr::left_join( pheno_bw , by = "mouse_id")
+
+pheno <- pheno_v1 %>%
+  dplyr::left_join(sample_df) %>%
+  dplyr::filter(remove == 0, !is.na(aprobs_sample)) %>%
+  dplyr::mutate(IL13 = ifelse(is.na(as.numeric(IL13)), 41, as.numeric(IL13))) %>%
+  as.data.frame
+```
+
+```{r cytokine_heatmap}
+# Load latest version of heatmap.3 function
+devtools::source_url("https://raw.githubusercontent.com/obigriffith/biostar-tutorials/master/Heatmaps/heatmap.3.R")
+
+# pheno <- read.csv(paste0(pheno_path, "pheno_batch4_processed.csv"))
+# pheno$Batches <- factor(pheno$Batches)
+# cnames <- colnames(pheno)[c(3:14,16,20, 22:33)]
+# options(na.action='na.pass')
+# dat_na_removed <- model.matrix(object = as.formula(paste("~ 0 +", paste(cnames, collapse = "+"))), 
+#                                  data = pheno,
+#                                  contrasts.arg = list(Batches = contrasts(pheno$Batches, contrasts = F)))
+# 
+#   
+# ## removing exluded mice
+# pheno <- pheno %>% filter(excluded == 0)
+
+# plotdata <- scale(pheno[, c("IgA_boxcox", "IgE_boxcox", "IgG1_boxcox", "IgG2_boxcox", "IgM_boxcox", "Mmcp1_boxcox")])
+# rownames(plotdata) <- pheno$ID
+
+plotdata <- scale(pheno[, 4:15])
+plotdata <- pheno[, 4:15]
+rownames(plotdata) <- pheno$mouse_id
+
+
+# myheatmap(plotdata, "Boxcox Data")
+
+bw_colors <- sort(unique(pheno$BW_1st))
+names(bw_colors) <- colorRampPalette(brewer.pal(8, "Oranges"))(15)
+  
+mouse_color <- c("black","grey", "white")[pheno$Color]
+mouse_batch <- c("Red", "Blue", "Green", "Purple")[pheno$Batches]
+mouse_bw_colors <- names(bw_colors)[pheno$BW_1st - 12]
+
+rowlabs <- t(cbind(mouse_color, mouse_batch, mouse_bw_colors))
+rownames(rowlabs) <- c("Color", "Batch", "Weight")
+
+rowlabs <- t(cbind(mouse_bw_colors))
+rownames(rowlabs) <- c("Weight")
+
+main_title = "Cytokine"
+par(cex.main=1)
+heatmap.3(x = plotdata, 
+          na.rm = TRUE, 
+          scale="none", 
+          dendrogram = "both", 
+          margins = c(6,12),
+          Rowv = TRUE, 
+          Colv = TRUE, 
+          RowSideColors = rowlabs, 
+          symbreaks = FALSE, 
+          key = TRUE, 
+          symkey = FALSE,
+          density.info = "none", 
+          trace = "none", 
+          main = main_title, 
+          col = rev(colorRampPalette(brewer.pal(8, "RdYlGn"))(25)), 
+          labCol = cnames[4:15],
+          labRow = FALSE,
+          RowSideColorsSize = 2, 
+          KeyValueName = "Cytokine")
+legend("topright",
+       legend = c("Batch1", "Batch2", "Batch3", "Batch4", "", "black mouse","white mouse", "grey mouse", "", "Low Weight", "Medium Weight", "High Weight"),
+      fill = c("Red", "Blue", "Green", "Purple", "white", "black", "white", "grey", "white", names(bw_colors)[c(2,8,17)]), 
+         border = FALSE, 
+         bty = "n", 
+         y.intersp = 0.7, 
+         cex = 0.7)
+```
+
+
+
+ 
+### Figure 6B
+
+ Cytokine Co-localization
+
+```{r}
+## IL-22
+ccre[il22_qtl == 1, lapply(.SD, sum), .SDcols = 37:96]
+
+il22_ilc3_markers <- ccre[il22_qtl==1 & chr == 1 & ilc3_eqtl_loci_mean==1, marker]
+table(ilc3_mean$gene[ilc3_mean$marker %in% il22_ilc3_markers])
+table(lti_mean$gene[lti_mean$marker %in% il22_ilc3_markers])
+
+
+
+topic19_marker <- ccre[il22_qtl==1 & chr == 8 & {ilc2_ilc3_prop_qtl==1 | topic19_qtl==1},marker]
+
+table(ilc1_cv$gene[ilc1_cv$marker %in% topic19_marker])
+table(ilc2_cv$gene[ilc2_cv$marker %in% topic19_marker])
+table(ilc3_cv$gene[ilc3_cv$marker %in% topic19_marker])
+table(lti_cv$gene[lti_cv$marker %in% topic19_marker])
+
+
+
+## TNFa
+ccre[tnf_qtl == 1, lapply(.SD, sum), .SDcols = 37:96]
+
+tnf_chr5_markers_loci1 <- ccre[tnf_qtl==1 & chr == 5 & pos < 115000000, marker]
+table(ilc3_mean$gene[ilc3_mean$marker %in% tnf_chr5_markers_loci1])
+
+
+tnf_chr5_markers_loci2 <- ccre[tnf_qtl==1 & chr == 5 & pos > 115000000, marker]
+
+
+
+
+
+```
+
+
+### Figure 6C
+
+```{r}
+
+```
+
+
+### Figure 6D
+
+```{r}
+
+```
+
+
+### Figure 6: Supplementary
+
+
+
+```{r}
+# Load latest version of heatmap.3 function
+devtools::source_url("https://raw.githubusercontent.com/obigriffith/biostar-tutorials/master/Heatmaps/heatmap.3.R")
+
+pheno <- read.csv(paste0(pheno_path, "pheno_batch4_processed.csv"))
+pheno$Batches <- factor(pheno$Batches)
+cnames <- colnames(pheno)[c(3:14,16,20, 22:33)]
+options(na.action='na.pass')
+dat_na_removed <- model.matrix(object = as.formula(paste("~ 0 +", paste(cnames, collapse = "+"))), 
+                                 data = pheno,
+                                 contrasts.arg = list(Batches = contrasts(pheno$Batches, contrasts = F)))
+
+  
+## removing exluded mice
+pheno <- pheno %>% filter(excluded == 0)
+
+# plotdata <- scale(pheno[, c("IgA_boxcox", "IgE_boxcox", "IgG1_boxcox", "IgG2_boxcox", "IgM_boxcox", "Mmcp1_boxcox")])
+# rownames(plotdata) <- pheno$ID
+
+plotdata <- scale(pheno[, c("IgA_boxcox", "IgE_boxcox", "IgG1_boxcox", "IgG2_boxcox", "IgM_boxcox")])
+rownames(plotdata) <- pheno$ID
+
+
+# myheatmap(plotdata, "Boxcox Data")
+
+bw_colors <- sort(unique(pheno$BW_1st))
+names(bw_colors) <- colorRampPalette(brewer.pal(8, "Oranges"))(17)
+  
+mouse_color <- c("black","grey", "white")[pheno$Color]
+mouse_batch <- c("Red", "Blue", "Green", "Purple")[pheno$Batches]
+mouse_bw_colors <- names(bw_colors)[pheno$BW_1st - 12]
+
+# rowlabs <- t(cbind(mouse_color, mouse_batch, mouse_bw_colors))
+# rownames(rowlabs) <- c("Color", "Batch", "Weight")
+
+rowlabs <- t(cbind(mouse_bw_colors))
+rownames(rowlabs) <- c("Weight")
+
+main_title = "Antibody"
+par(cex.main=1)
+heatmap.3(x = plotdata, 
+          na.rm = TRUE, 
+          scale="none", 
+          dendrogram = "both", 
+          margins = c(6,12),
+          Rowv = TRUE, 
+          Colv = TRUE, 
+          RowSideColors = rowlabs, 
+          symbreaks = FALSE, 
+          key = TRUE, 
+          symkey = FALSE,
+          density.info = "none", 
+          trace = "none", 
+          main = main_title, 
+          col = rev(colorRampPalette(brewer.pal(8, "RdYlGn"))(25)), 
+          labCol = sapply(c("IgA", "IgE", "IgG1", "IgG2", "IgM", "Mmcp1"), function(p) na.omit(str_extract(colnames(plotdata), p))),
+          labRow = FALSE,
+          RowSideColorsSize = 2, 
+          KeyValueName = "Antibody")
+legend("topright",
+       legend = c("Batch1", "Batch2", "Batch3", "Batch4", "", "black mouse","white mouse", "grey mouse", "", "Low Weight", "Medium Weight", "High Weight"),
+      fill = c("Red", "Blue", "Green", "Purple", "white", "black", "white", "grey", "white", names(bw_colors)[c(2,8,17)]), 
+         border = FALSE, 
+         bty = "n", 
+         y.intersp = 0.7, 
+         cex = 0.7)
+```
+
+
+
+### Figure 6Bs
+
+  - antibody-lod-heatmap.Rmd
+
+```{r}
+
+## QTL data
+qtl_data <- read_csv(paste0(my_path, "results/Antibody_QTL_wBatchCorrection.csv"))
+## Marker Map
+load(paste0(geno_path, "Regev_map_20171221.Rdata"))
+## SNP Info
+load(paste0(my_path, "data/GM_snps.Rdata"))
+## Genotype Data
+# load(paste0(geno))
+
+indexes <- qtl2:::map_to_index(map)
+xpos <- qtl2:::map_to_xpos(map, gap = 25)
+xpos <- data.frame(marker = names(xpos), xpos = xpos)
+chrbound <- qtl2:::map_to_boundaries(map, gap = 25)
+
+
+evens <- seq(2, length(map), by = 2)
+
+xpos_median <- xpos[mapply(median, indexes), ]
+xpos_min <- xpos[mapply(min, indexes), ]
+xpos_max <- xpos[mapply(max, indexes), ]
+
+
+plotdata <- qtl_data %>% 
+  #tibble::rownames_to_column %>%
+  rename(marker = X1) %>%
+  data.table::melt("marker") %>%
+  left_join(GM_snps) %>%
+  left_join(xpos) %>%
+  mutate(value = as.numeric(value))
+
+
+dat <- as.matrix(qtl_data[,-1])
+rownames(dat) <- qtl_data$X1
+
+cnames <- c("IgA_boxcox", "IgE_boxcox", "IgG1_boxcox", "IgG2_boxcox", "IgM_boxcox", "Mmcp1_boxcox", "BW_1st")
+distout <- dist(t(dat[,cnames]))
+
+ hc <- hclust(distout)
+ hc$order
+
+
+(p <- ggplot(plotdata[plotdata$variable %in% cnames, ], aes(x = xpos, y = variable)) + 
+  geom_tile(aes(color = value)) + 
+  scale_color_gradientn(colours = brewer.pal(11, "RdBu")[8:1]) +
+  labs(title= "Antibody LOD Heatmap", x = "Chromosome", y = "Antibody", color = "LOD") + 
+  theme(panel.background = element_rect(fill = "white"), 
+        panel.grid.minor = element_line(color = "black", size = 500, linetype = 8)) + 
+  scale_x_discrete(limits = xpos_median$xpos, 
+                   labels = paste0(c(1:19, "X"))) + 
+  scale_y_discrete(limits = cnames[hc$order], 
+                   labels = c("IgA", "IgE", "IgG1", "IgG2", "IgM", "Mmcp1", "BW")[hc$order]))
+
+ggsave("lod_heatmap.png", p)
+```
+
+
+
+## Figure 7
+
+
+### Figure 7A
+
+```{r}
+founders1 <- fread(paste0(my_path, 'data/founders1-louvain_labels-labels-transfer/obs.csv'),
+                   data.table = FALSE)
+founders2 <- fread(paste0(my_path, 'data/founders2-louvain_labels-labels-transfer/obs.csv'),
+                   data.table = FALSE)
+
+
+founders <- rbind(founders1, founders2)
+```
+
+
+
+```{r}
+for( t in paste0("topic", 0:19) ) {
+  
+  # t <- "topic0"
+  
+  genotype_order <- founders %>%
+    dplyr::filter(best_clean != "AMB", best_clean != "nan") %>%
+    dplyr::group_by( best_clean ) %>%
+    dplyr::summarise( topic = mean(.data[[ t ]]) ) %>% 
+    dplyr::arrange(topic) %>% 
+    .$best_clean %>%
+    as.character
+  
+  founders <- founders %>%
+    dplyr::mutate(founder_genotype = factor(best_clean, levels = genotype_order))
+  
+  
+  plot_out <- founders %>%
+    dplyr::filter(best_clean != "AMB", best_clean != "nan") %>%
+    dplyr::mutate(topic_score = .data[[ t ]]) %>%
+    # dplyr::group_by(best_clean, founder_genotype) %>% 
+    # dplyr::summarise(topic_score = mean(.data[[ t ]])) %>%
+    ggplot(., aes(founder_genotype, topic_score)) + 
+      geom_point() +
+      theme(
+        panel.grid.minor=element_blank()
+        ) + 
+    stat_summary(fun.data=mean_sdl, fun.args = list(mult = 2),
+                 geom = "errorbar", color = "red", width = 0.2) +
+    stat_summary(fun=mean, geom="point", color="red") + 
+    ylim(0, NA) + 
+    labs(title = paste(tools::toTitleCase(t), "by Founder Mouse"), 
+         x = "Founder Genotype", 
+         y = "Topic Score")
+  
+  ggsave(
+    filename = paste0(my_path, "results/figures/scatter-topicscore-byfounder-",t , ".png"), 
+    plot = plot_out, 
+    dpi = 300)
+  
+}
+
+```
+
+
+```{r}
+founders1X <- fread(paste0(my_path, 'data/founders1-louvain_labels-labels-transfer/X.csv'),
+                   data.table = FALSE)
+founders2X <- fread(paste0(my_path, 'data/founders2-louvain_labels-labels-transfer/X.csv'),
+                   data.table = FALSE)
+
+cnames <- intersect(colnames(founders1X), colnames(founders2X))
+foundersX <- rbind(founders1X[, cnames], founders2X[, cnames])
+colnames(foundersX) <- gsub("-", ".", colnames(foundersX)) 
+```
+
+```{r}
+founders <- founders %>%
+  dplyr::left_join(foundersX)
+```
+
+
+```{r}
+
+#  [1] "scatter-egene-bygenotype-ILC1_Cnn2_UNCHS028864.png"        
+#  [2] "scatter-egene-bygenotype-ILC1_Hopx_UNCHS014802.png"        
+#  [3] "scatter-egene-bygenotype-ILC1_Ppp1r2_JAX00417146.png"      
+#  [4] "scatter-egene-bygenotype-ILC2_Abcb1b_UNCHS013491.png"      
+#  [5] "scatter-egene-bygenotype-ILC2_Pdcd5_UNC12624590.png"       
+#  [6] "scatter-egene-bygenotype-ILC2_Sptssa_JAX00334445.png"      
+#  [7] "scatter-egene-bygenotype-ILC3_H2.Q4_UNCHS044197.png"       
+#  [8] "scatter-egene-bygenotype-ILC3_Hmha1_UNCHS028841.png"       
+#  [9] "scatter-egene-bygenotype-ILC3_Lgals3_UNC23954465.png"      
+# [10] "scatter-egene-bygenotype-ILC3_Necap2_JAX00568909.png"      
+# [11] "scatter-egene-bygenotype-LTi_H2.T23_backupUNC170076641.png"
+# [12] "scatter-egene-bygenotype-LTi_Lgals3_UNCHS038151.png" 
+
+ilc1_genelist <- c("Cnn2", "Hopx", "Ppp1r2")  # louvain_labels - 8
+ilc2_genelist <- c("Abcb1b", "Pdcd5", "Sptssa") # louvain_labels - 3
+ilc3_genelist <- c("H2.Q4", "Lgals3", "Necap2") # louvain_labels - 2,4
+lti_genelist <- c("H2.Q4", "Lgals3", "H2.T23") # louvain_labels - 1,5
+
+## maybe put cell type in plot name
+for( g in lti_genelist ) {
+  
+  # g <- "Hopx"
+  
+  genotype_order <- founders %>%
+    dplyr::filter(best_clean != "AMB", best_clean != "nan") %>%
+    dplyr::filter(louvain_labels %in% c(2,4)) %>%
+    dplyr::group_by( best_clean ) %>%
+    dplyr::summarise( gene = mean(.data[[ g ]]) ) %>% 
+    dplyr::arrange(gene) %>% 
+    .$best_clean %>%
+    as.character
+  
+  founders <- founders %>%
+    dplyr::mutate(founder_genotype = factor(best_clean, levels = genotype_order))
+  
+  
+  plot_out <- founders %>%
+    dplyr::filter(best_clean != "AMB", best_clean != "nan") %>%
+    dplyr::mutate(gene = .data[[g]]) %>%
+    # dplyr::group_by(best_clean, founder_genotype) %>% 
+    # dplyr::summarise(topic_score = mean(.data[[ t ]])) %>%
+    ggplot(., aes(founder_genotype, gene)) + 
+      geom_point() +
+      theme(
+        panel.grid.minor=element_blank()
+        ) +
+    stat_summary(fun.data=mean_sdl, fun.args = list(mult = 2),
+                 geom = "errorbar", color = "red", width = 0.2) +
+    stat_summary(fun=mean, geom="point", color="red") + 
+    ylim(0, NA) + 
+    labs(title = paste(tools::toTitleCase(g), "by Founder Mouse"), 
+         x = "Founder Genotype", 
+         y = "Gene Expression")
+  
+  ggsave(
+    filename = paste0(my_path, "results/figures/scatter-expression-byfounder-", g , ".png"), 
+    plot = plot_out, 
+    dpi = 300)
+  
+}
+
+```
+
+
+
+## Allergy and Proportion Overlap
+
+```{r}
+library(UpSetR)
+
+
+vars <- fread(paste0(my_path, "data/scanpy/allchannels/vars.csv"), data.table = FALSE)
+check_vars <- grep("prop|_steady|_allergy", colnames(vars), value = T)
+
+
+gene_list <- combn(check_vars, 2, function(x) {
+  list(vars$index[vars[[x[1]]] == 1], vars$index[vars[[x[2]]] == 1])
+}, simplify = FALSE)
+```
+
+
+### Lineage Tracing?
+
+lineage markers were poorly, if at all expressed, and did not differ between WT and Tox−/− cells. Genes Itga4 and Itgb7,
+
+```{r}
+id2plot <- plot_df %>% 
+  dplyr::filter(louvain_labels %in% c(1,2,3,4,5,8)) %>% 
+  my_plot(., "Id2", embedding = "net_fle") + theme_minimal()
+
+toxplot <- plot_df %>% 
+  dplyr::filter(louvain_labels %in% c(1,2,3,4,5,8)) %>% 
+  my_plot(., "Tox", embedding = "net_fle") + theme_minimal()
+
+rbpjplot <- plot_df %>% 
+  dplyr::filter(louvain_labels %in% c(1,2,3,4,5,8)) %>% 
+  my_plot(., "Rbpj", embedding = "net_fle") + theme_minimal()
+
+cxcr6plot <- plot_df %>% 
+  dplyr::filter(louvain_labels %in% c(1,2,3,4,5,8)) %>% 
+  my_plot(., "Cxcr6", embedding = "net_fle") + theme_minimal()
+
+rorcplot <- plot_df %>% 
+  dplyr::filter(louvain_labels %in% c(1,2,3,4,5,8)) %>% 
+  my_plot(., "Rorc", embedding = "net_fle") + theme_minimal()
+
+gata3plot <- plot_df %>% 
+  dplyr::filter(louvain_labels %in% c(1,2,3,4,5,8)) %>% 
+  my_plot(., "Gata3", embedding = "net_fle") + theme_minimal()
+
+tbetplot <- plot_df %>% 
+  dplyr::filter(louvain_labels %in% c(1,2,3,4,5,8)) %>% 
+  my_plot(., "Tbet", embedding = "net_fle") + theme_minimal()
+
+ncr1plot <- plot_df %>% 
+  dplyr::filter(louvain_labels %in% c(1,2,3,4,5,8)) %>% 
+  my_plot(., "Ncr1", embedding = "net_fle") + theme_minimal()
+
+ccr6plot <- plot_df %>% 
+  dplyr::filter(louvain_labels %in% c(1,2,3,4,5,8)) %>% 
+  my_plot(., "Ccr6", embedding = "net_fle") + theme_minimal()
+
+
+
+
+plot_grid(rbpjplot, toxplot, id2plot, 
+          cxcr6plot, rorcplot, gata3plot, 
+          tbetplot, ncr1plot, ccr6plot, nrow=3)
+
+```
+

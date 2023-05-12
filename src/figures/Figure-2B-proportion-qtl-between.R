@@ -9,24 +9,34 @@ library(ggplot2)
 
 
 figure_path <- paste0(results_dir, "figures/")
-source(paste0(figure_path, "helpers.R"))
+source("/workspace/fasi-domice/src/helpers.R")
 
-## Read marker map
-marker_map <- readRDS(paste0(data_path, "genotype/Regev_map_20171221.rds"))
+# ## Read marker map
+# marker_map <- readRDS(paste0(data_path, "genotype/Regev_map_20171221.rds"))
 
 ## ILC Cell Proportions ###############
-plot_files <- c("gwas-ilc1-ilc2-results.csv.gz", "gwas-ilc3-lti-results.csv.gz")
-names(plot_files) <- c("ILC1 vs ILC2", "ILC3 vs LTi")
+plot_files <- c("gwas-ilc1-ilc2-results.csv.gz",
+                "gwas-ilc1-ilc3-results.csv.gz",
+                "gwas-ilc1-lti-results.csv.gz",
+                "gwas-ilc2-ilc3-results.csv.gz",
+                "gwas-ilc2-lti-results.csv.gz",
+                "gwas-ilc3-lti-results.csv.gz")
+names(plot_files) <- c("ILC1 vs ILC2", 
+                       "ILC1 vs ILC3",
+                       "ILC1 vs LTi",
+                       "ILC2 vs ILC3",
+                       "ILC2 vs LTi",
+                       "ILC3 vs LTi")
 
 i <- 1
 plot_list <- Map(function(f, n) {
   
-  plot_out <- fread(paste0("results/proportions/", f)) %>%
+  plot_out <- fread(paste0(results_dir, "proportions/", f)) %>%
     dplyr::mutate(
       padj = p.adjust(p_values, method = "hochberg"),
       lods = -log10(p.adjust(p_values, method = "hochberg")) / 10
     ) %>%
-    gwas_plot(., marker_map = marker_map, plot_title = n, cutoff = 6) + 
+    gwas_plot(., plot_title = n, cutoff = 6) + 
       geom_hline(yintercept = 6, 
                  color = "red", 
                  linetype = "dashed")
