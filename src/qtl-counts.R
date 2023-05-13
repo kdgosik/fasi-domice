@@ -16,6 +16,7 @@ source("../fasi-domice/setup.R")
 # GM_Snps meta data
 ccre <- fread(paste0(data_dir, "references/GM_SNPS_Consequence_cCRE.csv"), data.table = FALSE)
 
+# gene level tracking
 vars <- read_csv("/workspace/fasi-domice/data/allchannels/vars.csv")
 
 ## Gene Data
@@ -49,6 +50,15 @@ lod_cutoff <- 6
 
 
 ## ILC1 ####
+
+# Step 1:  
+# Step 2:
+# Step 3:
+# Step 4:
+# Step 5:
+# Step 6:
+
+
 ilc1_eqtl <- fread(paste0(results_dir, "eqtl/qtl-plot-lods-ILC1-cv.csv.gz"), 
                    data.table = FALSE)
 
@@ -72,7 +82,8 @@ ilc1_eqtl_loci_by_gene <- ilc1_eqtl %>%
   filter(value_adj > 10) %>%
   dplyr::select(marker, gene, value, marker_chr, pos, strand,
                 id, gene_chr, gene_start, gene_end, 
-                cis_effect, value_adj)
+                cis_effect, value_adj) %>%
+  mutate(gene = paste0("ILC1_", gene))
 
 ilc1eqtlgrl <- makeGRangesListFromDataFrame(ilc1_eqtl_loci_by_gene,
                                             split.field = "gene",
@@ -159,6 +170,8 @@ loci_total_ilc1 <- qtl_loci_by_gene_ILC1 %>%
   n_distinct()
 
 
+loci_gene_expressed_ilc1 / loci_total_ilc1
+
 
 ## ILC2 ####
 ilc2_eqtl <- fread(paste0(results_dir, "eqtl/qtl-plot-lods-ILC2-cv.csv.gz"), 
@@ -180,9 +193,11 @@ ilc2_eqtl_loci_by_gene <- ilc2_eqtl %>%
   mutate(cis_effect = as.numeric(marker_chr == gene_chr & 
                                    {marker_pos > (gene_start - 1e6) & marker_pos < (gene_end + 1e6)})) %>%
   mutate(value_adj = ifelse(cis_effect==1, value + 6, value)) %>%
-  filter(value_adj > 10) %>%
+  filter(value_adj > 10,
+         strand = "+") %>%
   dplyr::select(marker, gene, value, marker_chr, pos, 
-                id, gene_chr, gene_start, gene_end, cis_effect, value_adj)
+                id, gene_chr, gene_start, gene_end, cis_effect, value_adj) %>%
+  mutate(gene = paste0("ILC2_", gene))
 
 ilc2eqtlgrl <- makeGRangesListFromDataFrame(ilc2_eqtl_loci_by_gene,
                                             split.field = "gene",
@@ -292,9 +307,11 @@ ilc3_eqtl_loci_by_gene <- ilc3_eqtl %>%
   mutate(cis_effect = as.numeric(marker_chr == gene_chr & 
                                    {marker_pos > (gene_start - 1e6) & marker_pos < (gene_end + 1e6)})) %>%
   mutate(value_adj = ifelse(cis_effect==1, value + 6, value)) %>%
-  filter(value_adj > 10) %>%
+  filter(value_adj > 10,
+         strand = "+") %>%
   dplyr::select(marker, gene, value, marker_chr, pos, 
-                id, gene_chr, gene_start, gene_end, cis_effect, value_adj)
+                id, gene_chr, gene_start, gene_end, cis_effect, value_adj) %>%
+  mutate(gene = paste0("ILC3_", gene))
 
 ilc3eqtlgrl <- makeGRangesListFromDataFrame(ilc3_eqtl_loci_by_gene,
                                             split.field = "gene",
@@ -403,9 +420,11 @@ lti_eqtl_loci_by_gene <- lti_eqtl %>%
   mutate(cis_effect = as.numeric(marker_chr == gene_chr & 
                                    {marker_pos > (gene_start - 1e6) & marker_pos < (gene_end + 1e6)})) %>%
   mutate(value_adj = ifelse(cis_effect==1, value + 6, value)) %>%
-  filter(value_adj > 10) %>%
+  filter(value_adj > 10,
+         strand = "+") %>%
   dplyr::select(marker, gene, value, marker_chr, pos, 
-                id, gene_chr, gene_start, gene_end, cis_effect, value_adj)
+                id, gene_chr, gene_start, gene_end, cis_effect, value_adj) %>%
+  mutate(gene = paste0("LTi_", gene))
 
 ltieqtlgrl <- makeGRangesListFromDataFrame(lti_eqtl_loci_by_gene,
                                            split.field = "gene",
@@ -699,6 +718,17 @@ lti_stressedgr <- makeGRangesFromDataFrame(lti_stressed,
 ## length of all genes in grl
 lti_stressed_count <- length(reduce(resize(sort(lti_stressedgr), 1000000)))
 
+prop_count_list <- list("ILC1_ILC2"=ilc1_ilc2, 
+                        "ILC1_ILC3"=ilc1_ilc3,
+                        "ILC1_LTi"=ilc1_lti,
+                        "ILC2_ILC3"=ilc2_ilc3,
+                        "ILC2_LTi"=ilc2_lti,
+                        "ILC3_LTi"=ilc3_lti,
+                        "ILC3_activated"=ilc3_stressed,
+                        "LTi_activated"=lti_stressed) %>%
+  bind_rows(.,.id = "trait")
+
+
 prop_count_list <- list("ILC1_ILC2"=ilc1_ilc2_count, 
                         "ILC1_ILC3"=ilc1_ilc3_count,
                         "ILC1_LTi"=ilc1_lti_count,
@@ -708,7 +738,7 @@ prop_count_list <- list("ILC1_ILC2"=ilc1_ilc2_count,
                         "ILC3_activated"=ilc3_stressed_count,
                         "LTi_activated"=lti_stressed_count)
 
-prop_list <- list("ILC1_ILC2"=ilc1_ilc2gr, 
+prop_gr_list <- list("ILC1_ILC2"=ilc1_ilc2gr, 
                   "ILC1_ILC3"=ilc1_ilc3gr,
                   "ILC1_LTi"=ilc1_ltigr,
                   "ILC2_ILC3"=ilc2_ilc3gr,
@@ -784,6 +814,23 @@ prop_polygeneicdf <- prop_loci_by_gene_outdf %>%
 write.csv(prop_polygeneicdf, paste0(results_dir, "proportions/qtl-loci-by-gene-proportions_polygenic_only.csv"))
 
 
+prop_qtl_count <- prop_loci_by_gene_outdf %>%
+  filter(propQTL_loci_gene %in% vars$index[vars$ilc1_expressed==1] |
+         propQTL_loci_gene %in% vars$index[vars$ilc2_expressed==1] |
+         propQTL_loci_gene %in% vars$index[vars$ilc3_expressed==1] |
+         propQTL_loci_gene %in% vars$index[vars$lti_expressed==1]) %>%
+  pull(loci_id) %>%
+  n_distinct()
+
+prop_qtl_total_count <- prop_loci_by_gene_outdf %>%
+  # filter(propQTL_loci_gene %in% vars$index[vars$ilc1_expressed==1] |
+  #          propQTL_loci_gene %in% vars$index[vars$ilc2_expressed==1] |
+  #          propQTL_loci_gene %in% vars$index[vars$ilc3_expressed==1] |
+  #          propQTL_loci_gene %in% vars$index[vars$lti_expressed==1]) %>%
+  pull(loci_id) %>%
+  n_distinct()
+
+
 
 
 ## topic qtl counts ####
@@ -795,12 +842,13 @@ topics <- fread(paste0(results_dir, "topics/qtl-topic-lods.csv.gz"),
   dplyr::select(1:23) %>%
   pivot_longer(-c(marker, chr, pos)) %>%
   mutate(strand = "+") %>%
-  filter(!is.na(pos), !is.na(chr), value > 6)
+  filter(!is.na(pos), !is.na(chr), value > 6) %>%
+  dplyr::rename(trait = name)
 
 
 
 topicqtlgrl <- makeGRangesListFromDataFrame(topics,
-                                            split.field = "name",
+                                            split.field = "trait",
                                             names.field = "marker",
                                             seqnames = "chr",
                                             start.field = "pos",
@@ -893,7 +941,8 @@ cytokines <- fread(paste0(results_dir,"cytokines/qtl-cytokines-steady-lods.csv.g
   dplyr::select(1:15) %>%
   pivot_longer(-c(marker, chr, pos)) %>%
   mutate(strand = "+") %>%
-  filter(!is.na(pos), !is.na(chr), value > 6)
+  filter(!is.na(pos), !is.na(chr), value > 6) %>%
+  dplyr::rename(trait = name)
 
 
 
@@ -1026,6 +1075,34 @@ topicqtl_list <- lapply(reduce(resize(sort(topicqtlgrl),10000)), length)
 ## cytokine
 cytokineqtl_list <- lapply(reduce(resize(sort(cytokinesqtlgrl),10000)), length)
 
+
+
+## Combining to Dataset ##########
+
+list(ilc1_eqtl = ilc1_eqtl_loci_by_gene %>% 
+       dplyr::select(trait = gene,
+                     marker,
+                     chr = marker_chr,
+                     strand,
+                     value),
+     ilc2_eqtl = ilc2_eqtl_loci_by_gene %>% 
+       dplyr::select(trait = gene,
+                     marker,
+                     chr = marker_chr,
+                     strand,
+                     value),
+     ilc3_eqtl = ilc3_eqtl_loci_by_gene %>% 
+       dplyr::select(trait = gene,
+                     marker,
+                     chr = marker_chr,
+                     strand,
+                     value),
+     lti_eqtl = lti_eqtl_loci_by_gene %>% 
+       dplyr::select(trait = gene,
+                     marker,
+                     chr = marker_chr,
+                     strand,
+                     value))
 
 
 
