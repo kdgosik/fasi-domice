@@ -28,7 +28,7 @@ ensembl <- readGFF(paste0(data_dir, "references/Mus_musculus.GRCm38.102.gtf")) %
   filter(seqid %in% c(as.character(1:19), "X"), 
          gene_biotype == "protein_coding", 
          type == "gene") %>%
-  dplyr::select(seqid, start, end, strand, gene_name)
+  dplyr::select(seqid, start, end, strand, gene_name, gene_id)
 
 
 mm10 <- makeGRangesFromDataFrame(ensembl, keep.extra.columns = T)
@@ -177,7 +177,7 @@ ilc1_ilc2 <- fread(paste0(results_dir,"proportions/gwas-ilc1-ilc2-results.csv.gz
     padj = p.adjust(p_values, method = "hochberg"),
     lods = -log10(p.adjust(p_values, method = "hochberg")) / 10
   ) %>%
-  dplyr::filter(lods > quantile(lods, 0.999)) %>%
+  dplyr::filter(lods > quantile(lods, 0.995)) %>%
   dplyr::select(marker, chr, betas, se, p_values, 
                 lods, chr, pos, cM, ensembl_gene, 
                 consequence, strand, xpos)
@@ -190,7 +190,7 @@ ilc1_ilc3 <- fread(paste0(results_dir,"proportions/gwas-ilc1-ilc3-results.csv.gz
     padj = p.adjust(p_values, method = "hochberg"),
     lods = -log10(p.adjust(p_values, method = "hochberg")) / 10
   ) %>%
-  dplyr::filter(lods > quantile(lods, 0.999)) %>%
+  dplyr::filter(lods > quantile(lods, 0.995)) %>%
   dplyr::select(marker, chr, betas, se, p_values, 
                 lods, chr, pos, cM, ensembl_gene, 
                 consequence, strand)
@@ -203,7 +203,7 @@ ilc1_lti <- fread(paste0(results_dir,"proportions/gwas-ilc1-lti-results.csv.gz")
     padj = p.adjust(p_values, method = "hochberg"),
     lods = -log10(p.adjust(p_values, method = "hochberg")) / 10
   ) %>%
-  dplyr::filter(lods > quantile(lods, 0.999)) %>%
+  dplyr::filter(lods > quantile(lods, 0.995)) %>%
   dplyr::select(marker, chr, betas, se, p_values, 
                 lods, chr, pos, cM, ensembl_gene, 
                 consequence, strand)
@@ -217,7 +217,7 @@ ilc2_ilc3 <- fread(paste0(results_dir,"proportions/gwas-ilc2-ilc3-results.csv.gz
     padj = p.adjust(p_values, method = "hochberg"),
     lods = -log10(p.adjust(p_values, method = "hochberg")) / 10
   ) %>%
-  dplyr::filter(lods > quantile(lods, 0.999)) %>%
+  dplyr::filter(lods > quantile(lods, 0.995)) %>%
   dplyr::select(marker, chr, betas, se, p_values, 
                 lods, chr, pos, cM, ensembl_gene, 
                 consequence, strand)
@@ -230,7 +230,7 @@ ilc2_lti <- fread(paste0(results_dir,"proportions/gwas-ilc2-lti-results.csv.gz")
     padj = p.adjust(p_values, method = "hochberg"),
     lods = -log10(p.adjust(p_values, method = "hochberg")) / 10
   ) %>%
-  dplyr::filter(lods > quantile(lods, 0.999)) %>%
+  dplyr::filter(lods > quantile(lods, 0.995)) %>%
   dplyr::select(marker, chr, betas, se, p_values, 
                 lods, chr, pos, cM, ensembl_gene, 
                 consequence, strand)
@@ -242,7 +242,7 @@ ilc3_lti <- fread(paste0(results_dir,"proportions/gwas-ilc3-lti-results.csv.gz")
     padj = p.adjust(p_values, method = "hochberg"),
     lods = -log10(p.adjust(p_values, method = "hochberg")) / 10
   ) %>%
-  dplyr::filter(lods > quantile(lods, 0.999)) %>%
+  dplyr::filter(lods > quantile(lods, 0.995)) %>%
   dplyr::select(marker, chr, betas, se, p_values, 
                 lods, chr, pos, cM, ensembl_gene, 
                 consequence, strand)
@@ -256,7 +256,7 @@ ilc3_stressed <- fread(paste0(results_dir,"proportions/ILC3_stressed_vs_non_qtl.
     padj = p.adjust(p_values, method = "hochberg"),
     lods = -log10(p.adjust(p_values, method = "hochberg")) / 10
   ) %>%
-  dplyr::filter(lods > quantile(lods, 0.999)) %>%
+  dplyr::filter(lods > quantile(lods, 0.995)) %>%
   dplyr::select(marker, chr, betas, p_values, 
                 lods, chr, pos, cM, ensembl_gene, 
                 consequence, strand)
@@ -269,7 +269,7 @@ lti_stressed <- fread(paste0(results_dir,"proportions/LTi_stressed_vs_non_qtl.cs
     padj = p.adjust(p_values, method = "hochberg"),
     lods = -log10(p.adjust(p_values, method = "hochberg")) / 10
   ) %>%
-  dplyr::filter(lods > quantile(lods, 0.999)) %>%
+  dplyr::filter(lods > quantile(lods, 0.995)) %>%
   dplyr::select(marker, chr, betas, p_values, 
                 lods, chr, pos, cM, ensembl_gene, 
                 consequence, strand)
@@ -365,8 +365,36 @@ combined_qtl_df <- list(ilc1_eqtl = ilc1_eqtl_loci_by_gene %>%
                      chr,
                      pos,
                      strand)) %>% 
-  bind_rows()
+  bind_rows() %>%
+  filter(!is.na(pos)) 
 
+
+combined_qtl_df %>%
+  left_join({
+    ccre %>%
+      mutate(chr = as.character(chr)) %>% 
+      dplyr::select(marker, chr, pos, ensembl_gene)
+    }) %>%
+  left_join(dplyr::select(ensembl, ensembl_gene = gene_id, eQTL_loci_gene_name = gene_name)) %>%
+  left_join(dplyr::select(vars, eQTL_loci_gene_name = index, 
+                          ilc1_expressed, ilc2_expressed, ilc3_expressed, lti_expressed)) %>%
+write.csv(., "trait_by_loci_no_window.csv", row.names = FALSE)
+
+
+combined_qtl_df %>%
+  group_by(marker) %>%
+  mutate(count = n_distinct(trait)) %>%
+  ungroup() %>%
+  filter(count > 1) %>%
+  left_join({
+    ccre %>%
+      mutate(chr = as.character(chr)) %>% 
+      dplyr::select(marker, chr, pos, ensembl_gene)
+  }) %>%
+  left_join(dplyr::select(ensembl, ensembl_gene = gene_id, eQTL_loci_gene_name = gene_name)) %>%
+  left_join(dplyr::select(vars, eQTL_loci_gene_name = index, 
+                          ilc1_expressed, ilc2_expressed, ilc3_expressed, lti_expressed)) %>%
+  write.csv(., "trait_by_loci_no_window_polygenic_only.csv", row.names = FALSE)
 
 
 combined_qtl_gr <- makeGRangesFromDataFrame(combined_qtl_df,
@@ -387,9 +415,129 @@ combined_qtl_grl <- makeGRangesListFromDataFrame(combined_qtl_df,
                                             keep.extra.columns = TRUE)
 
 
+
+qtl_count_df <- combined_qtl_df %>%
+  group_by(marker) %>%
+  summarise(count = n_distinct(trait)) %>%
+  left_join(dplyr::select(ccre, marker, chr, pos, ensembl_gene)) %>%
+  left_join(dplyr::select(ensembl, ensembl_gene = gene_id, qtl_loci_gene = gene_name)) %>%
+  left_join(dplyr::select(vars, qtl_loci_gene = index, 
+                          ilc1_expressed, ilc2_expressed, ilc3_expressed, lti_expressed))
+
+
+
+
+## start window search
 reduce(resize(sort(combined_qtl_grl), 500000))
 
 
-p <- findOverlapPairs(combined_qtl_grl,combined_qtl_grl)
-pintersect(p)
-0
+test_grl <- reduce(resize(sort(combined_qtl_grl), 1000))
+outdf <- lapply(seq_along(test_grl), function(i) {
+  
+  grl_subset <- test_grl[[i]]
+  
+  lapply(seq_along(grl_subset), function(j) {
+    
+    # find overlapping pairs between test loci and other loci
+    p <- findOverlapPairs(test_grl, test_grl[[i]][j])
+    # filter just to hits
+    as.data.frame(pintersect(p)) %>%
+      filter(hit) %>%
+      mutate(loci = paste0(names(test_grl)[[i]], "_loci", 
+                           str_pad(j, pad = 0, side = "left", width = 3)),
+             i = i,
+             j = j)
+    
+  }) %>% bind_rows()
+  
+}) %>% bind_rows(.,.id = "trait") %>%
+  ## pivot wider to group by position of commmon overlapping loci
+  pivot_wider(id_cols = c(seqnames, start, end,i,j), 
+              names_from = loci,
+              values_from = hit,
+              values_fn = n_distinct) %>% 
+  ## pivot longer and filter NAs to get only overlapping loci for each trait
+  pivot_longer(-c(seqnames, start, end,i,j)) %>% 
+  filter(!is.na(value)) %>% 
+  group_by(seqnames, start,end) %>%
+  ## count the loci
+  mutate(count = n()) %>% 
+  ## filter to above 1 to show multiple
+  # filter(count > 1) %>%
+  mutate(loci = paste0("loci_", str_pad(cur_group_id(), pad = 0, side = "left", width = 3))) %>%
+  dplyr::rename(trait = name)
+
+
+outgr <- outdf %>% distinct(seqnames, start, end) %>% as(.,"GRanges")
+
+
+annotdf <- lapply(seq_along(outgr), function(i) {
+  
+  tryCatch({
+    tmpdf <- as.data.frame(subsetByOverlaps(as(ensembl,"GRanges"), outgr[i]))
+    out <- data.frame(cbind(as.data.frame(outgr[i]), tmpdf[,c("gene_name", "gene_id")]))
+    out %>%
+      dplyr::select(seqnames, start, end, gene_name, gene_id)
+  }, error = function(e) NULL)
+
+}) %>% bind_rows()
+
+fulldf <- full_join(outdf, annotdf, by = c("seqnames","start","end")) %>%
+  dplyr::rename(loci_chr = seqnames,
+                loci_start = start,
+                loci_end = end,
+                eQTL_loci_gene_name = gene_name,
+                eQTL_loci_gene_id = gene_id) %>%
+  mutate(trait = str_remove(trait, "_loci[0-9]{3}")) %>%
+  dplyr::select(trait, loci, loci_chr, loci_start, loci_end, 
+                eQTL_loci_gene_name, eQTL_loci_gene_id,
+                count) %>%
+  left_join(dplyr::select(vars, eQTL_loci_gene_name = index, 
+                          ilc1_expressed, ilc2_expressed, ilc3_expressed, lti_expressed))
+
+
+write.csv(fulldf, "trait_by_loci_500kb_window.csv", row.names = FALSE)
+
+fulldf %>%
+  dplyr::filter(count > 1) %>%
+  write.csv(., "trait_by_loci_500kb_window_polygenic_only.csv", row.names = FALSE)
+
+
+
+
+
+
+
+## check Markers #####
+
+# UNCHS005636
+combined_qtl_df %>% 
+  filter(marker == "UNCHS005636") %>% 
+  count(trait) %>% 
+  separate(trait, c("cell_type", "gene")) %>% 
+  pivot_wider(id_cols = gene, names_from = cell_type, values_from = n) %>%
+  left_join(dplyr::select(vars, gene = index, 
+                          ilc1_expressed, ilc2_expressed, ilc3_expressed, lti_expressed))
+
+combined_qtl_df %>% filter(marker %in% c("ICR1041", "ICR5041", "UNCHS005636")) %>%  View
+
+
+
+## run through ENRICHR
+combined_qtl_df %>% 
+  filter(marker == "JAX00511533") %>% 
+  count(trait) %>% 
+  separate(trait, c("cell_type", "gene")) %>% 
+  filter(cell_type == "LTi") %>% 
+  pull(gene) %>% 
+  str_c(., collapse = "\n") %>%
+  cat()
+
+
+combined_qtl_df %>% 
+  filter(marker == "JAX00511533") %>% 
+  count(trait) %>% 
+  separate(trait, c("cell_type", "gene")) %>% 
+  pivot_wider(id_cols = gene, names_from = cell_type, values_from = n) %>%
+  left_join(dplyr::select(vars, gene = index, 
+                          ilc1_expressed, ilc2_expressed, ilc3_expressed, lti_expressed))
