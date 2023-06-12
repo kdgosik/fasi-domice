@@ -4,6 +4,8 @@
 
 
 library(data.table)
+library(dplyr)
+library(tidyr)
 library(Gviz)
 library(TxDb.Mmusculus.UCSC.mm10.knownGene)
 library(rtracklayer)
@@ -11,6 +13,8 @@ library(GenomicRanges)
 library(GenomicFeatures)
 library(BSgenome.Mmusculus.UCSC.mm10)
 my_path <- "/home/rstudio/"
+my_path <- "/workspace/fasi-domice/"
+
 ### Calca (ENSMUSG00000030669)
 ## Chromosome 7: 114,631,478-114,636,357 reverse strand.
 start_irange <- 114500000
@@ -38,6 +42,25 @@ ccre <- ccre %>% left_join(ilc2)
 
 txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
 keepStandardChromosomes(txdb, pruning.mode = "coarse")
+
+ensembl <- readGFF(paste0(data_dir, "references/Mus_musculus.GRCm38.102.gtf")) %>%
+  filter(seqid %in% c(as.character(1:19), "X"), 
+         gene_biotype == "protein_coding", 
+         type == "gene") %>%
+  dplyr::select(seqid, start, end, strand, gene_name)
+
+gr <- GeneRegionTrack(start = start_irange, 
+                end = end_irange, 
+                rstart = ensembl$start, 
+                rends = ensembl$end, 
+                chromosome = 7, 
+                genome = "mm10",
+                gene = ensembl$gene_id,
+                symbol = ensembl$gene_name)
+plotTracks(gr, start_irange, end_irange)
+
+mm10 <- makeGRangesFromDataFrame(ensembl, keep.extra.columns = T)
+
 
 ## make tracks ###############################3
 

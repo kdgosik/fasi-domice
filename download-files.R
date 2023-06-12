@@ -34,19 +34,41 @@ drive_download(as_id("1B7DT53luVwd2wJXxJqnKPVD7go8gn1RZ"),
 
 # https://drive.google.com/file/d/1DUZo14WdcNJSbfyA2CC1LqOZ8uTaUeTl/view?usp=share_link
 drive_download(as_id("1DUZo14WdcNJSbfyA2CC1LqOZ8uTaUeTl"), 
-               path=paste0(results_dir, "eqt/qtl-plot-lods-ILC1-cv.csv.gz"),
+               path=paste0(results_dir, "eqtl/qtl-plot-lods-ILC1-cv.csv.gz"),
+               overwrite = TRUE)
+
+# qtl-lods-ILC1-cv.csv.gz 1LHAYLCaTVQYeyO7iMsFOvGxIEHdxBxZ4
+drive_download(as_id("1LHAYLCaTVQYeyO7iMsFOvGxIEHdxBxZ4"), 
+               path=paste0(data_dir, "eqtl/qtl-lods-ILC1-cv.csv.gz"),
+               overwrite = TRUE)
+
+
+drive_download(as_id("1muSHQ_5UlHz6KexUR4ZL-Zaup6tjUrNh"), 
+               path=paste0(results_dir, "eqtl/qtl-plot-lods-ILC2-cv.csv.gz"),
+               overwrite = TRUE)
+
+# qtl-lods-ILC2-cv.csv.gz 1Rkv7EXmHKp-h-0u-_xfD7KtA1IvXmqz3
+drive_download(as_id("1Rkv7EXmHKp-h-0u-_xfD7KtA1IvXmqz3"), 
+               path=paste0(data_dir, "eqtl/qtl-lods-ILC2-cv.csv.gz"),
+               overwrite = TRUE)
+
+
+drive_download(as_id("1muSHQ_5UlHz6KexUR4ZL-Zaup6tjUrNh"), 
+               path=paste0(results_dir, "eqtl/qtl-plot-lods-NCR1\\+\\ ILC3-cv.csv.gz"),
+               overwrite = TRUE)
+
+# qtl-lods-NCR1+ ILC3-cv.csv.gz        1H4W0zSkcqoA_xuX8v8ByD17_pWBTowfU
+drive_download(as_id("1H4W0zSkcqoA_xuX8v8ByD17_pWBTowfU"), 
+               path=paste0(data_dir, "eqtl/qtl-lods-NCR1+ ILC3-cv.csv.gz"),
                overwrite = TRUE)
 
 drive_download(as_id("1muSHQ_5UlHz6KexUR4ZL-Zaup6tjUrNh"), 
-               path=paste0(results_dir, "eqt/qtl-plot-lods-ILC2-cv.csv.gz"),
+               path=paste0(results_dir, "eqtl/qtl-plot-lods-Lti ILC3-cv.csv.gz"),
                overwrite = TRUE)
 
-drive_download(as_id("1muSHQ_5UlHz6KexUR4ZL-Zaup6tjUrNh"), 
-               path=paste0(results_dir, "eqt/qtl-plot-lods-NCR1\\+\\ ILC3-cv.csv.gz"),
-               overwrite = TRUE)
-
-drive_download(as_id("1muSHQ_5UlHz6KexUR4ZL-Zaup6tjUrNh"), 
-               path=paste0(results_dir, "eqt/qtl-plot-lods-Lti ILC3-cv.csv.gz"),
+# qtl-lods-Lti ILC3-cv.csv.gz        1Kq-U1RAdbMGTvtjezwigUr7xj2DETJzD
+drive_download(as_id("1Kq-U1RAdbMGTvtjezwigUr7xj2DETJzD"), 
+               path=paste0(data_dir, "eqtl/qtl-lods-Lti ILC3-cv.csv.gz"),
                overwrite = TRUE)
 
 
@@ -124,4 +146,18 @@ drive_download(as_id("1u5ZuaI6YDRFxoWeYF252jTTL7fgRhwYn"),
 
 drive_download(as_id("1T2GDRh9cTyG_DX3C8mVj-Bzfxm9aNRcf"), 
                path=paste0(results_dir, "cytokines/qtl-cytokines-steady-lods.csv.gz"),
+               overwrite = TRUE)
+
+
+## genotypes #########
+
+# G30_scRNAseq_DOmice_SNPGrp1_QC0.50.vcf  1R4IAU1zCiSSWwOI11ivg2CaNHp1Vox85
+# Batch4_SNPGrp5_QC0.60.vcf 1cgj0lGRSvjF1kZNkPJDa7Aoi0E51e7or
+# Batch4_SNPGrp4_QC0.60.vcf 1UInfnKAIq9ngiO-dvyM0nO6yTWUVew9V
+# Batch4_SNPGrp3_QC0.60.vcf 1w9ZmcyxusO9BUZ-pZUeRqQLNYTmy3tXA
+# Batch4_SNPGrp2_QC0.60.vcf  1QFU4NTIvrqSzrZrunrJynHnBWuWnQYQd
+# Batch4_SNPGrp1_QC0.60.vcf  1MDjvyZFfZzh17pTs5p2WfLT8WMb9kv6l
+
+drive_download(as_id("1R4IAU1zCiSSWwOI11ivg2CaNHp1Vox85"), 
+               path=paste0(data_dir, "genotype/G30_scRNAseq_DOmice_SNPGrp1_QC0.50.vcf"),
                overwrite = TRUE)
