@@ -4,15 +4,19 @@
 
 
 library(data.table)
-library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(stringr)
 library(Gviz)
 library(TxDb.Mmusculus.UCSC.mm10.knownGene)
 library(rtracklayer)
 library(GenomicRanges)
 library(GenomicFeatures)
+library(BSgenome.Mmusculus.UCSC.mm10)
 # library(BSgenome.Mmusculus.UCSC.mm10)
 
 my_path <- "/home/rstudio/"
+my_path <- "/workspace/fasi-domice/"
 ### Muc2 (ENSMUSG00000025515)
 ## Chromosome 7: 141,690,340-141,754,693 forward strand.
 start_irange <- 141000000
@@ -46,10 +50,29 @@ ccre <- ccre %>% left_join(ilc1)
 
 
 
-txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
-keepStandardChromosomes(txdb, pruning.mode = "coarse")
+# txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+# keepStandardChromosomes(txdb, pruning.mode = "coarse")
 
-## make tracks ###############################3
+ensembl <- readGFF(paste0(data_dir, "references/Mus_musculus.GRCm38.102.gtf")) %>%
+  filter(seqid %in% c(as.character(1:19), "X"), 
+         gene_biotype == "protein_coding",
+         str_detect(transcript_name, "-201"),
+         type %in% c("gene", "exon")) %>%
+  dplyr::select(chromosome = seqid, start, end, strand, feature = type,
+                gene = gene_id, 
+                exon = exon_id, 
+                transcript = transcript_id, 
+                symbol = gene_name) %>%
+  mutate(width = abs(start - end))
+
+grtrack <- GeneRegionTrack(ensembl,
+                           chromosome = 7, 
+                           genome = "mm10", 
+                           transcriptAnnotation = "symbol")
+mm10 <- makeGRangesFromDataFrame(ensembl, keep.extra.columns = T)
+
+
+## make tracks ###############################
 
 # strack <- SequenceTrack(Mmusculus, chromosome = chr_str)
 gtrack <- GenomeAxisTrack()
@@ -84,11 +107,11 @@ ccre_atrack <- AnnotationTrack(start = start_ccre,
                                name = "cCREs")
 
 
-grtrack <- GeneRegionTrack(txdb, 
-                           genome = gen,
-                           chromosome = chr_str, 
-                           name = "Gene Model",
-                           geneAnnotation = "symbol")
+# grtrack <- GeneRegionTrack(txdb, 
+#                            genome = gen,
+#                            chromosome = chr_str, 
+#                            name = "Gene Model",
+#                            geneAnnotation = "symbol")
 
 
 
@@ -122,9 +145,15 @@ create_eGene_track <- function(gene_name, ccre, chr_num, gen) {
 Stub1_dtrack <- create_eGene_track(gene_name = "Stub1", ccre = ccre, chr_num = chr_num, gen = gen)
 Ift20_dtrack <- create_eGene_track(gene_name = "Ift20", ccre = ccre, chr_num = chr_num, gen = gen)
 
+
+
+
 pdf(paste0(my_path, "results/figures/Figure-6-gviz-genemodel-Muc2.pdf"))
-plotTracks(list(itrack, gtrack, snps_atrack, grtrack, ccre_atrack,
-                Stub1_dtrack, Ift20_dtrack),
+ht <- HighlightTrack(trackList = list(grtrack, ccre_atrack,
+                                      Stub1_dtrack, Ift20_dtrack),
+                     start = 141276583-10000, end = 141276583+10000,
+                     chromosome = 7)
+plotTracks(list(itrack, gtrack, snps_atrack, ht),
            from = start_irange, to = end_irange, cex = 0.8, type = "b")
 dev.off()
 
