@@ -4,6 +4,9 @@
 #' 
 
 library(data.table)
+library(dplyr)
+library(tidyr)
+library(stringr)
 library(Gviz)
 library(TxDb.Mmusculus.UCSC.mm10.knownGene)
 library(rtracklayer)
@@ -11,6 +14,9 @@ library(GenomicRanges)
 library(GenomicFeatures)
 library(BSgenome.Mmusculus.UCSC.mm10)
 my_path <- "/home/rstudio/"
+my_path <- "/workspace/fasi-domice/"
+
+
 ### Ccl17 (ENSMUSG00000031780)
 ## Ccl17 SNPs - Chromosome 8: 95,537,081-95,538,664 forward strand.
 start_irange <- 95000000
@@ -32,15 +38,35 @@ ilc3 <- fread(paste0(my_path, "data/eqtl/qtl-lods-NCR1+\ ILC3-cv.csv.gz"),
 
 ccre <- ccre %>% left_join(ilc3)
 
-ilc3_gwas <- fread(paste0(my_path, "results/proportion/ILC3_stressed_vs_non_qtl.csv.gz"))
+ilc3_gwas <- fread(paste0(my_path, "results/proportions/ILC3_stressed_vs_non_qtl.csv.gz"))
 
 
 # ilc2_ilc3_gwas <- fread(paste0(my_path, 'results/gwas-ilc2-ilc3-results.csv.gz'))
 # ilc2_lti_gwas <- fread(paste0(my_path, 'results/gwas-ilc2-lti-results.csv.gz'))
 
+# txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+# keepStandardChromosomes(txdb, pruning.mode = "coarse")
 
-txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
-keepStandardChromosomes(txdb, pruning.mode = "coarse")
+ensembl <- readGFF(paste0(data_dir, "references/Mus_musculus.GRCm38.102.gtf")) %>%
+  filter(seqid %in% c(as.character(1:19), "X"), 
+         gene_biotype == "protein_coding",
+         str_detect(transcript_name, "-201"),
+         type %in% c("gene", "exon")) %>%
+  dplyr::select(chromosome = seqid, start, end, strand, feature = type,
+                gene = gene_id, 
+                exon = exon_id, 
+                transcript = transcript_id, 
+                symbol = gene_name) %>%
+  mutate(width = abs(start - end))
+
+grtrack <- GeneRegionTrack(ensembl,
+                           chromosome = chr_num, 
+                           genome = "mm10", 
+                           transcriptAnnotation = "symbol")
+
+# plotTracks(grtrack, start_irange, end_irange)
+
+mm10 <- makeGRangesFromDataFrame(ensembl, keep.extra.columns = T)
 
 ## make tracks ###############################3
 
@@ -75,16 +101,6 @@ ccre_atrack <- AnnotationTrack(start = start_ccre,
                                group = names_ccre,
                                genome = gen,
                                name = "cCREs")
-
-
-grtrack <- GeneRegionTrack(txdb, 
-                           genome = gen,
-                           chromosome = chr_str, 
-                           name = "Gene Model",
-                           geneAnnotation = "symbol")
-
-
-
 
 
 
@@ -138,9 +154,16 @@ Cd48_dtrack <- DataTrack(data = data_Cd48,
 
 
 
-pdf(paste0(my_path, "results/figures/Figure-6-gviz-genemodel-ccl17.pdf"))
-plotTracks(list(itrack, gtrack, snps_atrack, grtrack, ccre_atrack,
-              ilc3_dtrack, Frmd4b_dtrack, Cd48_dtrack),
+ht <- HighlightTrack(trackList = list(grtrack, ccre_atrack,
+                                      ilc3_dtrack, Frmd4b_dtrack, Cd48_dtrack),
+                     start = 95530000-10000, end = 95530000+10000,
+                     chromosome = chr_num)
+
+
+
+
+pdf(paste0(my_path, "results/figures/gviz-genemodel-ccl17.pdf"))
+plotTracks(list(itrack, gtrack, snps_atrack, ht),
            from = start_irange, to = end_irange, cex = 0.8, type = "b")
 dev.off()
 

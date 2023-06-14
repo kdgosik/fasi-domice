@@ -1,11 +1,15 @@
 library(data.table)
+library(dplyr)
+library(tidyr)
+library(stringr)
 library(Gviz)
 library(TxDb.Mmusculus.UCSC.mm10.knownGene)
 library(rtracklayer)
 library(GenomicRanges)
 library(GenomicFeatures)
 library(BSgenome.Mmusculus.UCSC.mm10)
-my_path <- "/home/rstudio/domice/"
+my_path <- "/home/rstudio/"
+my_path <- "/workspace/fasi-domice/"
 
 ## cis-eQTL for all major lineages
 ## Washc2 (Fam21) Chr6:116208038-116262686  ENSMUSG00000024104 
@@ -17,19 +21,33 @@ gen <- "mm10"
 
 
 ## read data #######3
-ccre <- fread(paste0(my_path, "data/GM_SNPS_Consequence_cCRE.csv"))
-ilc1_ilc2_gwas <- fread(paste0(my_path, 'results/gwas-ilc1-ilc2-results.csv.gz'))
+ccre <- fread(paste0(my_path, "data/references/GM_SNPS_Consequence_cCRE.csv"))
+ilc1_ilc2_gwas <- fread(paste0(my_path, 'results/proportions/gwas-ilc1-ilc2-results.csv.gz'))
 
 
-txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
-keepStandardChromosomes(txdb, pruning.mode = "coarse")
+# txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+# keepStandardChromosomes(txdb, pruning.mode = "coarse")
 
-# gff_file <- paste0(my_path, "data/Mus_musculus.GRCm39.104.gff3.gz")
-# gff <- readGFF(gff_file)
-# rbpj <- subset(gff, Parent=="gene:ENSMUSG00000039191")
-# gff_gr <- readGFFAsGRanges(gff_file)
-# txdb <- makeTxDbFromGFF(gff_file, format="gff3")
-byexons <- exonsBy(txdb, by="gene")
+ensembl <- readGFF(paste0(data_dir, "references/Mus_musculus.GRCm38.102.gtf")) %>%
+  filter(seqid %in% c(as.character(1:19), "X"), 
+         gene_biotype == "protein_coding",
+         str_detect(transcript_name, "-201"),
+         type %in% c("gene", "exon")) %>%
+  dplyr::select(chromosome = seqid, start, end, strand, feature = type,
+                gene = gene_id, 
+                exon = exon_id, 
+                transcript = transcript_id, 
+                symbol = gene_name) %>%
+  mutate(width = abs(start - end))
+
+grtrack <- GeneRegionTrack(ensembl,
+                           chromosome = chr_num, 
+                           genome = "mm10", 
+                           transcriptAnnotation = "symbol")
+
+# plotTracks(grtrack, start_irange, end_irange)
+
+mm10 <- makeGRangesFromDataFrame(ensembl, keep.extra.columns = T)
 
 
 ## make tracks ###############################3
@@ -40,9 +58,9 @@ itrack <- IdeogramTrack(genome = gen, chromosome = chr_str)
 
 
 pos_snps <- ccre %>%
-  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %>% pull(pos)
 names_snps <-  ccre %>%
-  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% marker
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %>% pull(marker)
 
 snps_atrack <- AnnotationTrack(start = pos_snps,
                                width = rep(1, length(pos_snps)),
@@ -52,11 +70,11 @@ snps_atrack <- AnnotationTrack(start = pos_snps,
                                name = "SNPs")
 
 start_ccre <- ccre %>%
-  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% start
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %>% pull(start)
 end_ccre <- ccre %>%
-  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% end
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %>% pull(end)
 names_ccre <- ccre %>%
-  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% type.y
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %>% pull(type.y)
 
 ccre_atrack <- AnnotationTrack(start = start_ccre,
                                width = end_ccre - start_ccre,
@@ -64,14 +82,6 @@ ccre_atrack <- AnnotationTrack(start = start_ccre,
                                group = names_ccre,
                                genome = gen,
                                name = "cCREs")
-
-
-grtrack <- GeneRegionTrack(txdb, 
-                           genome = gen,
-                           chromosome = chr_str, 
-                           name = "Gene Model",
-                           geneAnnotation = "symbol")
-
 
 
 
@@ -92,10 +102,14 @@ ilc1_ilc2_dtrack <- DataTrack(data = data_ilc1_ilc2_gwas,
 
 
 
+ht <- HighlightTrack(trackList = list(grtrack, ccre_atrack,
+                                      ilc3_dtrack, Frmd4b_dtrack, Cd48_dtrack),
+                     start = 95530000-10000, end = 95530000+10000,
+                     chromosome = chr_num)
+
 
 pdf("domice/results/figures/genemodel-Fam21.pdf")
-plotTracks(list(itrack, gtrack, snps_atrack, grtrack, ccre_atrack,
-                ilc1_ilc2_dtrack),
+plotTracks(list(itrack, gtrack, snps_atrack, ht),
            from = start_irange, to = end_irange, cex = 0.8, type = "b")
 dev.off()
 

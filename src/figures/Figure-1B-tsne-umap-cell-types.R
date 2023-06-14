@@ -6,15 +6,17 @@
 
 
 library(data.table)
-library(tidyverse)
+# library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(forcats)
 
-figure_path <- "results/figures/"
-data_path <- "data/"
-plot_df <- fread(paste0(data_path, "manuscript-plot-data.csv"), data.table = FALSE)
+figure_path <- paste0(results_dir, "figures/")
+plot_df <- fread(paste0(data_dir, "manuscript-plot-data.csv.gz"), data.table = FALSE)
 
 ## subsetting to ILC populations
 plot_df <- plot_df %>%
-  filter(louvain_labels %in% (c(1,2,3,4,5,8))) %>%
+  # filter(louvain_labels %in% (c(1,2,3,4,5,8))) %>%
   mutate(cell_types = factor(louvain_labels)) %>%
   mutate(cell_types = fct_recode(cell_types,
                                  "LTi-like/CCR6_low" = "1",
@@ -62,7 +64,7 @@ p_umap <- plot_df %>%
   labs(color = "Cell Type") + 
   guides(color = guide_legend(override.aes = list(size=5, shape=20)))
 
-ggsave(filename = "./results/figures/Figure-1B-umap-cell-types.pdf",
+ggsave(filename = paste0(figure_path, "Figure-1B-umap-cell-types.pdf"),
        plot = p_umap,
        dpi = 330,
        width = 7,
