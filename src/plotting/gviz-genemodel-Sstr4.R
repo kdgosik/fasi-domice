@@ -1,15 +1,18 @@
 library(data.table)
-library(readxl)
 library(dplyr)
-library(qtl2)
+library(tidyr)
+library(stringr)
 library(Gviz)
+library(TxDb.Mmusculus.UCSC.mm10.knownGene)
+library(rtracklayer)
+library(GenomicRanges)
+library(GenomicFeatures)
+library(BSgenome.Mmusculus.UCSC.mm10)
+my_path <- "/home/rstudio/"
+my_path <- "/workspace/fasi-domice/"
 
-## setup.R ###########
-source("../fasi-domice/setup.R")
-
-# GM_Snps meta data
-ccre <- fread(paste0(data_dir, "references/GM_SNPS_Consequence_cCRE.csv"), data.table = FALSE)
-
+## read data #######
+ccre <- fread(paste0(my_path, "data/references/GM_SNPS_Consequence_cCRE.csv"))
 
 
 ## topic 3
@@ -22,24 +25,35 @@ chr_num <- "2"
 gen <- "mm10"
 
 
-## Sequence and Ideogram
+ensembl <- readGFF(paste0(data_dir, "references/Mus_musculus.GRCm38.102.gtf")) %>%
+  filter(seqid %in% c(as.character(1:19), "X"), 
+         gene_biotype == "protein_coding",
+         str_detect(transcript_name, "-201"),
+         type %in% c("gene", "exon")) %>%
+  dplyr::select(chromosome = seqid, start, end, strand, feature = type,
+                gene = gene_id, 
+                exon = exon_id, 
+                transcript = transcript_id, 
+                symbol = gene_name) %>%
+  mutate(width = abs(start - end))
+
+grtrack <- GeneRegionTrack(ensembl,
+                           chromosome = chr_num, 
+                           genome = "mm10", 
+                           transcriptAnnotation = "symbol")
+
+
+## make tracks ###############################
+
 strack <- SequenceTrack(Mmusculus, chromosome = chr_str)
-txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
-keepStandardChromosomes(txdb, pruning.mode="coarse")
 gtrack <- GenomeAxisTrack()
 itrack <- IdeogramTrack(genome = gen, chromosome = chr_str)
 
-## Genome Track
-grtrack <- GeneRegionTrack(txdb, 
-                           genome = gen,
-                           chromosome = chr_str, 
-                           name = "Gene Model",
-                           geneAnnotation = "symbol")
 
 pos_snps <- ccre %>%
-  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %>% pull(pos)
 names_snps <-  ccre %>%
-  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% marker
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %>% pull(marker)
 
 snps_atrack <- AnnotationTrack(start = pos_snps,
                                width = rep(1, length(pos_snps)),
@@ -49,11 +63,11 @@ snps_atrack <- AnnotationTrack(start = pos_snps,
                                name = "SNPs")
 
 start_ccre <- ccre %>%
-  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% start
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %>% pull(start)
 end_ccre <- ccre %>%
-  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% end
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %>% pull(end)
 names_ccre <- ccre %>%
-  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %$% type.y
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %>% pull(type.y)
 
 ccre_atrack <- AnnotationTrack(start = start_ccre,
                                width = end_ccre - start_ccre,
@@ -63,12 +77,12 @@ ccre_atrack <- AnnotationTrack(start = start_ccre,
                                name = "cCREs")
 
 ## topic1, topic3, topic6
-topics <- fread(paste0(my_path, "results/topic-qtl-lods.csv"))
+topics <- fread(paste0(my_path, "results/topics/qtl-topic-lods.csv.gz"))
 
 start_topic3 <- end_topic3 <- topics %>%
   dplyr::left_join(ccre, by = "marker") %>%
   dplyr::arrange(pos) %>%
-  dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+  dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %>% pull(pos)
 
 data_topic3 <- topics %>%
   dplyr::left_join(ccre, by = "marker") %>%
@@ -85,7 +99,13 @@ topic3_dtrack <- DataTrack(data = data_topic3,
                            genome = gen,
                            name = "Topic")
 
+ht <- HighlightTrack(trackList = list(grtrack, ccre_atrack,
+                                      topic3_dtrack),
+                     start = 148395377-10000, end = 148395377+10000,
+                     chromosome = chr_num)
 
-plotTracks(list(itrack, gtrack, snps_atrack, grtrack, strack, ccre_atrack, 
-                topic3_dtrack),
+pdf(paste0(my_path, "/results/figures/genemodel-sstr4.pdf"))
+plotTracks(list(itrack, gtrack, snps_atrack, ht),
            from = start_irange, to = end_irange, cex = 0.8, type = "b")
+dev.off()
+

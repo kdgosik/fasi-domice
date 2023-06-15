@@ -4,13 +4,18 @@
 
 
 library(data.table)
+library(dplyr)
+library(tidyr)
+library(stringr)
 library(Gviz)
 library(TxDb.Mmusculus.UCSC.mm10.knownGene)
 library(rtracklayer)
 library(GenomicRanges)
 library(GenomicFeatures)
 library(BSgenome.Mmusculus.UCSC.mm10)
-my_path <- "/home/rstudio/domice/"
+my_path <- "/home/rstudio/"
+my_path <- "/workspace/fasi-domice/"
+
 ### Rbpj
 ## Rbpj SNPs - chr5 53553396 - 53661165
 start_irange <- 53000000
@@ -19,22 +24,45 @@ chr_str <- "chr5"
 chr_num <- "5"
 gen <- "mm10"
 
-## read data ########
-ccre <- fread(paste0(my_path, "data/GM_SNPS_Consequence_cCRE.csv"))
-lti_gwas <- fread(paste0(my_path, "results/LTi_stressed_vs_non_qtl.csv.gz"))
-ilc2_ilc3_gwas <- fread(paste0(my_path, 'results/gwas-ilc2-ilc3-results.csv.gz'))
-ilc2_lti_gwas <- fread(paste0(my_path, 'results/gwas-ilc2-lti-results.csv.gz'))
+## read data #######
+ccre <- fread(paste0(my_path, "data/references/GM_SNPS_Consequence_cCRE.csv"))
+lti_gwas <- fread(paste0(my_path, "results/proportions/LTi_stressed_vs_non_qtl.csv.gz")) %>% 
+  mutate(strand = "+") %>% 
+  dplyr::mutate(
+    padj = p.adjust(p_values, method = "hochberg"),
+    lods = -log10(p.adjust(p_values, method = "hochberg")) / 10
+  )
+ilc2_ilc3_gwas <- fread(paste0(my_path, 'results/proportions/gwas-ilc2-ilc3-results.csv.gz')) %>% 
+  mutate(strand = "+") %>% 
+  dplyr::mutate(
+    padj = p.adjust(p_values, method = "hochberg"),
+    lods = -log10(p.adjust(p_values, method = "hochberg")) / 10
+  )
+ilc2_lti_gwas <- fread(paste0(my_path, 'results/proportions/gwas-ilc2-lti-results.csv.gz')) %>% 
+  mutate(strand = "+") %>% 
+  dplyr::mutate(
+    padj = p.adjust(p_values, method = "hochberg"),
+    lods = -log10(p.adjust(p_values, method = "hochberg")) / 10
+  )
 
 
-txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
-keepStandardChromosomes(txdb, pruning.mode = "coarse")
+ensembl <- readGFF(paste0(data_dir, "references/Mus_musculus.GRCm38.102.gtf")) %>%
+  filter(seqid %in% c(as.character(1:19), "X"), 
+         gene_biotype == "protein_coding",
+         str_detect(transcript_name, "-201"),
+         type %in% c("gene", "exon")) %>%
+  dplyr::select(chromosome = seqid, start, end, strand, feature = type,
+                gene = gene_id, 
+                exon = exon_id, 
+                transcript = transcript_id, 
+                symbol = gene_name) %>%
+  mutate(width = abs(start - end))
 
-gff_file <- paste0(my_path, "data/Mus_musculus.GRCm39.104.gff3.gz")
-gff <- readGFF(gff_file)
-rbpj <- subset(gff, Parent=="gene:ENSMUSG00000039191")
-gff_gr <- readGFFAsGRanges(gff_file)
-txdb <- makeTxDbFromGFF(gff_file, format="gff3")
-byexons <- exonsBy(txdb, by="gene")
+grtrack <- GeneRegionTrack(ensembl,
+                           chromosome = chr_num, 
+                           genome = "mm10", 
+                           transcriptAnnotation = "symbol")
+
 
 
 ## make tracks ###############################
@@ -70,17 +98,6 @@ ccre_atrack <- AnnotationTrack(start = start_ccre,
                                group = names_ccre,
                                genome = gen,
                                name = "cCREs")
-
-
-grtrack <- GeneRegionTrack(txdb, 
-                           genome = gen,
-                           chromosome = chr_str, 
-                           name = "Gene Model",
-                           geneAnnotation = "symbol")
-
-
-
-
 
 
 start_lti_gwas <- end_lti_gwas <- lti_gwas %>%
@@ -131,6 +148,15 @@ ilc2_lti_dtrack <- DataTrack(data = data_ilc2_lti_gwas,
                              genome = gen,
                              name = "ILC2 vs LTi-Like")
 
-plotTracks(list(itrack, gtrack, snps_atrack, grtrack, ccre_atrack,
-                lti_dtrack, ilc2_ilc3_dtrack, ilc2_lti_dtrack),
+ht <- HighlightTrack(trackList = list(grtrack, ccre_atrack,
+                                      ilc2_ilc3_dtrack, ilc2_lti_dtrack),
+                     start = 53670000-10000, end = 53670000+10000,
+                     chromosome = chr_num)
+
+pdf(paste0(my_path, "/results/figures/genemodel-rbpj.pdf"))
+plotTracks(list(itrack, gtrack, snps_atrack, ht),
            from = start_irange, to = end_irange, cex = 0.8, type = "b")
+dev.off()
+
+
+

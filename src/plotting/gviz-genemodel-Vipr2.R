@@ -4,6 +4,9 @@
 
 
 library(data.table)
+library(dplyr)
+library(tidyr)
+library(stringr)
 library(Gviz)
 library(TxDb.Mmusculus.UCSC.mm10.knownGene)
 library(rtracklayer)
@@ -11,6 +14,9 @@ library(GenomicRanges)
 library(GenomicFeatures)
 library(BSgenome.Mmusculus.UCSC.mm10)
 my_path <- "/home/rstudio/"
+my_path <- "/workspace/fasi-domice/"
+
+
 ### Vipr2 (ENSMUSG00000011171)
 ## Chromosome 12: 116,077,726-116,146,261 forward strand.
 start_irange <- 116000000
@@ -32,11 +38,31 @@ lti <- fread(paste0(my_path, "data/eqtl/qtl-lods-Lti ILC3-cv.csv.gz"),
 
 ccre <- ccre %>% left_join(lti)
 
-lti_gwas <- fread(paste0(my_path, "results/proportion/LTi_stressed_vs_non_qtl.csv.gz"))
+lti_gwas <- fread(paste0(my_path, "results/proportions/LTi_stressed_vs_non_qtl.csv.gz")) %>% 
+  mutate(strand = "+") %>% 
+  dplyr::mutate(
+    padj = p.adjust(p_values, method = "hochberg"),
+    lods = -log10(p.adjust(p_values, method = "hochberg")) / 10
+  )
 
 
-txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
-keepStandardChromosomes(txdb, pruning.mode = "coarse")
+ensembl <- readGFF(paste0(data_dir, "references/Mus_musculus.GRCm38.102.gtf")) %>%
+  filter(seqid %in% c(as.character(1:19), "X"), 
+         gene_biotype == "protein_coding",
+         str_detect(transcript_name, "-201"),
+         type %in% c("gene", "exon")) %>%
+  dplyr::select(chromosome = seqid, start, end, strand, feature = type,
+                gene = gene_id, 
+                exon = exon_id, 
+                transcript = transcript_id, 
+                symbol = gene_name) %>%
+  mutate(width = abs(start - end))
+
+grtrack <- GeneRegionTrack(ensembl,
+                           chromosome = chr_num, 
+                           genome = "mm10", 
+                           transcriptAnnotation = "symbol")
+
 
 ## make tracks ###############################3
 
@@ -73,16 +99,6 @@ ccre_atrack <- AnnotationTrack(start = start_ccre,
                                name = "cCREs")
 
 
-grtrack <- GeneRegionTrack(txdb, 
-                           genome = gen,
-                           chromosome = chr_str, 
-                           name = "Gene Model",
-                           geneAnnotation = "symbol")
-
-
-
-
-
 
 start_lti_gwas <- end_lti_gwas <- lti_gwas %>%
   arrange(pos) %>%
@@ -98,8 +114,6 @@ lti_dtrack <- DataTrack(data = data_lti_gwas,
                         chromosome = chr_num, 
                         genome = gen,
                         name = "ILC3 Activated")
-
-
 
 
 create_eGene_track <- function(gene_name, ccre, chr_num, gen) {
@@ -131,9 +145,16 @@ Slx1b_dtrack <- create_eGene_track(gene_name = "Slx1b", ccre = ccre, chr_num = c
 Rpl35_dtrack <- create_eGene_track(gene_name = "Rpl35", ccre = ccre, chr_num = chr_num, gen = gen)
 Ablim1_dtrack <- create_eGene_track(gene_name = "Ablim1", ccre = ccre, chr_num = chr_num, gen = gen)
 
-pdf(paste0(my_path, "results/figures/Figure-6-gviz-genemodel-vipr2.pdf"))
-plotTracks(list(itrack, gtrack, snps_atrack, grtrack,
-              lti_dtrack, Slx1b_dtrack, Rpl35_dtrack, Ablim1_dtrack),
+
+ht <- HighlightTrack(trackList = list(grtrack, ccre_atrack,
+                                      lti_dtrack, Slx1b_dtrack, Rpl35_dtrack, Ablim1_dtrack),
+                     start = 116150000-10000, end = 116150000+10000,
+                     chromosome = chr_num)
+
+
+
+pdf(paste0(my_path, "results/figures/gviz-genemodel-vipr2.pdf"))
+plotTracks(list(itrack, gtrack, snps_atrack, ht),
            from = start_irange, to = end_irange, cex = 0.8, type = "b")
 dev.off()
 

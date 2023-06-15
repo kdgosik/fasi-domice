@@ -1,22 +1,16 @@
-list.of.packages <- c("data.table", "tidyverse", "Gviz", "TxDb.Mmusculus.UCSC.mm10.knownGene", "rtracklayer",
-                      "GenomicRanges", "GenomicFeatures", "BSgenome.Mmusculus.UCSC.mm10", "R.utils")
-new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
-if(length(new.packages)) {
-  install.packages(c("DBI", "data.table", "tidyverse", "R.utils"))
-  BiocManager::install(c("Gviz", "TxDb.Mmusculus.UCSC.mm10.knownGene", "rtracklayer", "GenomicRanges",
-                         "GenomicFeatures", "BSgenome.Mmusculus.UCSC.mm10"))
-}
 library(data.table)
-library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(stringr)
 library(Gviz)
 library(TxDb.Mmusculus.UCSC.mm10.knownGene)
 library(rtracklayer)
 library(GenomicRanges)
 library(GenomicFeatures)
 library(BSgenome.Mmusculus.UCSC.mm10)
-library(DBI)
+my_path <- "/home/rstudio/"
+my_path <- "/workspace/fasi-domice/"
 
-my_path <- "/home/rstudio/domice/"
 ### Ptpn5 http://www.informatics.jax.org/marker/MGI:97807
 ## PTPN5 Chr7:46727543-46783432 bp, - strand
 start_irange <- 45000000
@@ -27,7 +21,7 @@ gen <- "mm10"
 
 
 ## read data #######
-ccre <- fread(paste0(my_path, "data/GM_SNPS_Consequence_cCRE.csv"))
+ccre <- fread(paste0(my_path, "data/references/GM_SNPS_Consequence_cCRE.csv"))
 marker_list <- ccre %>% filter(chr == chr_num, start > start_irange, end < end_irange) %>% pull(marker)
 
 # lti_gwas <- fread(paste0(my_path, "results/LTi_stressed_vs_non_qtl.csv.gz"))
@@ -36,27 +30,32 @@ marker_list <- ccre %>% filter(chr == chr_num, start > start_irange, end < end_i
 
 
 vars <- fread(paste0(my_path, "data/vars.csv"))
-cytokines <- fread(paste0(my_path, "data/qtl-steady-cytokines-lods.csv.gz"))
-ilc1 <- fread(paste0(my_path, "data/qtl-lods-ILC1-cv.csv.gz"), 
+cytokines <- fread(paste0(my_path, "data/cytokines/qtl-steady-cytokines-lods.csv.gz"))
+ilc1 <- fread(paste0(my_path, "data/eqtl/qtl-lods-ILC1-cv.csv.gz"), 
               select = c("marker", "Il18r1", "Hspa14"), 
               data.table = FALSE) %>% 
   filter(marker %in% marker_list)
   
-
-# ilc1_lods <- tbl(mydb, "ILC1-cv") %>%
-#   filter(marker %in% marker_list, name %in% c("Il18r1","Hspa14")) %>%
-#   collect()
+ccre <- ccre %>% left_join(ilc1)
 
 
-txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
-keepStandardChromosomes(txdb, pruning.mode = "coarse")
 
-# gff_file <- paste0(my_path, "data/Mus_musculus.GRCm39.104.gff3.gz")
-# gff <- readGFF(gff_file)
-# ptpn5 <- subset(gff, Parent=="gene:ENSMUSG00000030854") # ENSMUSG00000030854
-# gff_gr <- readGFFAsGRanges(gff_file)
-# txdb <- makeTxDbFromGFF(gff_file, format="gff3")
-# byexons <- exonsBy(txdb, by="gene")
+ensembl <- readGFF(paste0(data_dir, "references/Mus_musculus.GRCm38.102.gtf")) %>%
+  filter(seqid %in% c(as.character(1:19), "X"), 
+         gene_biotype == "protein_coding",
+         str_detect(transcript_name, "-201"),
+         type %in% c("gene", "exon")) %>%
+  dplyr::select(chromosome = seqid, start, end, strand, feature = type,
+                gene = gene_id, 
+                exon = exon_id, 
+                transcript = transcript_id, 
+                symbol = gene_name) %>%
+  mutate(width = abs(start - end))
+
+grtrack <- GeneRegionTrack(ensembl,
+                           chromosome = chr_num, 
+                           genome = "mm10", 
+                           transcriptAnnotation = "symbol")
 
 
 ## make tracks ###############################3
@@ -94,24 +93,37 @@ ccre_atrack <- AnnotationTrack(start = start_ccre,
                                name = "cCREs")
 
 
-grtrack <- GeneRegionTrack(txdb, 
-                           genome = gen,
-                           chromosome = chr_str, 
-                           name = "Gene Model",
-                           geneAnnotation = "symbol")
-
-
-
-
-
-
 start_ilc1 <- end_ilc1 <- ccre %>%
   filter(marker %in% ilc1$marker) %>%
   arrange(pos) %>% pull(pos)
 
-# startdata_lti_gwas <- lti_gwas %>%
-#   arrange(pos) %>%
-#   filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% lods
+create_eGene_track <- function(gene_name, ccre, chr_num, gen) {
+  
+  start_pos <- ccre %>%
+    arrange(pos) %>%
+    dplyr::rename(gene_lod = matches(gene_name)) %>%
+    filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(gene_lod)) %>% pull(pos)
+  
+  
+  data_lod <- ccre %>%
+    arrange(pos) %>%
+    dplyr::rename(gene_lod = matches(gene_name)) %>%
+    filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(gene_lod)) %>% pull(gene_lod)
+  
+  out_dtrack <- DataTrack(data = data_lod, 
+                          start = start_pos,
+                          end = start_pos+1, 
+                          chromosome = chr_num, 
+                          genome = gen,
+                          name = gene_name)
+  
+  out_dtrack
+  
+}
+
+ilc1_il18a_dtrack <- create_eGene_track(gene_name = "Il18r1", ccre = ccre, chr_num = chr_num, gen = gen)
+ilc1_Hspa14_dtrack <- create_eGene_track(gene_name = "Hspa14", ccre = ccre, chr_num = chr_num, gen = gen)
+
 
 ilc1_il18a_dtrack <- DataTrack(data = ilc1$Il18r1, 
                         start = start_ilc1,
@@ -145,8 +157,13 @@ ifng_dtrack <- DataTrack(data = data_ifng,
                          name = "IFNg")
 
 
-pdf("genemodel-ptpn5.pdf")
-plotTracks(list(itrack, gtrack, snps_atrack, grtrack, ccre_atrack,
-                ilc1_il18a_dtrack, ilc1_Hspa14_dtrack, ifng_dtrack),
+ht <- HighlightTrack(trackList = list(grtrack, ccre_atrack,
+                                      ilc1_il18a_dtrack, ilc1_Hspa14_dtrack),
+                     start = 46727543-10000, end = 46727543+10000,
+                     chromosome = chr_num)
+
+
+pdf(paste0(my_path, "/results/figures/genemodel-ptpn5.pdf"))
+plotTracks(list(itrack, gtrack, snps_atrack, ht),
            from = start_irange, to = end_irange, cex = 0.8, type = "b")
 dev.off()
