@@ -87,11 +87,11 @@ ccre_atrack <- AnnotationTrack(start = start_ccre,
 
 start_ilc1_ilc2_gwas <- end_ilc1_ilc2_gwas <- ilc1_ilc2_gwas %>%
   arrange(pos) %>%
-  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% pos
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %>% pull(pos)
 
 data_ilc1_ilc2_gwas <- ilc1_ilc2_gwas %>%
   arrange(pos) %>%
-  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% lods
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %>% pull(lods)
 
 ilc1_ilc2_dtrack <- DataTrack(data = data_ilc1_ilc2_gwas, 
                               start = start_ilc1_ilc2_gwas,
@@ -103,12 +103,12 @@ ilc1_ilc2_dtrack <- DataTrack(data = data_ilc1_ilc2_gwas,
 
 
 ht <- HighlightTrack(trackList = list(grtrack, ccre_atrack,
-                                      ilc3_dtrack, Frmd4b_dtrack, Cd48_dtrack),
-                     start = 95530000-10000, end = 95530000+10000,
+                                      ilc1_ilc2_dtrack),
+                     start = 116208038-10000, end = 116208038+10000,
                      chromosome = chr_num)
 
 
-pdf("domice/results/figures/genemodel-Fam21.pdf")
+pdf("results/figures/gviz-genemodel-Fam21.pdf")
 plotTracks(list(itrack, gtrack, snps_atrack, ht),
            from = start_irange, to = end_irange, cex = 0.8, type = "b")
 dev.off()
