@@ -431,7 +431,7 @@ qtl_count_df <- combined_qtl_df %>%
 reduce(resize(sort(combined_qtl_grl), 500000))
 
 
-test_grl <- reduce(resize(sort(combined_qtl_grl), 1000))
+test_grl <- reduce(resize(sort(combined_qtl_grl), 10000))
 outdf <- lapply(seq_along(test_grl), function(i) {
   
   grl_subset <- test_grl[[i]]
@@ -496,11 +496,11 @@ fulldf <- full_join(outdf, annotdf, by = c("seqnames","start","end")) %>%
                           ilc1_expressed, ilc2_expressed, ilc3_expressed, lti_expressed))
 
 
-write.csv(fulldf, "trait_by_loci_500kb_window.csv", row.names = FALSE)
+write.csv(fulldf, "trait_by_loci_10kb_window.csv", row.names = FALSE)
 
 fulldf %>%
   dplyr::filter(count > 1) %>%
-  write.csv(., "trait_by_loci_500kb_window_polygenic_only.csv", row.names = FALSE)
+  write.csv(., "trait_by_loci_10kb_window_polygenic_only.csv", row.names = FALSE)
 
 
 

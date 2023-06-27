@@ -13,6 +13,7 @@ library(readr)
 
 source("../fasi-domice/setup.R")
 
+
 # GM_Snps meta data
 ccre <- fread(paste0(data_dir, "references/GM_SNPS_Consequence_cCRE.csv"), data.table = FALSE)
 
