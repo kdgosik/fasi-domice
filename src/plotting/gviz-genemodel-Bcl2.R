@@ -2,21 +2,21 @@
 #' 
 #' 
 
-project_path <- "/home/rstudio/"
-figure_path <- paste0(project_path, "results/figures/")
-source(paste0(figure_path, "helpers.R"))
-
-
-vars <- fread(paste0(project_path, "data/vars.csv"), data.table = FALSE)
-ccre <- fread(paste0(project_path, "data/references/GM_SNPS_Consequence_cCRE.csv"))
-ccre[, recomb_rate := round(cM / (pos / 1e6), 4)]
-
-
+library(data.table)
+library(dplyr)
+library(tidyr)
+library(stringr)
 library(Gviz)
+library(TxDb.Mmusculus.UCSC.mm10.knownGene)
+library(rtracklayer)
 library(GenomicRanges)
 library(GenomicFeatures)
-library(TxDb.Mmusculus.UCSC.mm10.knownGene)
 library(BSgenome.Mmusculus.UCSC.mm10)
+my_path <- "/home/rstudio/"
+project_path <- "/workspace/fasi-domice/"
+
+
+ccre <- fread(paste0(project_path, "data/references/GM_SNPS_Consequence_cCRE.csv"))
 ## IL-5 and topic19 Gene Model Plot #########################
 
 ## cis-eQTL for all major lineages
@@ -36,11 +36,22 @@ gtrack <- GenomeAxisTrack()
 itrack <- IdeogramTrack(genome = gen, chromosome = chr_str)
 
 ## Genome Track
-grtrack <- GeneRegionTrack(txdb, 
-                           genome = gen,
-                           chromosome = chr_str, 
-                           name = "Gene Model",
-                           geneAnnotation = "symbol")
+ensembl <- readGFF(paste0(data_dir, "references/Mus_musculus.GRCm38.102.gtf")) %>%
+  filter(seqid %in% c(as.character(1:19), "X"), 
+         gene_biotype == "protein_coding",
+         str_detect(transcript_name, "-201"),
+         type %in% c("gene", "exon")) %>%
+  dplyr::select(chromosome = seqid, start, end, strand, feature = type,
+                gene = gene_id, 
+                exon = exon_id, 
+                transcript = transcript_id, 
+                symbol = gene_name) %>%
+  mutate(width = abs(start - end))
+
+grtrack <- GeneRegionTrack(ensembl,
+                           chromosome = chr_num, 
+                           genome = "mm10", 
+                           transcriptAnnotation = "symbol")
 
 pos_snps <- ccre %>%
   filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %>% 
@@ -74,7 +85,7 @@ ccre_atrack <- AnnotationTrack(start = start_ccre,
                                name = "cCREs")
 
 ## topic19
-topics <- fread(paste0(project_path, "results/topics/topic-qtl-lods.csv"), 
+topics <- fread(paste0(project_path, "results/topics/qtl-topic-lods.csv.gz"), 
                 select=c("marker", "topic19"))
 
 start_topic <- end_topic <- topics %>%
@@ -99,7 +110,7 @@ topic_dtrack <- DataTrack(data = data_topic19,
 
 
 ## IL-5 steady state
-steady <- fread(paste0(project_path, "results/cytokine/qtl-cytokines-steady-lods.csv"),
+steady <- fread(paste0(project_path, "results/cytokines/qtl-cytokines-steady-lods.csv.gz"),
                 select = c("marker", "IL5"))
 start_steady <- end_steady <- steady %>%
   dplyr::left_join(ccre, by = "marker") %>%
@@ -120,35 +131,17 @@ steady_dtrack <- DataTrack(data = data_steady,
                            genome = gen,
                            name = "IL-5")
 
-# ## IL-5 allergy state
-# allergy <- fread(paste0(my_path, "results/qtl-cytokines-allergy-lods.csv"),
-#                  select = c("marker", "IL5"))
-# start_allergy <- end_allergy <- allergy %>%
-#   dplyr::left_join(ccre, by = "marker") %>%
-#   dplyr::arrange(pos) %>%
-#   dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %>% 
-#   pull(pos)
-# 
-# data_allergy <- allergy %>%
-#   dplyr::left_join(ccre, by = "marker") %>%
-#   dplyr::arrange(pos) %>%
-#   dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %>% 
-#   pull(IL5)
-# 
-# allergy_dtrack <- DataTrack(data = data_allergy,
-#                             start = start_allergy,
-#                             end = end_allergy,
-#                             chromosome = chr_num,
-#                             genome = gen,
-#                             name = "IL-5 (Allergy)")
+
+ht <- HighlightTrack(trackList = list(grtrack, ccre_atrack,
+                                      topic_dtrack, steady_dtrack),
+                     start = 106735000-20000, end = 106735000+20000,
+                     chromosome = 1)
 
 
 
-pdf(paste0(figure_path, "Figure-4E-genemodel-Bcl2.pdf"))
-plotTracks(list(itrack, gtrack, snps_atrack, grtrack, strack, ccre_atrack, 
-                topic_dtrack, steady_dtrack),
-           from = start_irange, to = end_irange, cex = 0.8, type = "b",
-           background.panel = "grey95", background.title = "darkblue")
+pdf(paste0(project_path, "results/figures/gviz-genemodel-Bcl2.pdf"))
+plotTracks(list(itrack, gtrack, snps_atrack, ht),
+           from = start_irange, to = end_irange, cex = 0.8, type = "b")
 dev.off()
 
 

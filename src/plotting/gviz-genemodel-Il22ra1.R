@@ -33,13 +33,13 @@ ccre <- fread(paste0(my_path, "data/references/GM_SNPS_Consequence_cCRE.csv"))
 
 
 ## TODO: update ####
-# egene_list <- c("Ebp", "Eif4a2", "Actr10", "Cd81")
+# # egene_list <- c("Ebp", "Eif4a2", "Actr10", "Cd81")
 # ilc2 <- fread(paste0(my_path, "data/eqtl/qtl-lods-ILC2-cv.csv.gz"),
 #               select = c("marker", "Ebp", "Eif4a2", "Actr10", "Cd81"),
 #               data.table = FALSE)
-# 
-# 
-# ccre <- ccre %>% left_join(ilc2)
+
+
+ccre <- ccre %>% left_join(ilc2)
 
 # ilc3_gwas <- fread(paste0(my_path, "results/proportion/ILC3_stressed_vs_non_qtl.csv.gz"))
 
@@ -60,7 +60,7 @@ ensembl <- readGFF(paste0(data_dir, "references/Mus_musculus.GRCm38.102.gtf")) %
   mutate(width = abs(start - end))
 
 grtrack <- GeneRegionTrack(ensembl,
-                      chromosome = 7, 
+                      chromosome = chr_num, 
                       genome = "mm10", 
                       transcriptAnnotation = "symbol")
 
@@ -172,7 +172,7 @@ ht <- HighlightTrack(trackList = list(grtrack, ccre_atrack,
 
 
 
-pdf(paste0(my_path, "results/figures/Figure-6-gviz-genemodel-calca.pdf"))
+pdf(paste0(my_path, "results/figures/gviz-genemodel-Il22ra1.pdf"))
 plotTracks(list(itrack, gtrack, snps_atrack, ht),
            from = start_irange, to = end_irange, cex = 0.8, type = "b")
 dev.off()

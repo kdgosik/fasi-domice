@@ -169,7 +169,7 @@ ht <- HighlightTrack(trackList = list(grtrack, ccre_atrack,
 
 
 
-pdf(paste0(my_path, "results/figures/Figure-6-gviz-genemodel-calca.pdf"))
+pdf(paste0(my_path, "results/figures/gviz-genemodel-calca.pdf"))
 plotTracks(list(itrack, gtrack, snps_atrack, ht),
            from = start_irange, to = end_irange, cex = 0.8, type = "b")
 dev.off()
