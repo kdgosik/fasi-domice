@@ -101,34 +101,6 @@ ccre_atrack <- AnnotationTrack(start = start_ccre,
                                name = "cCREs")
 
 
-# grtrack <- GeneRegionTrack(txdb, 
-#                            genome = gen,
-#                            chromosome = chr_str, 
-#                            name = "Gene Model",
-#                            geneAnnotation = "symbol")
-
-
-
-
-
-
-# start_ilc3_gwas <- end_ilc3_gwas <- ilc3_gwas %>%
-#   arrange(pos) %>%
-#   filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %>% pull(pos)
-# 
-# data_ilc3_gwas <- ilc3_gwas %>%
-#   arrange(pos) %>%
-#   filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %>% pull(lods)/12
-# 
-# ilc3_dtrack <- DataTrack(data = data_ilc3_gwas,
-#                         start = start_ilc3_gwas,
-#                         end = end_ilc3_gwas+1,
-#                         chromosome = chr_num,
-#                         genome = gen,
-#                         name = "ILC3 Activated")
-
-
-
 
 create_eGene_track <- function(gene_name, ccre, chr_num, gen) {
   
