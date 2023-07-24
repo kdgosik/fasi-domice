@@ -32,6 +32,7 @@ dir.create(paste0(data_dir, "proportions"), showWarnings = FALSE)
 dir.create(paste0(data_dir, "topics"), showWarnings = FALSE)
 dir.create(paste0(data_dir, "genotype"), showWarnings = FALSE)
 
+dir.create(paste0(results_dir), showWarnings = FALSE)
 dir.create(paste0(results_dir, "cytokines"), showWarnings = FALSE)
 dir.create(paste0(results_dir, "eqtl"), showWarnings = FALSE)
 dir.create(paste0(results_dir, "proportions"), showWarnings = FALSE)
