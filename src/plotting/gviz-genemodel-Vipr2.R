@@ -1,4 +1,4 @@
-#' Figure ED 6A IL-25 Gene Model
+#' Vipr2 Gene Model
 #' 
 #' 
 
@@ -15,6 +15,8 @@ library(GenomicFeatures)
 library(BSgenome.Mmusculus.UCSC.mm10)
 my_path <- "/home/rstudio/"
 my_path <- "/workspace/fasi-domice/"
+data_dir <- paste0(my_path, "data/")
+results_dir <- paste0(my_path, "results/")
 
 
 ### Vipr2 (ENSMUSG00000011171)
@@ -37,13 +39,6 @@ lti <- fread(paste0(my_path, "data/eqtl/qtl-lods-Lti ILC3-cv.csv.gz"),
               data.table = FALSE)
 
 ccre <- ccre %>% left_join(lti)
-
-lti_gwas <- fread(paste0(my_path, "results/proportions/LTi_stressed_vs_non_qtl.csv.gz")) %>% 
-  mutate(strand = "+") %>% 
-  dplyr::mutate(
-    padj = p.adjust(p_values, method = "hochberg"),
-    lods = -log10(p.adjust(p_values, method = "hochberg")) / 10
-  )
 
 
 ensembl <- readGFF(paste0(data_dir, "references/Mus_musculus.GRCm38.102.gtf")) %>%
@@ -84,20 +79,28 @@ snps_atrack <- AnnotationTrack(start = pos_snps,
                                genome = gen,
                                name = "SNPs")
 
-start_ccre <- ccre %>%
-  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %>% pull(start)
-end_ccre <- ccre %>%
-  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %>% pull(end)
-names_ccre <- ccre %>%
-  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %>% pull(type.y)
+# start_ccre <- ccre %>%
+#   filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %>% pull(start)
+# end_ccre <- ccre %>%
+#   filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %>% pull(end)
+# names_ccre <- ccre %>%
+#   filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(type.y)) %>% pull(type.y)
+# 
+# ccre_atrack <- AnnotationTrack(start = start_ccre,
+#                                width = end_ccre - start_ccre,
+#                                chromosome = chr_str,
+#                                group = names_ccre,
+#                                genome = gen,
+#                                name = "cCREs")
 
-ccre_atrack <- AnnotationTrack(start = start_ccre,
-                               width = end_ccre - start_ccre,
-                               chromosome = chr_str,
-                               group = names_ccre,
-                               genome = gen,
-                               name = "cCREs")
 
+lti_gwas <- fread(paste0(results_dir,"proportions/LTi_stressed_vs_non_qtl.csv.gz"), 
+                      data.table = FALSE) %>% 
+  mutate(strand = "+") %>% 
+  dplyr::mutate(
+    padj = p.adjust(p_values, method = "hochberg"),
+    lods = -log10(p.adjust(p_values, method = "hochberg")) / 10
+  )
 
 
 start_lti_gwas <- end_lti_gwas <- lti_gwas %>%
@@ -146,14 +149,13 @@ Rpl35_dtrack <- create_eGene_track(gene_name = "Rpl35", ccre = ccre, chr_num = c
 Ablim1_dtrack <- create_eGene_track(gene_name = "Ablim1", ccre = ccre, chr_num = chr_num, gen = gen)
 
 
-ht <- HighlightTrack(trackList = list(grtrack, ccre_atrack,
-                                      lti_dtrack, Slx1b_dtrack, Rpl35_dtrack, Ablim1_dtrack),
-                     start = 116150000-10000, end = 116150000+10000,
+ht <- HighlightTrack(trackList = list(grtrack, Slx1b_dtrack, Rpl35_dtrack),
+                     start = 116180000-10000, end = 116180000+10000,
                      chromosome = chr_num)
 
 
 
-pdf(paste0(my_path, "results/figures/gviz-genemodel-vipr2.pdf"))
+pdf(paste0(my_path, "results/figures/gviz-genemodel-Vipr2.pdf"))
 plotTracks(list(itrack, gtrack, snps_atrack, ht),
            from = start_irange, to = end_irange, cex = 0.8, type = "b")
 dev.off()

@@ -17,6 +17,7 @@ library(GenomicFeatures)
 library(BSgenome.Mmusculus.UCSC.mm10)
 my_path <- "/home/rstudio/"
 my_path <- "/workspace/fasi-domice/"
+data_dir <- paste0(my_path, "data")
 
 ### Smad2 (ENSMUSG00000024563)
 ## Chromosome 18: 76,241,580-76,310,963 forward strand.
@@ -29,7 +30,6 @@ gen <- "mm10"
 ccre <- fread(paste0(my_path, "data/references/GM_SNPS_Consequence_cCRE.csv"))
 ## check results
 
-## TODO: update ####
 # IL17F IL9 cytokines
 cytokines <- fread(paste0(my_path, "results/cytokines/qtl-cytokines-steady-lods.csv.gz"))
 
