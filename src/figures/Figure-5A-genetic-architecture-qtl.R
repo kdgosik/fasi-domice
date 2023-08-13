@@ -11,7 +11,9 @@
 
 library(ComplexHeatmap)
 library(data.table)
-library(tidyverse)
+# library(tidyverse)
+library(dplyr)
+library(tidyr)
 # library(GenVisR)
 library(igraph)
 library(circlize)

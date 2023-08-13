@@ -1,14 +1,17 @@
 library(ComplexHeatmap)
 library(data.table)
-library(tidyverse)
+# library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(stringr)
 library(ggvenn)
 library(igraph)
 
-project_path <- my_path <-"./domice/"
-project_path <- "~/Documents/projects/domice/"
+project_path <- my_path <-"/workspace/fasi-domice/"
+# project_path <- "~/Documents/projects/domice/"
 figure_path <- paste0(project_path, "results/figures/")
 data_path <- paste0(project_path, "data/")
-source(paste0(figure_path, "helpers.R"))
+# source(paste0(figure_path, "helpers.R"))
 
 library(circlize)
 col_fun = colorRamp2(c(0, 1), c("lightgray", "red"))
@@ -16,8 +19,8 @@ col_fun(seq(-3, 3))
 
 
 
-vars <- fread(paste0(data_path, "vars.csv"))
-ccre <- fread(paste0(data_path, "GM_SNPS_Consequence_cCRE.csv"))
+vars <- fread(paste0(data_path, "allchannels/vars.csv"))
+ccre <- fread(paste0(data_path, "references/GM_SNPS_Consequence_cCRE.csv"))
 
 
 # mat <- vars %>%
