@@ -149,11 +149,11 @@ ilc2_lti_dtrack <- DataTrack(data = data_ilc2_lti_gwas,
                              name = "ILC2 vs LTi-Like")
 
 ht <- HighlightTrack(trackList = list(grtrack, ccre_atrack,
-                                      ilc2_ilc3_dtrack, ilc2_lti_dtrack),
+                                      lti_dtrack, ilc2_ilc3_dtrack, ilc2_lti_dtrack),
                      start = 53670000-10000, end = 53670000+10000,
                      chromosome = chr_num)
 
-pdf(paste0(my_path, "/results/figures/genemodel-rbpj.pdf"))
+pdf(paste0(my_path, "/results/figures/gviz-genemodel-rbpj.pdf"))
 plotTracks(list(itrack, gtrack, snps_atrack, ht),
            from = start_irange, to = end_irange, cex = 0.8, type = "b")
 dev.off()

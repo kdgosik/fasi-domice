@@ -1,3 +1,4 @@
+# remotes::install_github("jokergoo/ComplexHeatmap")
 library(ComplexHeatmap)
 library(data.table)
 # library(tidyverse)
@@ -19,9 +20,19 @@ col_fun(seq(-3, 3))
 
 
 
-vars <- fread(paste0(data_path, "allchannels/vars.csv"))
-ccre <- fread(paste0(data_path, "references/GM_SNPS_Consequence_cCRE.csv"))
+vars <- fread(paste0(data_path, "allchannels/vars.csv"), data.table = FALSE)
+ccre <- fread(paste0(data_path, "references/GM_SNPS_Consequence_cCRE.csv"), data.table = FALSE)
 
+trait <- fread(paste0(results_dir, "trait_by_loci_10kb_window.csv" ))
+
+trait <- trait %>%
+  mutate(loci_chr_num = case_when(loci_chr == "X"~20, TRUE ~ as.numeric(loci_chr)),
+         loci_start_pad = str_pad(loci_start, width = 9, side = "left", pad = "0")) %>%
+  unite("loci_order", c(loci_chr_num, loci_start_pad), sep = "", remove=FALSE) %>%
+  mutate(loci_order = as.numeric(loci_order)) %>%
+  mutate(loci_order_rank = rank(loci_order, ties.method = "min"))
+
+ggplot(trait, aes(loci_order_rank, trait, fill = count)) + geom_area()
 
 # mat <- vars %>%
 #   dplyr::select(213:218, 220:225, 227:232, 234:239, 260:283, 287:315) %>%
@@ -46,7 +57,7 @@ mat <- vars %>%
   #               topic12_qtl_genes = 0,
   #               topic16_qtl_genes = 0,
   #               topic17_qtl_genes =0) %>%
-  select(contains("eqtl"), 
+  dplyr::select(contains("eqtl"), 
          starts_with("topic"),
          "ilc3_activated_qtl_genes", "lti_activated_qtl_genes",
          "ilc1_ilc2_prop_qtl_genes", "ilc1_ilc3_prop_qtl_genes",
@@ -85,6 +96,11 @@ cbar <- HeatmapAnnotation(traits = anno_barplot(colSums(mat, na.rm=T)),
 #         column_order = NULL)
 
 
-pdf("Figure-3b-polygenic-heatmap-effects.pdf")
-Heatmap(mat, col = col_fun, name = "genes", top_annotation = cbar, row_order = NULL, column_order = NULL) + rbar
+pdf("Figure-5A-polygenic-heatmap-effects.pdf")
+Heatmap(mat, 
+        col = col_fun, 
+        name = "genes", 
+        top_annotation = cbar, 
+        row_order = NULL, 
+        column_order = NULL) + rbar
 dev.off()
