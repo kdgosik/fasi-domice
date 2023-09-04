@@ -31,6 +31,8 @@ ilc1 <- fread(paste0(data_path, "eqtl/qtl-lods-ILC1-cv.csv.gz"),
               select = c("marker", "Lman2"),
               data.table = FALSE)
 
+ccre <- ccre %>% left_join(ilc1)
+
 ## Nmu - Chr5:76333495..76363777
 start_irange <- 76000000
 end_irange <- 77000000
@@ -129,13 +131,13 @@ egene1_dtrack <- create_eGene_track(gene_name = "Lman2", ccre = ccre, chr_num = 
 
 ht <- HighlightTrack(trackList = list(grtrack, ccre_atrack,
                                       egene1_dtrack),
-                     start = 114618803-10000, end = 114618803+10000,
-                     chromosome = 7)
+                     start = 76333495-20000, end = 76333495+10000,
+                     chromosome = 5)
 
 
 
 
-pdf("results/figures/gviz-genemodel-Nmu.pdf")
+pdf("gviz-genemodel-Nmu.pdf")
 plotTracks(list(itrack, gtrack, snps_atrack, ht),
            from = start_irange, to = end_irange, cex = 0.8, type = "b")
 dev.off()

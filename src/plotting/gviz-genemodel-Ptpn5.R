@@ -12,8 +12,8 @@ my_path <- "/home/rstudio/"
 my_path <- "/workspace/fasi-domice/"
 
 ### Ptpn5 http://www.informatics.jax.org/marker/MGI:97807
-## PTPN5 Chr7:46727543-46783432 bp, - strand
-start_irange <- 45000000
+## PTPN5 Chromosome 7: 47,077,795-47,133,684 - strand
+start_irange <- 46000000
 end_irange <- 49000000
 chr_str <- "chr7"
 chr_num <- "7"
@@ -29,12 +29,12 @@ marker_list <- ccre %>% filter(chr == chr_num, start > start_irange, end < end_i
 # ilc2_lti_gwas <- fread(paste0(my_path, 'results/gwas-ilc2-lti-results.csv.gz'))
 
 
-vars <- fread(paste0(my_path, "data/vars.csv"))
+vars <- fread(paste0(my_path, "data/allchannels/vars.csv"))
 cytokines <- fread(paste0(my_path, "data/cytokines/qtl-steady-cytokines-lods.csv.gz"))
+cytokines <- fread(paste0(my_path, "results/cytokines/qtl-cytokines-steady-lods.csv.gz"))
 ilc1 <- fread(paste0(my_path, "data/eqtl/qtl-lods-ILC1-cv.csv.gz"), 
               select = c("marker", "Il18r1", "Hspa14"), 
-              data.table = FALSE) %>% 
-  filter(marker %in% marker_list)
+              data.table = FALSE)
   
 ccre <- ccre %>% left_join(ilc1)
 
@@ -121,24 +121,9 @@ create_eGene_track <- function(gene_name, ccre, chr_num, gen) {
   
 }
 
-ilc1_il18a_dtrack <- create_eGene_track(gene_name = "Il18r1", ccre = ccre, chr_num = chr_num, gen = gen)
+ilc1_il18r1_dtrack <- create_eGene_track(gene_name = "Il18r1", ccre = ccre, chr_num = chr_num, gen = gen)
 ilc1_Hspa14_dtrack <- create_eGene_track(gene_name = "Hspa14", ccre = ccre, chr_num = chr_num, gen = gen)
 
-
-ilc1_il18a_dtrack <- DataTrack(data = ilc1$Il18r1, 
-                        start = start_ilc1,
-                        end = end_ilc1+1, 
-                        chromosome = chr_num, 
-                        genome = gen,
-                        name = "ILC1 eGenes")
-
-
-ilc1_Hspa14_dtrack <- DataTrack(data = ilc1$Hspa14, 
-                         start = start_ilc1,
-                         end = end_ilc1+1, 
-                         chromosome = chr_num, 
-                         genome = gen,
-                         name = "ILC1 eGenes")
 
 
 start_ifng<- end_ifng <- ccre %>%
@@ -158,12 +143,12 @@ ifng_dtrack <- DataTrack(data = data_ifng,
 
 
 ht <- HighlightTrack(trackList = list(grtrack, ccre_atrack,
-                                      ilc1_il18a_dtrack, ilc1_Hspa14_dtrack),
-                     start = 46727543-10000, end = 46727543+10000,
+                                      ilc1_il18r1_dtrack, ilc1_Hspa14_dtrack, ifng_dtrack),
+                     start = 47077795-10000, end = 47077795+10000,
                      chromosome = chr_num)
 
 
-pdf(paste0(my_path, "/results/figures/genemodel-ptpn5.pdf"))
+pdf(paste0("gviz-genemodel-ptpn5.pdf"))
 plotTracks(list(itrack, gtrack, snps_atrack, ht),
            from = start_irange, to = end_irange, cex = 0.8, type = "b")
 dev.off()
