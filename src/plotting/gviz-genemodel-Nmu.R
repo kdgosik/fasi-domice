@@ -25,13 +25,28 @@ figure_path <- paste0(my_path, "results/figures/")
 
 ## read data #######
 ccre <- fread(paste0(my_path, "data/references/GM_SNPS_Consequence_cCRE.csv"))
+topics <- fread(paste0(my_path, "results/topics/qtl-topic-lods.csv.gz"), data.table = FALSE)
 
-
-ilc1 <- fread(paste0(data_path, "eqtl/qtl-lods-ILC1-cv.csv.gz"),
+ilc1 <- fread(paste0(data_dir, "eqtl/qtl-lods-ILC1-cv.csv.gz"),
               select = c("marker", "Lman2"),
               data.table = FALSE)
 
 ccre <- ccre %>% left_join(ilc1)
+
+ilc1_lti_gwas <- fread(paste0(my_path, 'results/proportions/gwas-ilc1-lti-results.csv.gz')) %>% 
+  mutate(strand = "+") %>% 
+  dplyr::mutate(
+    padj = p.adjust(p_values, method = "hochberg"),
+    lods = -log10(p.adjust(p_values, method = "hochberg")) / 10
+  )
+
+
+ilc2_lti_gwas <- fread(paste0(my_path, 'results/proportions/gwas-ilc2-lti-results.csv.gz')) %>% 
+  mutate(strand = "+") %>% 
+  dplyr::mutate(
+    padj = p.adjust(p_values, method = "hochberg"),
+    lods = -log10(p.adjust(p_values, method = "hochberg")) / 10
+  )
 
 ## Nmu - Chr5:76333495..76363777
 start_irange <- 76000000
@@ -101,6 +116,57 @@ ccre_atrack <- AnnotationTrack(start = start_ccre,
                                name = "cCREs")
 
 
+start_topic8 <- end_topic8 <- topics %>%
+  dplyr::left_join(ccre, by = "marker") %>%
+  dplyr::arrange(pos) %>%
+  dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %>% pull(pos)
+
+data_topic8 <- topics %>%
+  dplyr::left_join(ccre, by = "marker") %>%
+  dplyr::arrange(pos) %>% 
+  dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %>%
+  dplyr::select(topic8) 
+# dplyr::filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %$% topic3
+
+topic8_dtrack <- DataTrack(data = data_topic8,
+                           start = start_topic8,
+                           end = end_topic8,
+                           chromosome = chr_num,
+                           genome = gen,
+                           name = "Topic 8")
+
+
+start_ilc1_lti_gwas <- end_ilc1_lti_gwas <- ilc1_lti_gwas %>%
+  arrange(pos) %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %>% pull(pos)
+
+data_ilc1_lti_gwas <- ilc1_lti_gwas %>%
+  arrange(pos) %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %>% pull(lods)
+
+ilc1_lti_dtrack <- DataTrack(data = data_ilc1_lti_gwas, 
+                             start = start_ilc1_lti_gwas,
+                             end = end_ilc1_lti_gwas, 
+                             chromosome = chr_num, 
+                             genome = gen,
+                             name = "ILC1 vs LTi-Like")
+
+
+start_ilc2_lti_gwas <- end_ilc2_lti_gwas <- ilc2_lti_gwas %>%
+  arrange(pos) %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %>% pull(pos)
+
+data_ilc2_lti_gwas <- ilc2_lti_gwas %>%
+  arrange(pos) %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %>% pull(lods)
+
+ilc2_lti_dtrack <- DataTrack(data = data_ilc2_lti_gwas, 
+                             start = start_ilc2_lti_gwas,
+                             end = end_ilc2_lti_gwas, 
+                             chromosome = chr_num, 
+                             genome = gen,
+                             name = "ILC2 vs LTi-Like")
+
 
 create_eGene_track <- function(gene_name, ccre, chr_num, gen) {
   
@@ -130,7 +196,10 @@ egene1_dtrack <- create_eGene_track(gene_name = "Lman2", ccre = ccre, chr_num = 
 
 
 ht <- HighlightTrack(trackList = list(grtrack, ccre_atrack,
-                                      egene1_dtrack),
+                                      egene1_dtrack,
+                                      topic8_dtrack,
+                                      ilc1_lti_dtrack,
+                                      ilc2_lti_dtrack),
                      start = 76333495-20000, end = 76333495+10000,
                      chromosome = 5)
 

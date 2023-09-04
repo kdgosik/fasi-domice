@@ -30,7 +30,7 @@ marker_list <- ccre %>% filter(chr == chr_num, start > start_irange, end < end_i
 
 
 vars <- fread(paste0(my_path, "data/allchannels/vars.csv"))
-cytokines <- fread(paste0(my_path, "data/cytokines/qtl-steady-cytokines-lods.csv.gz"))
+
 cytokines <- fread(paste0(my_path, "results/cytokines/qtl-cytokines-steady-lods.csv.gz"))
 ilc1 <- fread(paste0(my_path, "data/eqtl/qtl-lods-ILC1-cv.csv.gz"), 
               select = c("marker", "Il18r1", "Hspa14"), 
