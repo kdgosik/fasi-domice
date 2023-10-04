@@ -165,14 +165,15 @@ il2_dtrack <- create_eGene_track(gene_name = "Il2", ccre = ccre, chr_num = chr_n
 
 
 ht <- HighlightTrack(trackList = list(grtrack,
-                                      il2_dtrack),
+                                      il2_dtrack,
+                                      ilc3_dtrack),
                      start = 5639218-10000, end = 5639218+10000,
                      chromosome = 10)
 
 
 
 
-pdf(paste0(my_path, "results/figures/gviz-genemodel-Vip.pdf"))
+pdf(paste0(my_path, "gviz-genemodel-Vip.pdf"))
 plotTracks(list(itrack, gtrack, snps_atrack, ht),
            from = start_irange, to = end_irange, cex = 0.8, type = "b")
 dev.off()
