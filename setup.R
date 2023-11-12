@@ -37,6 +37,7 @@ dir.create(paste0(results_dir, "cytokines"), showWarnings = FALSE)
 dir.create(paste0(results_dir, "eqtl"), showWarnings = FALSE)
 dir.create(paste0(results_dir, "proportions"), showWarnings = FALSE)
 dir.create(paste0(results_dir, "topics"), showWarnings = FALSE)
+dir.create(paste0(results_dir, "figures"), showWarnings = FALSE)
 
 
 
