@@ -161,3 +161,48 @@ drive_download(as_id("1T2GDRh9cTyG_DX3C8mVj-Bzfxm9aNRcf"),
 drive_download(as_id("1R4IAU1zCiSSWwOI11ivg2CaNHp1Vox85"), 
                path=paste0(data_dir, "genotype/G30_scRNAseq_DOmice_SNPGrp1_QC0.50.vcf"),
                overwrite = TRUE)
+
+
+
+## founders data ######
+# paste0(data_dir, "founders1-louvain_labels-labels-transfer")
+# X.csv
+## https://drive.google.com/file/d/1LALaZ8IX7qIQJtJHKsZxhdbk-iOMrEsj/view?usp=drive_link
+drive_download(as_id("1LALaZ8IX7qIQJtJHKsZxhdbk-iOMrEsj"), 
+               path=paste0(data_dir, "founders1-louvain_labels-labels-transfer/X.csv"),
+               overwrite = TRUE)
+
+
+# paste0(data_dir, "founders2-louvain_labels-labels-transfer")
+# X.csv:
+## https://drive.google.com/file/d/14Lv8RkSuAD3du9o9Xcb4YxNFScyLZEBu/view?usp=drive_link
+drive_download(as_id("14Lv8RkSuAD3du9o9Xcb4YxNFScyLZEBu"), 
+               path=paste0(data_dir, "founders2-louvain_labels-labels-transfer/X.csv"),
+               overwrite = TRUE)
+
+
+
+# eqtl-ILC1-founder-coefs.csv.gz    1BpgljQaHHzMTuVIoCRPq5ePw3LHIJLmX
+# eqtl-LTi-founder-coefs.csv.gz     1OFYUHwgniE-AnuHABP8v7Glif6iO33e_
+# eqtl-ILC3-founder-coefs.csv.gz    1DE37preC92Hzb3lZYRDE8XX1zRYezSZv
+# eqtl-ILC2-founder-coefs.csv.gz    19OuIh0BcffFuPhOI0YLe6fDVUlS-yq0b
+## ILC1
+drive_download(as_id("1BpgljQaHHzMTuVIoCRPq5ePw3LHIJLmX"), 
+               path=paste0(results_dir, "founders/eqtl-ILC1-founder-coefs.csv.gz"),
+               overwrite = TRUE)
+
+## ILC2
+drive_download(as_id("19OuIh0BcffFuPhOI0YLe6fDVUlS-yq0b"), 
+               path=paste0(results_dir, "founders/eqtl-ILC2-founder-coefs.csv.gz"),
+               overwrite = TRUE)
+
+## ILC3
+drive_download(as_id("1DE37preC92Hzb3lZYRDE8XX1zRYezSZv"), 
+               path=paste0(results_dir, "founders/eqtl-ILC3-founder-coefs.csv.gz"),
+               overwrite = TRUE)
+
+## LTi
+drive_download(as_id("1OFYUHwgniE-AnuHABP8v7Glif6iO33e_"), 
+               path=paste0(results_dir, "founders/eqtl-LTi-founder-coefs.csv.gz"),
+               overwrite = TRUE)
+

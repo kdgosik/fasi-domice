@@ -120,13 +120,18 @@ cat("Using celltype:", celltype, "...\n")
 #   mutate(min_rank = min_rank(value_adj), n = n()) %>%
 #   dplyr::filter(min_rank == n)
 
-vars <- read_csv(paste0(data_path, "vars.csv"))
+
+library(data.table)
+library(dplyr)
+library(ggplot2)
+
+vars <- fread(paste0(data_dir, "allchannels/vars.csv"), data.table=FALSE)
 eqtl_genes <-unique(c(vars$index[vars$ilc1_egenes_cv == 1],
                       vars$index[vars$ilc2_egenes_cv == 1],
                       vars$index[vars$ilc3_egenes_cv == 1],
                       vars$index[vars$lti_egenes_cv == 1]))
 
-ccre <- fread(paste0(data_path, "GM_SNPS_Consequence_cCRE.csv"))
+ccre <- fread(paste0(data_dir, "references/GM_SNPS_Consequence_cCRE.csv"), data.table=FALSE)
 ilc1_ccre <- ccre$marker[ccre$ilc1_eqtl_loci_cv==1]
 ilc2_ccre <- ccre$marker[ccre$ilc2_eqtl_loci_cv==1]
 ilc3_ccre <- ccre$marker[ccre$ilc3_eqtl_loci_cv==1]
@@ -136,7 +141,7 @@ loci_markers <- unique(c(ilc1_ccre, ilc2_ccre, ilc3_ccre, lti_ccre))
   
 outdf <- lapply(c("ILC1", "ILC2", "ILC3", "LTi"), function(celltype) {
   
-  in_file <- paste0("zcat ", my_path, "results/eqtl-", celltype, "-founder-coefs.csv.gz")
+  in_file <- paste0("zcat ", domice_dir, "results/founders/eqtl-", celltype, "-founder-coefs.csv.gz")
   coef <- fread(in_file, data.table = FALSE)
   # coef <- read.csv(in_file) %>%
   #   dplyr::filter(marker %in% eqtl_df$marker[eqtl_df$cell_type == celltype])
