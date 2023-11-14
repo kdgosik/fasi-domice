@@ -1,4 +1,4 @@
-#' Figure 3E
+#' Figure 5C
 #' 
 #' 
 
@@ -122,8 +122,12 @@ cat("Using celltype:", celltype, "...\n")
 
 
 library(data.table)
+library(tibble)
 library(dplyr)
+library(tidyr)
+library(purrr)
 library(ggplot2)
+library(stringr)
 
 vars <- fread(paste0(data_dir, "allchannels/vars.csv"), data.table=FALSE)
 eqtl_genes <-unique(c(vars$index[vars$ilc1_egenes_cv == 1],
@@ -169,20 +173,20 @@ outdf <- lapply(c("ILC1", "ILC2", "ILC3", "LTi"), function(celltype) {
   dplyr::left_join(founderdf)
 
 
-f1_cnames <- readLines(paste0(data_path, "founders1-louvain_labels-labels-transfer/X.csv"), n=1)
+f1_cnames <- readLines(paste0(data_dir, "founders1-louvain_labels-labels-transfer/X.csv"), n=1)
 f1_cnames <- unlist(strsplit(x = f1_cnames, split = ","))
 f1_cnames <- intersect(eqtl_genes, f1_cnames)
-f2_cnames <- readLines(paste0(data_path, "founders2-louvain_labels-labels-transfer/X.csv"), n=1)
+f2_cnames <- readLines(paste0(data_dir, "founders2-louvain_labels-labels-transfer/X.csv"), n=1)
 f2_cnames <- unlist(strsplit(x = f2_cnames, split = ","))
 f2_cnames <- intersect(eqtl_genes, f2_cnames)
 genelist <- intersect(f1_cnames, f2_cnames)
 genelist <- genelist[-c(1,2)]
 
-f1X <- fread(paste0(data_path, "founders1-louvain_labels-labels-transfer/X.csv"),
+f1X <- fread(paste0(data_dir, "founders1-louvain_labels-labels-transfer/X.csv"),
              select = c("index", "best_clean", "SNG.1ST","called_cell_types_new", genelist)) %>%
   dplyr::filter(called_cell_types_new %in% c("ILC1", "ILC2", "ILC3", "ILC3(LTi-like)"))
 
-f2X <- fread(paste0(data_path, "founders2-louvain_labels-labels-transfer/X.csv"),
+f2X <- fread(paste0(data_dir, "founders2-louvain_labels-labels-transfer/X.csv"),
              select = c("index", "best_clean", "SNG.1ST","called_cell_types_new", genelist)) %>%
   dplyr::filter(called_cell_types_new %in% c("ILC1", "ILC2", "ILC3", "ILC3(LTi-like)"))
 
@@ -241,6 +245,9 @@ foundercor <- merge_genes %>%
   separate(celltype_gene, c("cell_type", "gene")) %>%
   left_join(outdf)
 
+## check Hopx correlation
+# mydf <- merge_genes %>% filter(cell_type=="ILC1", gene == "Hopx") 
+# cor.test(mydf$expression, mydf$pred_exp)
 
 p1 <- foundercor %>%
   # filter(value_adj > 10) %>%

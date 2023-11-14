@@ -7,8 +7,13 @@
 
 
 library(data.table)
-library(tidyverse)
-
+# library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(readr)
+library(purrr)
+library(ggplot2)
 
 data_path <- "data/"
 results_path <- "results/"
@@ -42,3 +47,30 @@ ggplot(bar_plot_df, aes(cell_type, n, group = cis_effect, fill = cis_effect)) +
        fill = "Loci Type")
 
 
+
+
+
+
+plotdf <- trait_by_loci_500kb_window %>%
+  dplyr::select(trait, loci, count) %>% unique() %>%
+  mutate(group = case_when(str_detect(trait, "ILC[1-3]_ILC")~"Proportion",
+                           str_detect(trait, "ILC[1-3]_LTi")~"Proportion",
+                           str_detect(trait, "ILC1_")~"ILC1",
+                           str_detect(trait, "ILC2_")~"ILC2",
+                           str_detect(trait, "ILC3_")~"ILC3",
+                           str_detect(trait, "LTi_")~"LTi",
+                           str_detect(trait, "topic")~"Topic",
+                           TRUE ~ "cycotkine"))
+
+bar_plot_df <- plotdf %>%
+  count(group, polygenic = count > 1)
+  
+ggplot(bar_plot_df, aes(group, n, group = polygenic, fill = polygenic)) + 
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_minimal() + 
+  theme(legend.position = "top") +
+  scale_fill_brewer(palette = "Dark2") +
+  labs(title = "",
+       x = "Cell Type",
+       y = "Number of loci",
+       fill = "Loci Type")

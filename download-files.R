@@ -42,7 +42,13 @@ drive_download(as_id("1LHAYLCaTVQYeyO7iMsFOvGxIEHdxBxZ4"),
                path=paste0(data_dir, "eqtl/qtl-lods-ILC1-cv.csv.gz"),
                overwrite = TRUE)
 
+# qtl-loci-by-genes-ILC1.csv
+drive_download(as_id("1KpsZg4TzAyufVMxXitjAi4OmYhjiptDn"), 
+               path=paste0(results_dir, "eqtl/qtl-loci-by-genes-ILC1.csv"),
+               overwrite = TRUE)
 
+
+# qtl-plot-lods-ILC2-cv.csv.gz
 drive_download(as_id("1muSHQ_5UlHz6KexUR4ZL-Zaup6tjUrNh"), 
                path=paste0(results_dir, "eqtl/qtl-plot-lods-ILC2-cv.csv.gz"),
                overwrite = TRUE)
@@ -52,6 +58,10 @@ drive_download(as_id("1Rkv7EXmHKp-h-0u-_xfD7KtA1IvXmqz3"),
                path=paste0(data_dir, "eqtl/qtl-lods-ILC2-cv.csv.gz"),
                overwrite = TRUE)
 
+# qtl-loci-by-genes-ILC2.csv
+drive_download(as_id("1mq4qtjUeomfDqSZZ8MgrCYKeevkfcIMx"), 
+               path=paste0(results_dir, "eqtl/qtl-loci-by-genes-ILC2.csv"),
+               overwrite = TRUE)
 
 drive_download(as_id("1muSHQ_5UlHz6KexUR4ZL-Zaup6tjUrNh"), 
                path=paste0(results_dir, "eqtl/qtl-plot-lods-NCR1\\+\\ ILC3-cv.csv.gz"),
@@ -62,14 +72,29 @@ drive_download(as_id("1H4W0zSkcqoA_xuX8v8ByD17_pWBTowfU"),
                path=paste0(data_dir, "eqtl/qtl-lods-NCR1+ ILC3-cv.csv.gz"),
                overwrite = TRUE)
 
+
+# qtl-loci-by-genes-ILC3.csv
+drive_download(as_id("15Yx9U3HiXWCYdk12aPUevvd7jkxm04ZC"), 
+               path=paste0(results_dir, "eqtl/qtl-loci-by-genes-ILC3.csv"),
+               overwrite = TRUE)
+
+
 drive_download(as_id("1muSHQ_5UlHz6KexUR4ZL-Zaup6tjUrNh"), 
                path=paste0(results_dir, "eqtl/qtl-plot-lods-Lti ILC3-cv.csv.gz"),
                overwrite = TRUE)
+
 
 # qtl-lods-Lti ILC3-cv.csv.gz        1Kq-U1RAdbMGTvtjezwigUr7xj2DETJzD
 drive_download(as_id("1Kq-U1RAdbMGTvtjezwigUr7xj2DETJzD"), 
                path=paste0(data_dir, "eqtl/qtl-lods-Lti ILC3-cv.csv.gz"),
                overwrite = TRUE)
+
+# qtl-loci-by-genes-LTi.csv
+drive_download(as_id("1jBRgqaCcMvWUtyG7lBteGDQBURhaJLCN"), 
+               path=paste0(results_dir, "eqtl/qtl-loci-by-genes-LTi.csv"),
+               overwrite = TRUE)
+
+
 
 
 ## Proportion #########
@@ -204,5 +229,24 @@ drive_download(as_id("1DE37preC92Hzb3lZYRDE8XX1zRYezSZv"),
 ## LTi
 drive_download(as_id("1OFYUHwgniE-AnuHABP8v7Glif6iO33e_"), 
                path=paste0(results_dir, "founders/eqtl-LTi-founder-coefs.csv.gz"),
+               overwrite = TRUE)
+
+
+
+# trait_by_loci_10kb_window.csv
+drive_download(as_id("1bn4LbBI613GgDhNvEIFMZqR69D_0Opuw"), 
+               path=paste0(results_dir, "trait_by_loci_10kb_window.csv"),
+               overwrite = TRUE)
+
+
+# trait_by_loci_50kb_window.csv
+drive_download(as_id("1Kol5vTqNqQBSlUJKFXshZGLXlThxXL8B"), 
+               path=paste0(results_dir, "trait_by_loci_50kb_window.csv"),
+               overwrite = TRUE)
+
+
+# trait_by_loci_500kb_window.csv
+drive_download(as_id("176ldRbzb3vOON_eUjE3CkVG5VBof1eNS"), 
+               path=paste0(results_dir, "trait_by_loci_500kb_window.csv"),
                overwrite = TRUE)
 
