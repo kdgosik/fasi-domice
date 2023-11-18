@@ -1,7 +1,8 @@
 library(data.table)
-library(tidyverse)
-library(ggvenn)
-library(igraph)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(readr)
 
 project_path <- my_path <-"./domice/"
 project_path <-"~/Documents/projects/domice/"
@@ -11,7 +12,7 @@ source(paste0(figure_path, "helpers.R"))
 
 
 vars <- fread(paste0(data_dir, "allchannels/vars.csv"), data.table = F)
-ccre <- fread(paste0(data_path, "GM_SNPS_Consequence_cCRE.csv"), data.table = F)
+ccre <- fread(paste0(data_dir, "references/GM_SNPS_Consequence_cCRE.csv"), data.table = F)
 
 ## add polygenic vs monogenic feature? ##################
 
@@ -26,7 +27,7 @@ ccre <- fread(paste0(data_path, "GM_SNPS_Consequence_cCRE.csv"), data.table = F)
 ilc1_egenes <- vars %>% filter(ilc1_egenes_cv == 1) %>% pull(index)
 
 # reading in LOD scores
-ilc1_lods <- fread(paste0(project_path, "results/qtl-plot-lods-ILC1-cv.csv.gz"), data.table = FALSE) 
+ilc1_lods <- fread(paste0(results_dir, "eqtl/qtl-plot-lods-ILC1-cv.csv.gz"), data.table = FALSE) 
 
 # Counting number of QTLs per eGene
 ilc1_polygenic <- ilc1_lods %>% 
@@ -223,7 +224,6 @@ topic_poly <- fread(paste0(domice_dir, "results/topics/topic-qtl-lods.csv.gz")) 
 
 
 ## cytokine qtl: polygenic ###########################
-
 
 cytokine_poly <- fread(paste0(data_path, "qtl-steady-cytokines-lods.csv.gz"), data.table = F) %>%
   left_join({

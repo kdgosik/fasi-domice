@@ -52,7 +52,7 @@ ggplot(bar_plot_df, aes(cell_type, n, group = cis_effect, fill = cis_effect)) +
 
 
 plotdf <- trait_by_loci_500kb_window %>%
-  dplyr::select(trait, loci, count) %>% unique() %>%
+ # dplyr::select(trait, loci, count) %>% unique() %>%
   mutate(group = case_when(str_detect(trait, "ILC[1-3]_ILC")~"Proportion",
                            str_detect(trait, "ILC[1-3]_LTi")~"Proportion",
                            str_detect(trait, "ILC1_")~"ILC1",
@@ -60,7 +60,7 @@ plotdf <- trait_by_loci_500kb_window %>%
                            str_detect(trait, "ILC3_")~"ILC3",
                            str_detect(trait, "LTi_")~"LTi",
                            str_detect(trait, "topic")~"Topic",
-                           TRUE ~ "cycotkine"))
+                           TRUE ~ "cytokine"))
 
 bar_plot_df <- plotdf %>%
   count(group, polygenic = count > 1)
