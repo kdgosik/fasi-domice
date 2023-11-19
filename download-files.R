@@ -12,6 +12,17 @@ drive_download(as_id("1md2aNYx_XLE4r2mY7oncVfd5ZrqEnlCt"),
 
 drive_download(as_id("1h6IShEYfcKSy3boXd-eSyLlf9Lj0XEmI"), 
                path=paste0(data_dir, "allchannels/vars.csv"))
+
+
+# https://drive.google.com/file/d/18hjkwig-CYFzVmkmqqll8ujDNQEvqoCY/view?usp=drive_link
+drive_download(as_id("18hjkwig-CYFzVmkmqqll8ujDNQEvqoCY"), 
+               path=paste0(data_dir, "allchannels/obs.csv"))
+
+
+
+
+
+
 # 
 drive_download(as_id("1B7DT53luVwd2wJXxJqnKPVD7go8gn1RZ"), 
                path=paste0(data_dir, "manuscript-plot-data.csv.gz"))
@@ -188,6 +199,24 @@ drive_download(as_id("1R4IAU1zCiSSWwOI11ivg2CaNHp1Vox85"),
                overwrite = TRUE)
 
 
+# GM_geno.rdata 1mRIV9KYsPvGTR5hZAg5zyDzrnA4N3PYL
+drive_download(as_id("1mRIV9KYsPvGTR5hZAg5zyDzrnA4N3PYL"), 
+               path=paste0(data_dir, "genotype/GM_geno.rdata"),
+               overwrite = TRUE)
+
+# alleleprobs.Rdata  1VYk5rr9j04TKTfx8aG0NR6ZBshYAWj-D
+drive_download(as_id("1VYk5rr9j04TKTfx8aG0NR6ZBshYAWj-D"), 
+               path=paste0(data_dir, "genotype/alleleprobs.Rdata"),
+               overwrite = TRUE)
+
+
+# Regev_genoprobs_20171221.rds -  1NPnWooZC_p5HOaX9LM8x_QWv6ROSsSrB
+drive_download(as_id("1NPnWooZC_p5HOaX9LM8x_QWv6ROSsSrB"), 
+               path=paste0(data_dir, "genotype/Regev_genoprobs_20171221.rds"),
+               overwrite = TRUE)
+
+
+
 
 ## founders data ######
 # paste0(data_dir, "founders1-louvain_labels-labels-transfer")
@@ -204,6 +233,8 @@ drive_download(as_id("1LALaZ8IX7qIQJtJHKsZxhdbk-iOMrEsj"),
 drive_download(as_id("14Lv8RkSuAD3du9o9Xcb4YxNFScyLZEBu"), 
                path=paste0(data_dir, "founders2-louvain_labels-labels-transfer/X.csv"),
                overwrite = TRUE)
+
+
 
 
 
