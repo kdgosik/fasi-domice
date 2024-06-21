@@ -66,7 +66,7 @@ ilc1 <- vars %>%
 ilc2_egenes <- vars %>% filter(ilc2_egenes_cv == 1) %>% pull(index)
 
 # reading in LOD scores
-ilc2_lods <- fread(paste0(project_path, "results/qtl-plot-lods-ILC2-cv.csv.gz"), data.table = FALSE) 
+ilc2_lods <- fread(paste0(results_dir, "eqtl/qtl-plot-lods-ILC2-cv.csv.gz"), data.table = FALSE) 
 
 # Counting number of QTLs per eGene
 ilc2_polygenic <- ilc2_lods %>% 
@@ -105,7 +105,7 @@ ilc2 <- vars %>%
 ilc3_egenes <- vars %>% filter(ilc3_egenes_cv == 1) %>% pull(index)
 
 # reading in LOD scores
-ilc3_lods <- fread(paste0(project_path, "results/qtl-plot-lods-NCR1+ ILC3-cv.csv.gz"), data.table = FALSE) 
+ilc3_lods <- fread(paste0(results_dir, "eqtl/qtl-plot-lods-NCR1\\+\\ ILC3-cv.csv.gz"), data.table = FALSE) 
 
 # Counting number of QTLs per eGene
 ilc3_polygenic <- ilc3_lods %>% 
@@ -145,7 +145,7 @@ ilc3 <- vars %>%
 lti_egenes <- vars %>% filter(lti_egenes_cv == 1) %>% pull(index)
 
 # reading in LOD scores
-lti_lods <- fread(paste0(project_path, "results/qtl-plot-lods-Lti ILC3-cv.csv.gz"), data.table = FALSE) 
+lti_lods <- fread(paste0(results_dir, "eqtl/qtl-plot-lods-Lti ILC3-cv.csv.gz"), data.table = FALSE) 
 
 # Counting number of QTLs per eGene
 lti_polygenic <- lti_lods %>% 

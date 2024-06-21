@@ -264,6 +264,11 @@ drive_download(as_id("1OFYUHwgniE-AnuHABP8v7Glif6iO33e_"),
 
 
 
+# trait_by_loci_no_window.csv
+drive_download(as_id("1nN7nkDeBM_SIX51jYS82ioFWAZCQy6SL"), 
+               path=paste0(results_dir, "trait_by_loci_no_window.csv"),
+               overwrite = TRUE)
+
 # trait_by_loci_10kb_window.csv
 drive_download(as_id("1bn4LbBI613GgDhNvEIFMZqR69D_0Opuw"), 
                path=paste0(results_dir, "trait_by_loci_10kb_window.csv"),
