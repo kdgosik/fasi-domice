@@ -49,7 +49,7 @@ trait_by_loci_50kb_window %>%
 
 
 
-outdf <- trait_by_loci_no_window %>% 
+outdf <- trait_by_loci_50kb_window %>% 
   replace_na(list(ilc1_expressed=0, ilc2_expressed=0, ilc3_expressed=0, lti_expressed=0)) %>% 
   mutate(ilc_expressed = as.numeric(ilc1_expressed+ilc2_expressed+ilc3_expressed+lti_expressed > 0))  %>%
   separate("trait", c("cell_type", "gene"), remove=FALSE) %>% 
