@@ -28,8 +28,8 @@ col_fun(seq(-3, 3))
 
 
 ## read data #########################
-vars <- fread(paste0(data_path, "vars.csv"))
-ccre <- fread(paste0(data_path, "references/GM_SNPS_Consequence_cCRE.csv"))
+vars <- fread(paste0(data_dir, "vars.csv"))
+ccre <- fread(paste0(data_dir, "references/GM_SNPS_Consequence_cCRE.csv"))
 
 
 # ## Notes:
