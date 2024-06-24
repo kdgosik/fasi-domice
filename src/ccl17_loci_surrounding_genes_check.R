@@ -59,3 +59,33 @@ vars %>%
   dplyr::select(index, ilc1_expressed, ilc2_expressed, ilc3_expressed, lti_expressed)
 
 
+
+
+### Muc2 (ENSMUSG00000025515)
+## Chromosome 7: 141,690,340-141,754,693 forward strand.
+start_irange <- 141000000
+end_irange <- 142000000
+chr_str <- "chr7"
+chr_num <- "7"
+gen <- "mm10"
+
+
+vars %>% 
+  filter(chr == chr_num, start > start_irange, end < end_irange)  %>% 
+  dplyr::select(index, ilc1_expressed, ilc2_expressed, ilc3_expressed, lti_expressed)
+
+
+
+## cis-eQTL for all major lineages
+## Washc2 (Fam21) Chr6:116208038-116262686  ENSMUSG00000024104 
+start_irange <- 116000000
+end_irange <- 117000000
+chr_str <- "chr6"
+chr_num <- "6"
+gen <- "mm10"
+
+vars %>% 
+  filter(chr == chr_num, start > start_irange, end < end_irange)  %>% 
+  dplyr::select(index, ilc1_expressed, ilc2_expressed, ilc3_expressed, lti_expressed)
+
+
