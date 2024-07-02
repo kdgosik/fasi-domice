@@ -14,7 +14,7 @@ RUN wget -qO- https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc |
     add-apt-repository "deb https://cloud.r-project.org/bin/linux/ubuntu $(lsb_release -cs)-cran40/"
 
 RUN apt-get update && \
-    apt-get install -y gdebi-core r-base s3fs lftp graphviz graphviz-dev
+    apt-get install -y gdebi-core r-base r-base-dev s3fs lftp graphviz graphviz-dev
 
 # Install RStudio
 RUN wget https://download2.rstudio.org/server/bionic/amd64/rstudio-server-2022.07.2-576-amd64.deb
@@ -22,16 +22,17 @@ RUN gdebi -n rstudio-server-2022.07.2-576-amd64.deb
 RUN rm -rf rstudio-server-2022.07.2-576-amd64.deb
 
 # Base R packages
-RUN R -e 'install.packages("tidyverse")'
+RUN R -e 'install.packages(c("tidyverse", "BiocManager"))'
 RUN R -e 'install.packages(c("languageserver", "shiny", "reticulate", "remotes", "kableExtra", "ggrepel"))'
+RUN R -e 'BiocManager::install("rtracklayer")'
 
 # Reset gitpod user credentials (for Rstudio login)
 RUN echo "gitpod:gitpod" | chpasswd
 USER gitpod
 
-## Configure RStudio to start from the comp-bio directory
-RUN echo "session-default-working-dir=/workspace/comp-bio" | sudo tee -a /etc/rstudio/rsession.conf && \
-    echo "session-default-new-project-dir=/workspace/comp-bio" | sudo tee -a /etc/rstudio/rsession.conf
+## Configure RStudio to start from the fasi-domice directory
+RUN echo "session-default-working-dir=/workspace/fasi-domice" | sudo tee -a /etc/rstudio/rsession.conf && \
+    echo "session-default-new-project-dir=/workspace/fasi-domice" | sudo tee -a /etc/rstudio/rsession.conf
 
 # Base Python packages
 RUN pip install --no-cache-dir \
