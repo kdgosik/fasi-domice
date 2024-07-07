@@ -193,9 +193,9 @@ ilc2_eqtl_loci_by_gene <- ilc2_eqtl %>%
   ungroup() %>%
   mutate(cis_effect = as.numeric(marker_chr == gene_chr & 
                                    {marker_pos > (gene_start - 1e6) & marker_pos < (gene_end + 1e6)})) %>%
-  mutate(value_adj = ifelse(cis_effect==1, value + 6, value)) %>%
-  filter(value_adj > 10,
+  mutate(value_adj = ifelse(cis_effect==1, value + 6, value),
          strand = "+") %>%
+  filter(value_adj > 10) %>%
   dplyr::select(marker, gene, value, marker_chr, pos, 
                 id, gene_chr, gene_start, gene_end, cis_effect, value_adj) %>%
   mutate(gene = paste0("ILC2_", gene))
@@ -307,9 +307,9 @@ ilc3_eqtl_loci_by_gene <- ilc3_eqtl %>%
   ungroup() %>%
   mutate(cis_effect = as.numeric(marker_chr == gene_chr & 
                                    {marker_pos > (gene_start - 1e6) & marker_pos < (gene_end + 1e6)})) %>%
-  mutate(value_adj = ifelse(cis_effect==1, value + 6, value)) %>%
-  filter(value_adj > 10,
+  mutate(value_adj = ifelse(cis_effect==1, value + 6, value),
          strand = "+") %>%
+  filter(value_adj > 10) %>%
   dplyr::select(marker, gene, value, marker_chr, pos, 
                 id, gene_chr, gene_start, gene_end, cis_effect, value_adj) %>%
   mutate(gene = paste0("ILC3_", gene))
@@ -420,9 +420,9 @@ lti_eqtl_loci_by_gene <- lti_eqtl %>%
   ungroup() %>%
   mutate(cis_effect = as.numeric(marker_chr == gene_chr & 
                                    {marker_pos > (gene_start - 1e6) & marker_pos < (gene_end + 1e6)})) %>%
-  mutate(value_adj = ifelse(cis_effect==1, value + 6, value)) %>%
-  filter(value_adj > 10,
+  mutate(value_adj = ifelse(cis_effect==1, value + 6, value),
          strand = "+") %>%
+  filter(value_adj > 10) %>%
   dplyr::select(marker, gene, value, marker_chr, pos, 
                 id, gene_chr, gene_start, gene_end, cis_effect, value_adj) %>%
   mutate(gene = paste0("LTi_", gene))
@@ -933,7 +933,7 @@ write.csv(topic_polygeneicdf, paste0(results_dir, "topics/qtl-loci-by-gene-topic
 
 
 
-## cytokine qtl counts
+## cytokine qtl counts ####
 
 cytokines <- fread(paste0(results_dir,"cytokines/qtl-cytokines-steady-lods.csv.gz"), 
                    data.table = FALSE) %>%
@@ -1107,3 +1107,61 @@ list(ilc1_eqtl = ilc1_eqtl_loci_by_gene %>%
 
 
 
+
+
+## TODO: DELETE #####
+
+tmpdf <- ilc1_eqtl_loci_by_gene %>% 
+  pivot_wider(id_cols = marker, 
+              names_from = gene, 
+              values_from = value_adj, 
+              values_fn = max) %>%
+  full_join({
+    ilc2_eqtl_loci_by_gene %>%
+      pivot_wider(id_cols = marker, 
+                names_from = gene, 
+                values_from = value_adj, 
+                values_fn = max)
+  }) %>%
+  full_join({
+    ilc3_eqtl_loci_by_gene %>% 
+      pivot_wider(id_cols = marker, 
+                names_from = gene, 
+                values_from = value_adj, 
+                values_fn = max)
+    }) %>%
+  full_join({
+    lti_eqtl_loci_by_gene %>% 
+      pivot_wider(id_cols = marker, 
+                names_from = gene, 
+                values_from = value_adj, 
+                values_fn = max)
+    }) %>%
+  full_join(cytokines)
+
+
+
+sumdf <- ilc1_eqtl_loci_by_gene %>% 
+  group_by(marker) %>% 
+  summarise(ILC1 = n_distinct(gene)) %>%
+  full_join({
+    ilc2_eqtl_loci_by_gene %>% 
+      group_by(marker) %>% 
+      summarise(ILC2 = n_distinct(gene))
+  }) %>%
+  full_join({
+    ilc3_eqtl_loci_by_gene %>% 
+      group_by(marker) %>% 
+      summarise(ILC3 = n_distinct(gene))
+  }) %>%
+  full_join({
+    lti_eqtl_loci_by_gene %>% 
+      group_by(marker) %>% 
+      summarise(LTi = n_distinct(gene))
+  }) %>%
+  full_join({
+    cytokines %>% 
+      group_by(marker) %>% 
+      summarise(cytokines = n_distinct(trait))
+  }) %>%
+  left_join(dplyr::select(ccre, marker, chr, pos))

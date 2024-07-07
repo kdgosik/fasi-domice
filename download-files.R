@@ -60,7 +60,7 @@ drive_download(as_id("1KpsZg4TzAyufVMxXitjAi4OmYhjiptDn"),
 
 
 # qtl-plot-lods-ILC2-cv.csv.gz
-drive_download(as_id("1muSHQ_5UlHz6KexUR4ZL-Zaup6tjUrNh"), 
+drive_download(as_id("1jwea1SSyrrl3bj2CzfUSwWny87pFY3oH"), 
                path=paste0(results_dir, "eqtl/qtl-plot-lods-ILC2-cv.csv.gz"),
                overwrite = TRUE)
 
@@ -90,7 +90,7 @@ drive_download(as_id("15Yx9U3HiXWCYdk12aPUevvd7jkxm04ZC"),
                overwrite = TRUE)
 
 
-drive_download(as_id("1muSHQ_5UlHz6KexUR4ZL-Zaup6tjUrNh"), 
+drive_download(as_id("1F4o0IWLpOXPO9LSxTt6H5oIjKat-mkHk"), 
                path=paste0(results_dir, "eqtl/qtl-plot-lods-Lti ILC3-cv.csv.gz"),
                overwrite = TRUE)
 
