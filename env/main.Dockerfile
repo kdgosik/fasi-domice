@@ -24,7 +24,7 @@ RUN rm -rf rstudio-server-2022.07.2-576-amd64.deb
 # Base R packages
 RUN R -e 'install.packages(c("tidyverse", "BiocManager"))'
 RUN R -e 'install.packages(c("languageserver", "shiny", "reticulate", "remotes", "kableExtra", "ggrepel"))'
-RUN R -e 'BiocManager::install("rtracklayer")'
+RUN R -e 'BiocManager::install(c("rtracklayer", "Gviz","TxDb.Mmusculus.UCSC.mm10.knownGene","GenomicRanges","GenomicFeatures","BSgenome.Mmusculus.UCSC.mm10"))'
 
 # Reset gitpod user credentials (for Rstudio login)
 RUN echo "gitpod:gitpod" | chpasswd

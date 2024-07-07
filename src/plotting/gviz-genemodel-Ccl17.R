@@ -32,11 +32,16 @@ ccre <- fread(paste0(my_path, "data/references/GM_SNPS_Consequence_cCRE.csv"), d
 # ilc3 <- fread(paste0(my_path, "results/eqtl/qtl-plot-lods-NCR1+ ILC3-cv.csv.gz"), data.table = FALSE)
 
 ## Frmd4b, Cd48
-ilc3 <- fread(paste0(my_path, "data/eqtl/qtl-lods-NCR1+\ ILC3-cv.csv.gz"),
-              select = c("marker", "Frmd4b", "Cd48"),
+ilc2 <- fread(paste0(data_dir, "eqtl/qtl-lods-ILC2-cv.csv.gz"),
+              select = c("marker", "Dap3", "Myl12b"),
               data.table = FALSE)
 
-ccre <- ccre %>% left_join(ilc3)
+## Frmd4b, Cd48
+# ilc3 <- fread(paste0(data_dir, "eqtl/qtl-lods-NCR1+\ ILC3-cv.csv.gz"),
+#               select = c("marker", "Frmd4b", "Cd48"),
+#               data.table = FALSE)
+
+ccre <- ccre %>% left_join(ilc2)
 
 ilc3_gwas <- fread(paste0(my_path, "results/proportions/ILC3_stressed_vs_non_qtl.csv.gz"))
 

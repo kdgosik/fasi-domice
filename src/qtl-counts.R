@@ -1111,33 +1111,37 @@ list(ilc1_eqtl = ilc1_eqtl_loci_by_gene %>%
 
 ## TODO: DELETE #####
 
-tmpdf <- ilc1_eqtl_loci_by_gene %>% 
-  pivot_wider(id_cols = marker, 
-              names_from = gene, 
-              values_from = value_adj, 
-              values_fn = max) %>%
-  full_join({
+tmpdf <- ccre %>%
+  dplyr::select(marker, chr, pos, ensembl_gene) %>%
+  left_join({
+    ilc1_eqtl_loci_by_gene %>% 
+      pivot_wider(id_cols = marker, 
+                names_from = gene, 
+                values_from = value_adj, 
+                values_fn = max) 
+    }) %>%
+  left_join({
     ilc2_eqtl_loci_by_gene %>%
       pivot_wider(id_cols = marker, 
                 names_from = gene, 
                 values_from = value_adj, 
                 values_fn = max)
   }) %>%
-  full_join({
+  left_join({
     ilc3_eqtl_loci_by_gene %>% 
       pivot_wider(id_cols = marker, 
                 names_from = gene, 
                 values_from = value_adj, 
                 values_fn = max)
     }) %>%
-  full_join({
+  left_join({
     lti_eqtl_loci_by_gene %>% 
       pivot_wider(id_cols = marker, 
                 names_from = gene, 
                 values_from = value_adj, 
                 values_fn = max)
     }) %>%
-  full_join(cytokines)
+  left_join(dplyr::select(cytokines, marker, trait, value))
 
 
 
