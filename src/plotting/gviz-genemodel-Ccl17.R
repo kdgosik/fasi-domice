@@ -31,9 +31,9 @@ ccre <- fread(paste0(my_path, "data/references/GM_SNPS_Consequence_cCRE.csv"), d
 ## check results
 # ilc3 <- fread(paste0(my_path, "results/eqtl/qtl-plot-lods-NCR1+ ILC3-cv.csv.gz"), data.table = FALSE)
 
-## Frmd4b, Cd48
+## Dap3, Myl12b, Tmsb4x
 ilc2 <- fread(paste0(data_dir, "eqtl/qtl-lods-ILC2-cv.csv.gz"),
-              select = c("marker", "Dap3", "Myl12b"),
+              select = c("marker", "Dap3", "Myl12b", "Tmsb4x"),
               data.table = FALSE)
 
 ## Frmd4b, Cd48
@@ -43,7 +43,7 @@ ilc2 <- fread(paste0(data_dir, "eqtl/qtl-lods-ILC2-cv.csv.gz"),
 
 ccre <- ccre %>% left_join(ilc2)
 
-ilc3_gwas <- fread(paste0(my_path, "results/proportions/ILC3_stressed_vs_non_qtl.csv.gz"))
+# ilc3_gwas <- fread(paste0(my_path, "results/proportions/ILC3_stressed_vs_non_qtl.csv.gz"))
 
 
 # ilc2_ilc3_gwas <- fread(paste0(my_path, 'results/gwas-ilc2-ilc3-results.csv.gz'))
@@ -109,59 +109,108 @@ ccre_atrack <- AnnotationTrack(start = start_ccre,
 
 
 
-start_ilc3_gwas <- end_ilc3_gwas <- ilc3_gwas %>%
+# start_ilc3_gwas <- end_ilc3_gwas <- ilc3_gwas %>%
+#   arrange(pos) %>%
+#   filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %>% pull(pos)
+# 
+# data_ilc3_gwas <- ilc3_gwas %>%
+#   arrange(pos) %>%
+#   filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %>% pull(lods)/12
+# 
+# ilc3_dtrack <- DataTrack(data = data_ilc3_gwas, 
+#                         start = start_ilc3_gwas,
+#                         end = end_ilc3_gwas+1, 
+#                         chromosome = chr_num, 
+#                         genome = gen,
+#                         name = "ILC3 Activated")
+
+
+
+# start_Frmd4b <- end_Frmd4b <- ccre %>%
+#   arrange(pos) %>%
+#   filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(Frmd4b)) %>% pull(pos)
+# 
+# data_Frmd4b <- ccre %>%
+#   arrange(pos) %>%
+#   filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(Frmd4b)) %>% pull(Frmd4b)
+# 
+# Frmd4b_dtrack <- DataTrack(data = data_Frmd4b, 
+#                            start = start_Frmd4b,
+#                            end = end_Frmd4b+1, 
+#                            chromosome = chr_num, 
+#                            genome = gen,
+#                            name = "Frmd4b")
+# 
+# 
+# start_Cd48 <- end_Cd48 <- ccre %>%
+#   arrange(pos) %>%
+#   filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(Cd48)) %>% pull(pos)
+# 
+# data_Cd48 <- ccre %>%
+#   arrange(pos) %>%
+#   filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(Cd48)) %>% pull(Cd48)
+# 
+# Cd48_dtrack <- DataTrack(data = data_Cd48, 
+#                            start = start_Cd48,
+#                            end = end_Cd48+1, 
+#                            chromosome = chr_num, 
+#                            genome = gen,
+#                            name = "Cd48")
+
+
+start_Dap3 <- end_Dap3 <- ccre %>%
   arrange(pos) %>%
-  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %>% pull(pos)
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(Dap3)) %>% pull(pos)
 
-data_ilc3_gwas <- ilc3_gwas %>%
+data_Dap3 <- ccre %>%
   arrange(pos) %>%
-  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(pos)) %>% pull(lods)/12
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(Dap3)) %>% pull(Dap3)
 
-ilc3_dtrack <- DataTrack(data = data_ilc3_gwas, 
-                        start = start_ilc3_gwas,
-                        end = end_ilc3_gwas+1, 
-                        chromosome = chr_num, 
-                        genome = gen,
-                        name = "ILC3 Activated")
+Dap3_dtrack <- DataTrack(data = data_Dap3, 
+                         start = start_Dap3,
+                         end = end_Dap3+1, 
+                         chromosome = chr_num, 
+                         genome = gen,
+                         name = "Dap3")
 
-
-
-start_Frmd4b <- end_Frmd4b <- ccre %>%
+# Myl12b
+start_Myl12b <- end_Myl12b <- ccre %>%
   arrange(pos) %>%
-  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(Frmd4b)) %>% pull(pos)
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(Myl12b)) %>% pull(pos)
 
-data_Frmd4b <- ccre %>%
+data_Myl12b <- ccre %>%
   arrange(pos) %>%
-  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(Frmd4b)) %>% pull(Frmd4b)
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(Myl12b)) %>% pull(Myl12b)
 
-Frmd4b_dtrack <- DataTrack(data = data_Frmd4b, 
-                           start = start_Frmd4b,
-                           end = end_Frmd4b+1, 
+Myl12b_dtrack <- DataTrack(data = data_Myl12b, 
+                         start = start_Myl12b,
+                         end = end_Myl12b+1, 
+                         chromosome = chr_num, 
+                         genome = gen,
+                         name = "Myl12b")
+
+
+# Tmsb4x
+start_Tmsb4x <- end_Tmsb4x <- ccre %>%
+  arrange(pos) %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(Tmsb4x)) %>% pull(pos)
+
+data_Tmsb4x <- ccre %>%
+  arrange(pos) %>%
+  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(Tmsb4x)) %>% pull(Tmsb4x)
+
+Tmsb4x_dtrack <- DataTrack(data = data_Tmsb4x, 
+                           start = start_Tmsb4x,
+                           end = end_Myl12b+1, 
                            chromosome = chr_num, 
                            genome = gen,
-                           name = "Frmd4b")
+                           name = "Tmsb4x")
 
 
-start_Cd48 <- end_Cd48 <- ccre %>%
-  arrange(pos) %>%
-  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(Cd48)) %>% pull(pos)
-
-data_Cd48 <- ccre %>%
-  arrange(pos) %>%
-  filter(chr == chr_num, between(pos, start_irange, end_irange), !is.na(Cd48)) %>% pull(Cd48)
-
-Cd48_dtrack <- DataTrack(data = data_Cd48, 
-                           start = start_Cd48,
-                           end = end_Cd48+1, 
-                           chromosome = chr_num, 
-                           genome = gen,
-                           name = "Cd48")
-
-
-
+# 94811601
 ht <- HighlightTrack(trackList = list(grtrack, ccre_atrack,
-                                      ilc3_dtrack, Frmd4b_dtrack, Cd48_dtrack),
-                     start = 95530000-10000, end = 95530000+10000,
+                                      Dap3_dtrack, Myl12b_dtrack, Tmsb4x_dtrack),
+                     start = 94819451-10000, end = 94819451+10000,
                      chromosome = chr_num)
 
 
