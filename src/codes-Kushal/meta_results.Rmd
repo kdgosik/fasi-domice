@@ -1,0 +1,156 @@
+---
+title: "Meta-analyzed tau-star and enrichment"
+output: html_document
+date: "2023-08-13"
+---
+
+```{r}
+library(data.table)
+library(ggplot2)
+library(latex2exp)
+library(ggpattern)
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+tt1 = get(load("~/Documents/Mouse_DO/output/marginal_meta_taustar_Miao_DO.rda"))
+tt2 = get(load("~/Documents/Mouse_DO/output/marginal_meta_taustar_Miao_DO_eQTL.rda"))
+```
+
+```{r}
+merged_df = data.frame(tau = as.numeric(tt1$Autoimmune[-(17:21),1]),
+                       stau = as.numeric(tt1$Autoimmune[-(17:21),2]),
+                       type = factor(rep(c("eQTL.expressed", "eQTL", "eQTL.specexpressed", 
+                                            "eQTL.noexpressed", "eQTL_noexpressed.anyILC"), each = 4), 
+                                      levels = c("eQTL", "eQTL.expressed","eQTL.specexpressed", 
+                                            "eQTL.noexpressed", "eQTL_noexpressed.anyILC")),
+                       class = factor(rep(c("ILC1", "ILC2", "ILC3", "LTi"), 5), 
+                                      levels = c("ILC1", "ILC2", "ILC3", "LTi")))
+```
+
+## Tau* analysis
+
+```{r fig.width=9, fig.height=6, dev = c('png', 'pdf')}
+dodge <- position_dodge(width=0.9)
+p<-ggplot(merged_df, aes(type, y=tau, fill=class)) +
+  geom_col(position = "dodge2") +
+  geom_errorbar(
+    aes(ymin = tau-1.96*stau, ymax = tau+1.96*stau),
+    position = position_dodge2(width = 0.5, padding = 0.5)
+  ) + 
+  scale_fill_manual(values = c("darkorchid3", "darkorange1", "turquoise1", "darkgreen")) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 70, vjust=1, hjust=0.95, size = 15, face="bold")) + 
+  theme(axis.text.y = element_text(angle = 0, size = 15, face="bold")) +
+  theme(axis.title.x = element_text(size=15)) +
+  theme(axis.title.y = element_text(size=15)) +
+  geom_hline(yintercept = 0, linetype = "dashed") + 
+  ylab(TeX(r'($\tau^*$)')) +
+  ggtitle("S-LDSC tau* analysis")
+p
+```
+
+```{r}
+merged_df = data.frame(tau = as.numeric(tt1$BloodBio[-(17:21),1]),
+                       stau = as.numeric(tt1$BloodBio[-(17:21),2]),
+                       type = factor(rep(c("eQTL.expressed", "eQTL", "eQTL.specexpressed", 
+                                            "eQTL.noexpressed", "eQTL_noexpressed.anyILC"), each = 4), 
+                                      levels = c("eQTL", "eQTL.expressed","eQTL.specexpressed", 
+                                            "eQTL.noexpressed", "eQTL_noexpressed.anyILC")),
+                       class = factor(rep(c("ILC1", "ILC2", "ILC3", "LTi"), 5), 
+                                      levels = c("ILC1", "ILC2", "ILC3", "LTi")))
+```
+
+## Tau* analysis
+
+```{r fig.width=9, fig.height=6, dev = c('png', 'pdf')}
+dodge <- position_dodge(width=0.9)
+p<-ggplot(merged_df, aes(type, y=tau, fill=class)) +
+  geom_col(position = "dodge2") +
+  geom_errorbar(
+    aes(ymin = tau-1.96*stau, ymax = tau+1.96*stau),
+    position = position_dodge2(width = 0.5, padding = 0.5)
+  ) + 
+  scale_fill_manual(values = c("darkorchid3", "darkorange1", "turquoise1", "darkgreen")) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 70, vjust=1, hjust=0.95, size = 15, face="bold")) + 
+  theme(axis.text.y = element_text(angle = 0, size = 15, face="bold")) +
+  theme(axis.title.x = element_text(size=15)) +
+  theme(axis.title.y = element_text(size=15)) +
+  geom_hline(yintercept = 0, linetype = "dashed") + 
+  ylab(TeX(r'($\tau^*$)')) +
+  ggtitle("S-LDSC tau* analysis")
+p
+```
+
+## Enrichment analysis
+
+```{r}
+tt1 = get(load("~/Documents/Mouse_DO/output/marginal_meta_enrichment_Miao_DO.rda"))
+tt2 = get(load("~/Documents/Mouse_DO/output/marginal_meta_enrichment_Miao_DO_eQTL.rda"))
+```
+
+```{r}
+merged_df = data.frame(tau = as.numeric(tt1$Autoimmune[-(17:21),1]),
+                       stau = as.numeric(tt1$Autoimmune[-(17:21),2]),
+                       type = factor(rep(c("eQTL.expressed", "eQTL", "eQTL.specexpressed", 
+                                            "eQTL.noexpressed", "eQTL_noexpressed.anyILC"), each = 4), 
+                                      levels = c("eQTL", "eQTL.expressed","eQTL.specexpressed", 
+                                            "eQTL.noexpressed", "eQTL_noexpressed.anyILC")),
+                       class = factor(rep(c("ILC1", "ILC2", "ILC3", "LTi"), 5), 
+                                      levels = c("ILC1", "ILC2", "ILC3", "LTi")))
+```
+
+```{r fig.width=9, fig.height=6, dev = c('png', 'pdf')}
+dodge <- position_dodge(width=0.9)
+p<-ggplot(merged_df, aes(type, y=tau, fill=class)) +
+  geom_col(position = "dodge2") +
+  geom_errorbar(
+    aes(ymin = tau-1.96*stau, ymax = tau+1.96*stau),
+    position = position_dodge2(width = 0.5, padding = 0.5)
+  ) + 
+  scale_fill_manual(values = c("darkorchid3", "darkorange1", "turquoise1", "darkgreen")) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 70, vjust=1, hjust=0.95, size = 15, face="bold")) + 
+  theme(axis.text.y = element_text(angle = 0, size = 15, face="bold")) +
+  theme(axis.title.x = element_text(size=15)) +
+  theme(axis.title.y = element_text(size=15)) +
+  geom_hline(yintercept = 1, linetype = "dashed") + 
+  ylab('Enrichment') +
+  ggtitle("S-LDSC enrichment analysis")
+p
+```
+
+```{r}
+merged_df = data.frame(tau = as.numeric(tt1$BloodBio[-(17:21),1]),
+                       stau = as.numeric(tt1$BloodBio[-(17:21),2]),
+                       type = factor(rep(c("eQTL.expressed", "eQTL", "eQTL.specexpressed", 
+                                            "eQTL.noexpressed", "eQTL_noexpressed.anyILC"), each = 4), 
+                                      levels = c("eQTL", "eQTL.expressed","eQTL.specexpressed", 
+                                            "eQTL.noexpressed", "eQTL_noexpressed.anyILC")),
+                       class = factor(rep(c("ILC1", "ILC2", "ILC3", "LTi"), 5), 
+                                      levels = c("ILC1", "ILC2", "ILC3", "LTi")))
+```
+
+```{r fig.width=9, fig.height=6, dev = c('png', 'pdf')}
+dodge <- position_dodge(width=0.9)
+p<-ggplot(merged_df, aes(type, y=tau, fill=class)) +
+  geom_col(position = "dodge2") +
+  geom_errorbar(
+    aes(ymin = tau-1.96*stau, ymax = tau+1.96*stau),
+    position = position_dodge2(width = 0.5, padding = 0.5)
+  ) + 
+  scale_fill_manual(values = c("darkorchid3", "darkorange1", "turquoise1", "darkgreen")) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 70, vjust=1, hjust=0.95, size = 15, face="bold")) + 
+  theme(axis.text.y = element_text(angle = 0, size = 15, face="bold")) +
+  theme(axis.title.x = element_text(size=15)) +
+  theme(axis.title.y = element_text(size=15)) +
+  geom_hline(yintercept = 1, linetype = "dashed") + 
+  ylab('Enrichment') +
+  ggtitle("S-LDSC enrichment analysis")
+p
+```

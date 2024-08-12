@@ -91,7 +91,7 @@ my_plot <- function( data, column, embedding = "tsne" ) {
                           color = column)) +
     geom_point(shape = 46) + 
     # my_theme_nolegened + 
-    scale_color_gradient(low="lightgrey", high="darkgreen") +
+    scale_color_gradient(low="lightgrey", high="darkblue") +
     labs(title = column)
   
 }

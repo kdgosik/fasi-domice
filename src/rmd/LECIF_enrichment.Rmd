@@ -1,0 +1,51 @@
+---
+title: "LECIF enrichment results"
+output: html_document
+date: "2023-08-13"
+---
+
+```{r}
+library(data.table)
+library(ggplot2)
+library(latex2exp)
+library(ggpattern)
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+tt = get(load("~/Documents/Mouse_DO/output/LECIF_enrichment_all.rda"))
+tt
+```
+
+```{r}
+merged_df = data.frame(tau = as.numeric(tt$LECIF.Enrich[-5, ]),
+                       stau = as.numeric(tt$LECIF.Enrich.sd[-5, ]),
+                       class = factor(rep(colnames(tt$LECIF.Enrich), each = nrow(tt$LECIF.Enrich)-1), levels = colnames(tt$LECIF.Enrich)),
+                       type = factor(rep(rownames(tt$LECIF.Enrich)[-5], ncol(tt$LECIF.Enrich)), levels = rownames(tt$LECIF.Enrich)[-5]))
+```
+
+## Enrichment
+
+```{r fig.width=9, fig.height=6, dev = c('png', 'pdf')}
+dodge <- position_dodge(width=0.9)
+p<-ggplot(merged_df, aes(type, y=tau, fill=class)) +
+  geom_col(position = "dodge2") +
+  geom_errorbar(
+    aes(ymin = tau-1.96*stau, ymax = tau+1.96*stau),
+    position = position_dodge2(width = 0.5, padding = 0.5)
+  ) + 
+  scale_fill_manual(values = c("darkorchid3", "darkorange1", "turquoise1", "darkgreen")) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 70, vjust=1, hjust=0.95, size = 15, face="bold")) + 
+  theme(axis.text.y = element_text(angle = 0, size = 15, face="bold")) +
+  theme(axis.title.x = element_text(size=15)) +
+  theme(axis.title.y = element_text(size=15)) +
+  geom_hline(yintercept = 1, linetype = "dashed") + 
+  ylab('Enrichment') 
+p
+```

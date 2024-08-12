@@ -218,6 +218,28 @@ drive_download(as_id("1NPnWooZC_p5HOaX9LM8x_QWv6ROSsSrB"),
 
 
 
+## phenotype files ######
+
+# 3_immune_phenotype_data_four_batches_v2.xlsx
+drive_download(as_id("1tcH3xQKI2oDXyFJa39hYZqCUwNq8Gofk"), 
+               path=paste0(data_dir, "phenotype/3_immune_phenotype_data_four_batches_v2.xlsx"),
+               overwrite = TRUE)
+
+
+# phenotype_data_batch1_2_v1.csv
+drive_download(as_id("1v6naph8y1FtQwPF1gNQ7_O-Tb1qqFR6Q"), 
+               path=paste0(data_dir, "phenotype/phenotype_data_batch1_2_v1.csv"),
+               overwrite = TRUE)
+
+
+# phenotype_data_four_batches_v1.xlsx
+drive_download(as_id("1I6pHL-ImsPZswQtsbFdYihHN3jswG---"), 
+               path=paste0(data_dir, "phenotype/phenotype_data_four_batches_v1.xlsx"),
+               overwrite = TRUE)
+
+
+
+
 ## founders data ######
 # paste0(data_dir, "founders1-louvain_labels-labels-transfer")
 # X.csv
@@ -285,4 +307,6 @@ drive_download(as_id("1Kol5vTqNqQBSlUJKFXshZGLXlThxXL8B"),
 drive_download(as_id("176ldRbzb3vOON_eUjE3CkVG5VBof1eNS"), 
                path=paste0(results_dir, "trait_by_loci_500kb_window.csv"),
                overwrite = TRUE)
+
+
 

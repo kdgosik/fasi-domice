@@ -1,0 +1,323 @@
+---
+title: "Mouse DO sclinker analysis"
+output: html_document
+date: "2023-08-09"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Placenta
+
+```{r}
+library(data.table)
+library(ggplot2)
+library(latex2exp)
+source("~/Documents/ENCODE4AWG/workflow/scripts/DistalReg/get_Escores.R")
+```
+
+## Data preprocessing
+
+### Miao DO
+
+```{r}
+LDSC_proc_results = get(load("~/Documents/Mouse_DO/output/sclinker_2023_Miao_DO_hg38_baselineEpi.rda"))
+dim(LDSC_proc_results)
+dimnames(LDSC_proc_results)[[1]]
+dimnames(LDSC_proc_results)[[3]]
+dimnames(LDSC_proc_results)[[2]]
+```
+
+## Enrichment scores
+
+```{r}
+EEmat = get_Escore(LDSC_proc_results, "ABC_Road_GI_ALL", flag=0)
+EE1 = EEmat$Escore
+pEE1 = EEmat$pEscore
+EE1[EE1 < 1] = 1
+colnames(pEE1) = colnames(EE1)
+WW1 = EE1
+pWW1 = pEE1
+```
+
+```{r fig.height = 12, fig.width = 12, dev = c('png', 'pdf'), dpi=800}
+tabb = data.frame("Escore" = as.numeric(EE1),
+                  "neglogpval" = as.numeric(-log(pEE1, base=10)),
+                  "celltypes" = rep(rownames(EE1), ncol(EE1)),
+                  "trait" = rep(colnames(EE1), each=nrow(EE1)))
+tabb$celltypes = factor(tabb$celltypes, levels = rownames(EE1))
+tabb$trait = factor(tabb$trait, levels = colnames(EE1))
+tabb$neglogpval[tabb$neglogpval > 10] = 10
+tabb$Escore[tabb$Escore < 1] = 1
+tabb$Escore[tabb$Escore > 5] = 5
+tabb$issig = "sig"
+tabb$issig[which(tabb$neglogpval < -log(0.05, base=10))] = "nonsig"
+tabb$issig = factor(tabb$issig, levels = c("nonsig", "sig"))
+
+require(ggplot2)
+  ggplot(tabb, aes(y = celltypes,
+             x = trait)) +        ## global aes
+  geom_point(aes(fill = neglogpval, 
+                 colour = neglogpval,
+                 shape = issig,
+                 size = Escore))  +    ## geom_point for circle illusion
+  scale_fill_gradient(low = "white",  
+                       high = "red")+       ## color of the corresponding aes
+  scale_color_gradient(low = "white",  
+                       high = "red")+
+  scale_shape_manual(values = c(1, 19)) + 
+  scale_size(range = c(0, 8), name='Escore', limits=c(1, 5))+             ## to tune the size of circles
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 70, vjust=1, hjust=1, size = 10, face="bold")) + 
+  theme(axis.text.y = element_text(angle = 0, size = 10, face="bold")) 
+  
+```
+
+
+
+```{r}
+EEmat = get_Escore(LDSC_proc_results, "ABC_Road_GI_BLD", flag=0)
+EE1 = EEmat$Escore
+pEE1 = EEmat$pEscore
+EE1[EE1 < 1] = 1
+colnames(pEE1) = colnames(EE1)
+WW1 = EE1
+pWW1 = pEE1
+```
+
+```{r fig.height = 12, fig.width = 12, dev = c('png', 'pdf'), dpi=800}
+tabb = data.frame("Escore" = as.numeric(EE1),
+                  "neglogpval" = as.numeric(-log(pEE1, base=10)),
+                  "celltypes" = rep(rownames(EE1), ncol(EE1)),
+                  "trait" = rep(colnames(EE1), each=nrow(EE1)))
+tabb$celltypes = factor(tabb$celltypes, levels = rownames(EE1))
+tabb$trait = factor(tabb$trait, levels = colnames(EE1))
+tabb$neglogpval[tabb$neglogpval > 10] = 10
+tabb$Escore[tabb$Escore < 1] = 1
+tabb$Escore[tabb$Escore > 5] = 5
+tabb$issig = "sig"
+tabb$issig[which(tabb$neglogpval < -log(0.05, base=10))] = "nonsig"
+tabb$issig = factor(tabb$issig, levels = c("nonsig", "sig"))
+
+require(ggplot2)
+  ggplot(tabb, aes(y = celltypes,
+             x = trait)) +        ## global aes
+  geom_point(aes(fill = neglogpval, 
+                 colour = neglogpval,
+                 shape = issig,
+                 size = Escore))  +    ## geom_point for circle illusion
+  scale_fill_gradient(low = "white",  
+                       high = "red")+       ## color of the corresponding aes
+  scale_color_gradient(low = "white",  
+                       high = "red")+
+  scale_shape_manual(values = c(1, 19)) + 
+  scale_size(range = c(0, 8), name='Escore', limits=c(1, 5))+             ## to tune the size of circles
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 70, vjust=1, hjust=1, size = 10, face="bold")) + 
+  theme(axis.text.y = element_text(angle = 0, size = 10, face="bold")) 
+  
+```
+
+
+
+### Miao DO eQTL
+
+```{r}
+LDSC_proc_results = get(load("~/Documents/Mouse_DO/output/sclinker_2023_Miao_DO_eQTL_hg38_baselineEpi.rda"))
+dim(LDSC_proc_results)
+dimnames(LDSC_proc_results)[[1]]
+dimnames(LDSC_proc_results)[[3]]
+dimnames(LDSC_proc_results)[[2]]
+```
+
+```{r}
+EEmat = get_Escore(LDSC_proc_results, "ABC_Road_GI_ALL", flag=0)
+EE1 = EEmat$Escore
+pEE1 = EEmat$pEscore
+EE1[EE1 < 1] = 1
+colnames(pEE1) = colnames(EE1)
+WW1 = EE1
+pWW1 = pEE1
+```
+
+```{r fig.height = 12, fig.width = 12, dev = c('png', 'pdf'), dpi=800}
+tabb = data.frame("Escore" = as.numeric(EE1),
+                  "neglogpval" = as.numeric(-log(pEE1, base=10)),
+                  "celltypes" = rep(rownames(EE1), ncol(EE1)),
+                  "trait" = rep(colnames(EE1), each=nrow(EE1)))
+tabb$celltypes = factor(tabb$celltypes, levels = rownames(EE1))
+tabb$trait = factor(tabb$trait, levels = colnames(EE1))
+tabb$neglogpval[tabb$neglogpval > 10] = 10
+tabb$Escore[tabb$Escore < 1] = 1
+tabb$Escore[tabb$Escore > 5] = 5
+tabb$issig = "sig"
+tabb$issig[which(tabb$neglogpval < -log(0.05, base=10))] = "nonsig"
+tabb$issig = factor(tabb$issig, levels = c("nonsig", "sig"))
+
+require(ggplot2)
+  ggplot(tabb, aes(y = celltypes,
+             x = trait)) +        ## global aes
+  geom_point(aes(fill = neglogpval, 
+                 colour = neglogpval,
+                 shape = issig,
+                 size = Escore))  +    ## geom_point for circle illusion
+  scale_fill_gradient(low = "white",  
+                       high = "red")+       ## color of the corresponding aes
+  scale_color_gradient(low = "white",  
+                       high = "red")+
+  scale_shape_manual(values = c(1, 19)) + 
+  scale_size(range = c(0, 8), name='Escore', limits=c(1, 5))+             ## to tune the size of circles
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 70, vjust=1, hjust=1, size = 10, face="bold")) + 
+  theme(axis.text.y = element_text(angle = 0, size = 10, face="bold")) 
+  
+```
+
+
+
+```{r}
+EEmat = get_Escore(LDSC_proc_results, "ABC_Road_GI_BLD", flag=0)
+EE1 = EEmat$Escore
+pEE1 = EEmat$pEscore
+EE1[EE1 < 1] = 1
+colnames(pEE1) = colnames(EE1)
+WW1 = EE1
+pWW1 = pEE1
+```
+
+```{r fig.height = 12, fig.width = 12, dev = c('png', 'pdf'), dpi=800}
+tabb = data.frame("Escore" = as.numeric(EE1),
+                  "neglogpval" = as.numeric(-log(pEE1, base=10)),
+                  "celltypes" = rep(rownames(EE1), ncol(EE1)),
+                  "trait" = rep(colnames(EE1), each=nrow(EE1)))
+tabb$celltypes = factor(tabb$celltypes, levels = rownames(EE1))
+tabb$trait = factor(tabb$trait, levels = colnames(EE1))
+tabb$neglogpval[tabb$neglogpval > 10] = 10
+tabb$Escore[tabb$Escore < 1] = 1
+tabb$Escore[tabb$Escore > 5] = 5
+tabb$issig = "sig"
+tabb$issig[which(tabb$neglogpval < -log(0.05, base=10))] = "nonsig"
+tabb$issig = factor(tabb$issig, levels = c("nonsig", "sig"))
+
+require(ggplot2)
+  ggplot(tabb, aes(y = celltypes,
+             x = trait)) +        ## global aes
+  geom_point(aes(fill = neglogpval, 
+                 colour = neglogpval,
+                 shape = issig,
+                 size = Escore))  +    ## geom_point for circle illusion
+  scale_fill_gradient(low = "white",  
+                       high = "red")+       ## color of the corresponding aes
+  scale_color_gradient(low = "white",  
+                       high = "red")+
+  scale_shape_manual(values = c(1, 19)) + 
+  scale_size(range = c(0, 8), name='Escore', limits=c(1, 5))+             ## to tune the size of circles
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 70, vjust=1, hjust=1, size = 10, face="bold")) + 
+  theme(axis.text.y = element_text(angle = 0, size = 10, face="bold")) 
+  
+```
+
+
+
+### Orr
+
+```{r}
+LDSC_proc_results = get(load("~/Documents/Mouse_DO/output/sclinker_2023_Orr_hg38_baselineEpi.rda"))
+dim(LDSC_proc_results)
+dimnames(LDSC_proc_results)[[1]]
+dimnames(LDSC_proc_results)[[3]]
+dimnames(LDSC_proc_results)[[2]]
+```
+
+## Enrichment scores
+
+```{r}
+EEmat = get_Escore(LDSC_proc_results, "ABC_Road_GI_ALL", flag=0)
+EE1 = EEmat$Escore
+pEE1 = EEmat$pEscore
+EE1[EE1 < 1] = 1
+colnames(pEE1) = colnames(EE1)
+WW1 = EE1
+pWW1 = pEE1
+```
+
+```{r fig.height = 12, fig.width = 12, dev = c('png', 'pdf'), dpi=800}
+tabb = data.frame("Escore" = as.numeric(EE1),
+                  "neglogpval" = as.numeric(-log(pEE1, base=10)),
+                  "celltypes" = rep(rownames(EE1), ncol(EE1)),
+                  "trait" = rep(colnames(EE1), each=nrow(EE1)))
+tabb$celltypes = factor(tabb$celltypes, levels = rownames(EE1))
+tabb$trait = factor(tabb$trait, levels = colnames(EE1))
+tabb$neglogpval[tabb$neglogpval > 10] = 10
+tabb$Escore[tabb$Escore < 1] = 1
+tabb$Escore[tabb$Escore > 5] = 5
+tabb$issig = "sig"
+tabb$issig[which(tabb$neglogpval < -log(0.05, base=10))] = "nonsig"
+tabb$issig = factor(tabb$issig, levels = c("nonsig", "sig"))
+
+require(ggplot2)
+  ggplot(tabb, aes(y = celltypes,
+             x = trait)) +        ## global aes
+  geom_point(aes(fill = neglogpval, 
+                 colour = neglogpval,
+                 shape = issig,
+                 size = Escore))  +    ## geom_point for circle illusion
+  scale_fill_gradient(low = "white",  
+                       high = "red")+       ## color of the corresponding aes
+  scale_color_gradient(low = "white",  
+                       high = "red")+
+  scale_shape_manual(values = c(1, 19)) + 
+  scale_size(range = c(0, 8), name='Escore', limits=c(1, 5))+             ## to tune the size of circles
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 70, vjust=1, hjust=1, size = 10, face="bold")) + 
+  theme(axis.text.y = element_text(angle = 0, size = 10, face="bold")) 
+  
+```
+
+
+
+```{r}
+EEmat = get_Escore(LDSC_proc_results, "ABC_Road_GI_BLD", flag=0)
+EE1 = EEmat$Escore
+pEE1 = EEmat$pEscore
+EE1[EE1 < 1] = 1
+colnames(pEE1) = colnames(EE1)
+WW1 = EE1
+pWW1 = pEE1
+```
+
+```{r fig.height = 12, fig.width = 12, dev = c('png', 'pdf'), dpi=800}
+tabb = data.frame("Escore" = as.numeric(EE1),
+                  "neglogpval" = as.numeric(-log(pEE1, base=10)),
+                  "celltypes" = rep(rownames(EE1), ncol(EE1)),
+                  "trait" = rep(colnames(EE1), each=nrow(EE1)))
+tabb$celltypes = factor(tabb$celltypes, levels = rownames(EE1))
+tabb$trait = factor(tabb$trait, levels = colnames(EE1))
+tabb$neglogpval[tabb$neglogpval > 10] = 10
+tabb$Escore[tabb$Escore < 1] = 1
+tabb$Escore[tabb$Escore > 5] = 5
+tabb$issig = "sig"
+tabb$issig[which(tabb$neglogpval < -log(0.05, base=10))] = "nonsig"
+tabb$issig = factor(tabb$issig, levels = c("nonsig", "sig"))
+
+require(ggplot2)
+  ggplot(tabb, aes(y = celltypes,
+             x = trait)) +        ## global aes
+  geom_point(aes(fill = neglogpval, 
+                 colour = neglogpval,
+                 shape = issig,
+                 size = Escore))  +    ## geom_point for circle illusion
+  scale_fill_gradient(low = "white",  
+                       high = "red")+       ## color of the corresponding aes
+  scale_color_gradient(low = "white",  
+                       high = "red")+
+  scale_shape_manual(values = c(1, 19)) + 
+  scale_size(range = c(0, 8), name='Escore', limits=c(1, 5))+             ## to tune the size of circles
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 70, vjust=1, hjust=1, size = 10, face="bold")) + 
+  theme(axis.text.y = element_text(angle = 0, size = 10, face="bold")) 
+  
+```
+

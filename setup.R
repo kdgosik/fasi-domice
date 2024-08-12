@@ -31,6 +31,7 @@ dir.create(paste0(data_dir, "cytokines"), showWarnings = FALSE)
 dir.create(paste0(data_dir, "proportions"), showWarnings = FALSE)
 dir.create(paste0(data_dir, "topics"), showWarnings = FALSE)
 dir.create(paste0(data_dir, "genotype"), showWarnings = FALSE)
+dir.create(paste0(data_dir, "phenotype"), showWarnings = FALSE)
 dir.create(paste0(data_dir, "founders1-louvain_labels-labels-transfer"), showWarnings = FALSE)
 dir.create(paste0(data_dir, "founders2-louvain_labels-labels-transfer"), showWarnings = FALSE)
 
