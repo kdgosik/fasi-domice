@@ -1,4 +1,4 @@
-#' @title Figure 6 C.QTL intersection among four phenotypic traits
+#' @title Figure 4 A.QTL intersection among four phenotypic traits
 #' @author Kirk Gosik
 #' 
 #' @description 
