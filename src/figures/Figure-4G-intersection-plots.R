@@ -45,32 +45,30 @@ ccre_summary <- ccre %>%
   left_join(intrinsic) %>%
   replace_na(list(intrinsic = 0))
 
+## Figure 4G: trait type #########################
 
-
-## Figure 4B: eQTL x proportion QTL  #########################
-
-eqtl_proportion_upsetdf <- ccre_summary %>%
+all_traits_upsetdf <- ccre_summary %>%
   ungroup() %>%
-  dplyr::select(contains("prop"), contains('eqtl_loci_cv')) 
+  rowwise() %>%
+  mutate(Topic = as.numeric(sum(c_across(starts_with("topic")))>0),
+         Proportion = as.numeric(sum(c_across(contains("prop")))>0),
+         eQTL = as.numeric(sum(c_across(ends_with('eqtl_loci_cv')))>0),
+         Cytokine = as.numeric(sum(c_across(ends_with('_steady')))>0)) %>%
+  dplyr::select(Topic, Proportion, eQTL, Cytokine)
 
-colnames(eqtl_proportion_upsetdf) <- c("ILC1 vs ILC2","ILC2 vs ILC3",
-                                       "ILC3 vs LTi","ILC1 vs LTi",
-                                       "ILC2 vs LTi","ILC1 vs ILC3",
-                                       "ILC1 eQTL", "ILC2 eQTL", "ILC3 eQTL", "LTi-like eQTL")
+colnames(all_traits_upsetdf) <- c("Topic","Proportion", "eQTL","Cytokine")
 
 
-eqtl_proportion_upset<- ComplexUpset::upset(data = eqtl_proportion_upsetdf, 
-                                            intersect = colnames(eqtl_proportion_upsetdf),
-                                            min_degree = 2,
-                                            min_size = 6,
-                                            set_size = FALSE) + 
-  ggplot2::labs(title = "eQTL x proportion QTL")
-
+all_traits_upset <- ComplexUpset::upset(data = all_traits_upsetdf, 
+                                             intersect = colnames(all_traits_upsetdf),
+                                             min_degree = 2,
+                                             min_size = 2,
+                                             set_size = FALSE) + 
+  ggplot2::labs(title = "QTL Overlap")
 
 ## save plot
-ggplot2::ggsave(filename =  "results/figures/Figure-4B-eQTL-proportion-upset.pdf",
-                plot = eqtl_proportion_upset,
+ggplot2::ggsave(filename =  "results/figures/Figure-4H-all-traits-upset.pdf",
+                plot = all_traits_upsetdf,
                 width = 7,
                 height = 5,
                 dpi = 330)
-
