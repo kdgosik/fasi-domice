@@ -1,21 +1,26 @@
+#' @title Supplementary Figure 1C cCRE Pie Charts
+#' @author Kirk Gosik
+#' @description
+#'
+#'
+
 library(ggpubr)
 library(tidyverse)
 library(patchwork)
 
 
 ## setup ##################
-project_path <-"./domice/"
-my_path <- "./"
 figure_path <- paste0("./results/figures/")
-data_path <- paste0(project_path, "data/")
+data_path <- "data/"
 source(paste0(figure_path, "helpers.R"))
 setwd(project_path)
-ccre <- fread("./data/GM_SNPS_Consequence_cCRE.csv", data.table = FALSE) %>%
+
+ccre <- fread(paste0(data_path, "GM_SNPS_Consequence_cCRE.csv"), data.table = FALSE) %>%
   mutate(ccre_type = ifelse(type.y == "CTCF-only,CTCF-bound", "CTCF-bound",
                             ifelse(str_detect(type.y, "ELS"), "Enhancer",
                                               ifelse(str_detect(type.y, "PLS"), "Promoter", "DNase-H3K4me3"))))
 
-ccre <- fread("./data/GM_SNPS_Consequence_cCRE.csv", data.table = FALSE) %>%
+ccre <- fread(paste0(data_path, "GM_SNPS_Consequence_cCRE.csv"), data.table = FALSE) %>%
   mutate(ccre_type = ifelse(str_detect(type.y, "ELS"), "Enhancer",
                                    ifelse(str_detect(type.y, "PLS"), "Promoter", NA)))
 
