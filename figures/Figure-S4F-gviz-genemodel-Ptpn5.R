@@ -1,3 +1,8 @@
+#' @title Figure S4F PTPN5 Gene Model
+#' @author Kirk Gosik
+#' @description
+#'
+
 library(data.table)
 library(dplyr)
 library(tidyr)

@@ -1,7 +1,7 @@
-#' Vipr2 Gene Model
-#' 
-#' 
-
+#' @title Figure S6F Vipr2 Gene Model
+#' @author Kirk Gosik
+#' @description
+#'
 
 library(data.table)
 library(dplyr)

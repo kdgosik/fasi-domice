@@ -1,4 +1,4 @@
-#' @title Figure 3A Topic Scores Embeddings
+#' @title Figure 3B Program Scores Embeddings
 #' @author Kirk Gosik
 #' @description
 #'

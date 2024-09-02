@@ -1,7 +1,7 @@
-#' Vip Gene Model
-#' 
-#' 
-
+#' @title Figure S6B Vip Gene Model
+#' @author Kirk Gosik
+#' @description
+#'
 
 library(data.table)
 library(dplyr)
