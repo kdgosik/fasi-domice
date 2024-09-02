@@ -1,0 +1,454 @@
+---
+title: "DO_QTL_expression.Rmd"
+author: "Orr Ashenberg"
+date: "8/24/2022"
+output: html_document
+---
+
+Load gut reference Seurat objects created by DO_QTL_read_gut_data.Rmd and make visualizations.
+
+# Load libraries, set paths, etc. 
+```{r}
+# Load libraries
+rm(list = ls())
+library(ggplot2)
+library(cowplot)
+theme_set(theme_cowplot())
+library(Seurat)
+library(dplyr)
+library(Matrix)
+library(gplots)
+library(GSA)
+library(stringr)
+library(fossil)  # adjusted rand index function
+library(patchwork)
+library(readxl)
+
+# Set directories 
+proj.path <- "/Volumes/broad_kco/projects/GutCircuits"
+proj.FASI.path <- "/Volumes/ahg_regevdata/projects/FASI_DOmice"
+user.path <- "/Volumes/ahg_regevdata/users/orr"
+# proj.path <- "/broad/kco/projects/GutCircuits"
+# proj.FASI.path <- "/ahg/regevdata/projects/FASI_DOmice"
+# user.path <- "/ahg/regevdata/users/orr"
+
+proj.path <- "/Users/kirkgosik/Documents/projects/fasi-domice/orrs-part"
+user.path <- "/Users/kirkgosik/Documents/projects/fasi-domice/orrs-part"
+
+# Set date year_month_day to use in figure directory name and in names for saving Rda objects.
+date <- "2022_06_17"
+
+# Output figures.
+figures.dir <- paste0(proj.path, "/results/", date, "_DO_QTL_expression/")
+
+# Create output directories.
+out.dir <- c(figures.dir)
+sapply(c(out.dir), function(i) {if (!dir.exists(i)) {dir.create(i, recursive = T)} })
+
+# Select which DE test implemented in Seurat to use.
+tests <- c("wilcox", "t", "roc", "MAST", "bimod")
+test <- tests[1]
+
+# Read gmt file(s).
+name.sheet <- "eQTL"
+file.gmt.QTL <- paste0(user.path, "/data/genelists/DO_mouse_", name.sheet, "_genes.gmt")
+invisible(capture.output(gs <- GSA.read.gmt(file.gmt.QTL)))
+
+name.sheets <- c("eQTL", "proportionQTL", "topicQTL")
+gs.list <- vector(mode = "list", length = length(name.sheets))
+for (name.sheet in name.sheets) {
+  print(name.sheet)
+  file.gmt.QTL <- paste0(user.path, "/data/genelists/DO_mouse_", name.sheet, "_genes.gmt")
+  invisible(capture.output(gs <- GSA.read.gmt(file.gmt.QTL)))
+  gs.list[[name.sheet]] <- gs
+}
+
+# Mapping human-mouse gene homologs.
+file.homolog <- paste0(user.path, "/data/genelists/mouse_human_mapping.Rda")
+load(file.homolog)
+
+# Load my functions.
+source(paste0(user.path, "/code/R/plotutils.R"))
+source(paste0(user.path, "/code/R/seurat3utils.R"))
+source(paste0(user.path, "/code/R/color.R"))
+
+# knitr settings for code chunks.
+knitr::opts_knit$set(root.dir = proj.path)  # set working directory for all chunks
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(cache = TRUE)
+```
+
+## Paths to all gut scRNA-Seq datasets
+I prepared these Seurat objects using DO_QTL_read_gut_data.Rmd. This code chunk organizes the paths to all the Seurat objects into a list.
+```{r datasets}
+# Make a list of paths to the Rdata objects.
+Rda.paths <- list()
+
+# Kirk Gosik and Miao Xu ILC study
+Rda.path <- paste0(proj.path, "/src/Rdata/gutreference/mouseDO_subsample.Rda")
+Rda.paths[["mouseDO"]] <- Rda.path
+
+# Path to mouse large intestine Tabula Muris object.
+Rda.path <- paste0(proj.path, "/src/Rdata/gutreference/mouseTabulaMuris.large.intestine.Rda")
+Rda.paths[["mouseTabulaMuris"]] <- Rda.path
+
+# Paths to all Tabula Muris tissue object.
+Rda.path <- paste0(proj.path, "/src/Rdata/gutreference/mouseTabulaMuris_droplet.Rda")
+Rda.paths[["mouseTabulaMuris_droplet"]] <- Rda.path
+Rda.path <- paste0(proj.path, "/src/Rdata/gutreference/mouseTabulaMuris_plate.Rda")
+Rda.paths[["mouseTabulaMuris_plate"]] <- Rda.path
+
+# Path to Mouse Cell Atlas by Microwell-Seq object.
+cell.subsets <- list("Small-Intestinal-Epithelium" = "Small-Intestinal-Epithelium", "Adult-Intestine" = "Adult-Intestine")
+Rda.paths[["mousecellatlas"]] <- paste0(proj.path, "/src/Rdata/gutreference/mousecellatlas.", names(cell.subsets), ".Rda")
+
+# Path to mouse Small intestinal epithelium single cell portal object.
+Rda.path <- paste0(proj.path, "/src/Rdata/gutreference/mouseSI.Rda")
+Rda.paths[["mouseSI"]] <- Rda.path
+
+# Path to mouse ENS objects.
+cell.subsets <- list("hli" = "Human colon all cells (10X)", "hli.glia" = "Human colon enteric glia (10X)", "hli.neur" = "Human colon enteric neurons (10X)", "mli" = "Mouse colon all cells (10X)", "mli.glia" = "Mouse colon enteric glia (10X)", "mli.neur" = "Mouse colon enteric neurons (10X)", "ss2.glia" = "Mouse colon enteric glia (Smart-Seq2)", "ss2.neur" = "Mouse colon enteric neurons (Smart-Seq2)", "msi" = "Mouse ileum all cells (10X)", "msi.glia" = "Mouse ileum enteric glia (10X)", "msi.neur" = "Mouse ileum enteric neurons (10X)")
+Rda.paths[["mouseENS"]] <- paste0(proj.path, "/src/Rdata/gutreference/mouseENS.", names(cell.subsets), ".Rda")
+
+# Path to mouse intestinal immune cells LP and PP objects.
+cell.subsets <- list("LP" = "LP", "PP" = "PP")
+Rda.paths[["mouseintestineimmune"]] <- paste0(proj.path, "/src/Rdata/gutreference/mouseintestineimmune.", names(cell.subsets), ".Rda")
+
+# Path to human UC objects
+cell.subsets <- list("Epi" = "Epi", "Fib" = "Fib", "Imm" = "Imm")
+Rda.paths[["humanUC"]] <- paste0(proj.path, "/src/Rdata/gutreference/humanUC.", names(cell.subsets), ".Rda")
+
+# Path to human gut atlas objects.
+Rda.path <- paste0(proj.path, "/src/Rdata/gutreference/humangut.Rda")
+Rda.paths[["humangut"]] <- Rda.path
+```
+
+## Gene expression of genes in QTL loci
+Rda.paths
+$mouseDO
+[1] "/Volumes/broad_kco/projects/GutCircuits/src/Rdata/gutreference/mouseDO_subsample.Rda"
+
+$mouseTabulaMuris
+[1] "/Volumes/broad_kco/projects/GutCircuits/src/Rdata/gutreference/mouseTabulaMuris.large.intestine.Rda"
+
+$mouseTabulaMuris_droplet
+[1] "/broad/kco/projects/GutCircuits/src/Rdata/gutreference/mouseTabulaMuris_droplet.Rda"
+
+$mouseTabulaMuris_plate
+[1] "/broad/kco/projects/GutCircuits/src/Rdata/gutreference/mouseTabulaMuris_plate.Rda"
+
+$mousecellatlas
+[1] "/Volumes/broad_kco/projects/GutCircuits/src/Rdata/gutreference/mousecellatlas.Small-Intestinal-Epithelium.Rda"
+[2] "/Volumes/broad_kco/projects/GutCircuits/src/Rdata/gutreference/mousecellatlas.Adult-Intestine.Rda"            
+$mouseSI
+[1] "/Volumes/broad_kco/projects/GutCircuits/src/Rdata/gutreference/mouseSI.Rda"
+
+$mouseENS
+ [1] "/Volumes/broad_kco/projects/GutCircuits/src/Rdata/gutreference/mouseENS.hli.Rda"     
+ [2] "/Volumes/broad_kco/projects/GutCircuits/src/Rdata/gutreference/mouseENS.hli.glia.Rda"
+ [3] "/Volumes/broad_kco/projects/GutCircuits/src/Rdata/gutreference/mouseENS.hli.neur.Rda"
+ [4] "/Volumes/broad_kco/projects/GutCircuits/src/Rdata/gutreference/mouseENS.mli.Rda"     
+ [5] "/Volumes/broad_kco/projects/GutCircuits/src/Rdata/gutreference/mouseENS.mli.glia.Rda"
+ [6] "/Volumes/broad_kco/projects/GutCircuits/src/Rdata/gutreference/mouseENS.mli.neur.Rda"
+ [7] "/Volumes/broad_kco/projects/GutCircuits/src/Rdata/gutreference/mouseENS.ss2.glia.Rda"
+ [8] "/Volumes/broad_kco/projects/GutCircuits/src/Rdata/gutreference/mouseENS.ss2.neur.Rda"
+ [9] "/Volumes/broad_kco/projects/GutCircuits/src/Rdata/gutreference/mouseENS.msi.Rda"     
+[10] "/Volumes/broad_kco/projects/GutCircuits/src/Rdata/gutreference/mouseENS.msi.glia.Rda"
+[11] "/Volumes/broad_kco/projects/GutCircuits/src/Rdata/gutreference/mouseENS.msi.neur.Rda"
+
+$mouseintestineimmune
+[1] "/Volumes/broad_kco/projects/GutCircuits/src/Rdata/gutreference/mouseintestineimmune.LP.Rda"
+[2] "/Volumes/broad_kco/projects/GutCircuits/src/Rdata/gutreference/mouseintestineimmune.PP.Rda"
+
+$humanUC
+[1] "/Volumes/broad_kco/projects/GutCircuits/src/Rdata/gutreference/humanUC.Epi.Rda"
+[2] "/Volumes/broad_kco/projects/GutCircuits/src/Rdata/gutreference/humanUC.Fib.Rda"
+[3] "/Volumes/broad_kco/projects/GutCircuits/src/Rdata/gutreference/humanUC.Imm.Rda"
+
+$humangut
+[1] "/Volumes/broad_kco/projects/GutCircuits/src/Rdata/gutreference/humangut.Rda"
+```{r expression}
+# Rda.path <- paste0(proj.path, "/src/Rdata/gutreference/mouseSI.Rda")
+# Load mouse DO data and change the order in which cell types are displayed.
+load(Rda.paths[["mouseDO"]])
+gcdata.DO <- gcdata
+levels.DO <- unique(gcdata.DO$annotation)
+levels.DO <- levels.DO[c(6,1,11,7,5,14,2,9,13,4,10,8,15,12,3)]
+gcdata.DO$annotation <- factor(gcdata.DO$annotation, levels = levels.DO)
+Idents(gcdata.DO) <- "annotation"
+rm(gcdata)
+
+load(Rda.paths[["mouseSI"]])
+gcdata.SI <- gcdata
+# Merge SS2 ENS neuron and glia data.
+load(Rda.paths[["mouseENS"]][7])
+gcdata.ENS.ss2.glia <- gcdata
+load(Rda.paths[["mouseENS"]][8])
+gcdata.ENS.ss2.neur <- gcdata
+gcdata.ENS <- merge(gcdata.ENS.ss2.glia, gcdata.ENS.ss2.neur, add.cell.ids = c("glia", "neur"))
+Matrix::colSums(expm1(gcdata.ENS[['RNA']]@data[,1:10]))
+Matrix::colSums(expm1(gcdata.ENS[['RNA']]@data[,5100:5110]))
+gcdata.ENS <- gcdata
+load(Rda.paths[["mouseintestineimmune"]][1])
+gcdata.mouseintestineimmune <- gcdata
+load(Rda.paths[["mouseTabulaMuris"]])
+gcdata.mouseTabulaMuris <- gcdata
+load(Rda.paths[["mouseTabulaMuris_droplet"]])
+gcdata.mouseTabulaMuris_droplet <- gcdata
+load(Rda.paths[["mouseTabulaMuris_plate"]])
+gcdata.mouseTabulaMuris_plate <- gcdata
+load(Rda.paths[["humangut"]])
+gcdata.humangut <- gcdata
+
+Idents(gcdata.DO) <- "annotation"
+Idents(gcdata.SI) <- "annotation"
+Idents(gcdata.ENS) <- "annotation"
+Idents(gcdata.mouseintestineimmune) <- "annotation"
+Idents(gcdata.mouseTabulaMuris) <- "annotation"
+Idents(gcdata.mouseTabulaMuris_droplet) <- "annotation"
+Idents(gcdata.mouseTabulaMuris_plate) <- "annotation"
+Idents(gcdata.humangut) <- "annotation"
+
+# Mouse non-ILC expressed genes.
+genes <- c("Sox9", "Il25", "Ccl17", "Nmu", "Calca", "Vip", "Tac1")
+DotPlot(gcdata.DO, features = genes) + ggtitle("Mouse DO QTL (2022)") + RotatedAxis()
+ggsave(paste0(figures.dir, "dot_intercellularcircuit_genes_DO.pdf"), width = 6, height = 6)
+DotPlot(gcdata.SI, features = genes) + ggtitle("Mouse small intestine (2017)") + RotatedAxis()
+ggsave(paste0(figures.dir, "dot_intercellularcircuit_genes_SI.pdf"), width = 10, height = 6)
+DotPlot(gcdata.mouseTabulaMuris_droplet, features = genes) + RotatedAxis() + ggtitle("Mouse Tabula Muris (2018) droplet-all tissues")
+ggsave(paste0(figures.dir, "dot_intercellularcircuit_genes_mouseTabulaMuris_droplet.pdf"), width = 12, height = 20)
+DotPlot(gcdata.mouseTabulaMuris_plate, features = genes) + RotatedAxis() + ggtitle("Mouse Tabula Muris (2018) plate-all tissues")
+ggsave(paste0(figures.dir, "dot_intercellularcircuit_genes_mouseTabulaMuris_plate.pdf"), width = 12, height = 20)
+DotPlot(gcdata.ENS, features = genes) + RotatedAxis() + ggtitle("Mouse ENS (2020) SS2-neuron and glia")
+ggsave(paste0(figures.dir, "dot_intercellularcircuit_genes_ENS.pdf"), width = 6, height = 6)
+# DotPlot(gcdata.mouseintestineimmune, features = genes) + ggtitle("Mouse intestinal immune atlas (2019) LP") + RotatedAxis()
+# ggsave(paste0(figures.dir, "dot_intercellularcircuit_genes_SI.pdf"), width = 12, height = 20)
+# DotPlot(gcdata.mouseTabulaMuris, features = genes) + RotatedAxis() + ggtitle("Mouse Tabula Muris (2018) plate-large intestine")
+# ggsave(paste0(figures.dir, "dot_intercellularcircuit_genes_mouseTabulaMuris.pdf"), width = 12, height = 6)
+# Human non-ILC expressed genes.
+genes <- c("SOX9", "IL25", "CCL17", "NMU", "CALCA", "VIP", "TAC1")
+DotPlot(gcdata.humangut, features = genes, group.by = "annotation") + ggtitle("Human gut atlas (2021)") + RotatedAxis()
+ggsave(paste0(figures.dir, "dot_intercellularcircuit_genes_humangut_coarse.pdf"), width = 6, height = 6)
+DotPlot(gcdata.humangut, features = genes, group.by = "Integrated_05") + ggtitle("Human gut atlas (2021)") + RotatedAxis()
+ggsave(paste0(figures.dir, "dot_intercellularcircuit_genes_humangut_fine.pdf"), width = 9, height = 18)
+
+# Show expression of individual genes in DO ILC, mouse SI, Tabula Muris organs, 
+# mouse ENS, and Human Gut atlas.
+genes.mouse <- c("Socs2", "Rbpj", "Il17a", "Il17f")  # mouse
+genes.human <- c("SOCS2", "RBPJ", "IL17A", "IL17F", "IL25")  # human
+
+genes.mouse <- c("Ptpn5", "Bcl2", "Fam21", "Il20ra", "Il25")
+for (gene in genes.mouse) {
+  DotPlot(gcdata.DO, features = gene) + RotatedAxis()
+  ggsave(paste0(figures.dir, "dot_gene_", gene, "_DO.pdf"), width = 6, height = 6)
+  if (gene %in% rownames(gcdata.SI)) {
+    DotPlot(gcdata.SI, features = gene) + RotatedAxis()
+    ggsave(paste0(figures.dir, "dot_gene_", gene, "_SI.pdf"), width = 6, height = 6)
+  }
+  if (gene %in% rownames(gcdata.ENS)) {
+    DotPlot(gcdata.ENS, features = gene) + RotatedAxis()
+    ggsave(paste0(figures.dir, "dot_gene_", gene, "_ENS.pdf"), width = 6, height = 6)
+  }
+  if (gene %in% rownames(gcdata.mouseTabulaMuris_droplet)) {
+    DotPlot(gcdata.mouseTabulaMuris_droplet, features = gene) + RotatedAxis() + ggtitle("Mouse Tabula Muris (2018) droplet-all tissues")
+    ggsave(paste0(figures.dir, "dot_gene_", gene, "_mouseTabulaMuris_droplet.pdf"), width = 12, height = 20)
+  }
+  if (gene %in% rownames(gcdata.mouseTabulaMuris_plate)) {
+    DotPlot(gcdata.mouseTabulaMuris_plate, features = gene) + RotatedAxis() + ggtitle("Mouse Tabula Muris (2018) plate-all tissues")
+    ggsave(paste0(figures.dir, "dot_gene_", gene, "_mouseTabulaMuris_plate.pdf"), width = 12, height = 20)
+  }
+}
+for (gene in genes.human) {
+  Idents(gcdata.humangut) <- "annotation"  # annotation, Integrated_05
+  DotPlot(gcdata.humangut, features = gene) + RotatedAxis()
+  ggsave(paste0(figures.dir, "dot_gene_", gene, "_humangut.pdf"), width = 6, height = 6)
+}
+
+# # mouse receptor genes
+# genes <- c("Ccr4", "Nmur1", "Calcrl", "Tacr1", "Vpac1",  "Vpac2", "Vipr2")
+# DotPlot(gcdata.DO, features = genes) + RotatedAxis()
+```
+
+## Average expression of QTL gene sets, not expressed in ILCs, across cell subsets.
+```{r average_expression, eval=TRUE}
+# Heatmap functions needed to save pheatmap and also to make grids of pheatmap plots
+library(pheatmap)
+library(gridExtra)
+library(grid)
+save_pheatmap_pdf <- function(x, filename, width=7, height=7) {
+  stopifnot(!missing(x))
+  stopifnot(!missing(filename))
+  pdf(filename, width=width, height=height)
+  grid::grid.newpage()
+  grid::grid.draw(x$gtable)
+  dev.off()
+}
+save_pheatmap_png <- function(x, filename, width = 1200, height = 900, res = 150) {
+  png(filename, width = width, height = height, res = res)
+  grid::grid.newpage()
+  grid::grid.draw(x$gtable)
+  dev.off()
+}
+
+# Specify which gut dataset to plot eQTL, topicQTL, proportionQTL mean gene sets.
+dataset.gut <- "DO"
+gcdata <- gcdata.DO
+Idents(gcdata) <- "annotation"
+
+dataset.gut <- "SI"
+gcdata <- gcdata.SI
+Idents(gcdata) <- "annotation"
+
+# dataset.gut <- "TabulaMuris"
+# gcdata <- gcdata.mouseTabulaMuris
+# Idents(gcdata) <- "annotation"
+
+dataset.gut <- "TabulaMuris_droplet"
+gcdata <- gcdata.mouseTabulaMuris_droplet
+Idents(gcdata) <- "annotation"
+
+dataset.gut <- "TabulaMuris_plate"
+gcdata <- gcdata.mouseTabulaMuris_plate
+Idents(gcdata) <- "annotation"
+
+dataset.gut <- "ENS"
+gcdata <- gcdata.ENS
+Idents(gcdata) <- "annotation"
+
+dataset.gut <- "humangut"
+gcdata <- gcdata.humangut
+Idents(gcdata) <- "annotation"
+
+# Iterate through each gene set.
+for (name.sheet in name.sheets) {
+  # Specify and load gene set list.
+  # name.sheet <- "eQTL"
+  gs <- gs.list[[name.sheet]]
+  print(name.sheet)
+
+  # For human data, map the mouse homologs to human homologs.
+  if (dataset.gut == "humangut") {
+    for (i in seq(gs$geneset.names)) {
+      geneset <- gs$genesets[[i]]
+      gs$genesets[[i]] <- MouseHumanHomolog(mouse.human, gs$genesets[[i]], "mouse")
+    }
+  }
+  
+  # Take the average expression of each gene set within each cell.
+  assay.data <- GetAssayData(gcdata, slot = "data", assay = "RNA")
+  meangenes.matrix <- matrix(, nrow = length(gs$genesets), ncol = ncol(gcdata))
+  for (i in seq(length(gs$genesets))) {
+    print(gs$geneset.names[i])
+    genes <- gs$genesets[[i]]
+    genes <- genes[genes %in% rownames(gcdata)]  # ask Miao about ILC1_not_in_ILC1 entry 752
+    if (length(genes)) {  # gene set found in Seurat object
+      meangenes.matrix[i, ] <- colMeans(expm1(assay.data[genes, , drop = FALSE])) #  take mean in non-log space
+    } else {  # none of gene set found in Seurat object
+      meangenes.matrix[i, ] <- 0
+    }
+  }
+  meangenes.matrix <- log1p(meangenes.matrix)  # return to log space
+  rownames(meangenes.matrix) <- gs$geneset.names
+  colnames(meangenes.matrix) <- colnames(gcdata)
+  gcdata.meangenes <- CreateSeuratObject(meangenes.matrix, meta.data = gcdata[[]], project = "mean")
+  
+  # Take the average experession of each gene set across all cells within a cell subset.
+  # This will also scale the average expression within a cell subset.
+  Idents(gcdata.meangenes) <- "annotation"
+  gcdata.mean <- AverageExpression(gcdata.meangenes, group.by = c("annotation"), slot = "data", return.seurat = T)
+  gcdata.mean[["annotation"]] <- rownames(gcdata.mean[[]])
+  Idents(gcdata.mean) <- "annotation"
+  gcdata.mean[['RNA']]@data
+  rowSums(gcdata.mean[['RNA']]@scale.data)
+  
+  # Heatmap of average gene set expression within each cell subset.
+  p <- pheatmap(gcdata.mean[['RNA']]@scale.data, show_colnames = T, cluster_rows = F, cluster_cols = F, breaks = seq(-2,2,length=100), color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(100))
+  save_pheatmap_png(p, paste0(figures.dir, "heatmap_scale_", name.sheet, "_genes_", dataset.gut, ".pdf"), width = 1200, height = 900)
+  #save_pheatmap_png(p, paste0(figures.dir, "heatmap_scale_", name.sheet, "_genes_", dataset.gut, ".pdf"), width = 1600, height = 1200)  # Tabula Muris plots (droplet width = 1600 plate width = 1800)
+}
+
+# p <- pheatmap(gcdata.mean[['RNA']]@data, show_colnames = T, cluster_rows = F, cluster_cols = F)
+# save_pheatmap_png(p, paste0(figures.dir, "heatmap_mean_", name.sheet, "_genes_", dataset.gut, ".pdf"), width = 1200, height = 900)
+# save_pheatmap_png(p, paste0(figures.dir, "heatmap_mean_", name.sheet, "_genes_", dataset.gut, ".pdf"), width = 1600, height = 1200)
+# pheatmap(test, legend_breaks = c(10, 20, 30, 40, max(test)), main = "", legend_labels = c("10", "20", "30", "40", "title\n"), legend = TRUE, cluster_rows = FALSE, cluster_cols = FALSE)
+# save_pheatmap_pdf(p, paste0(figures.dir, "heatmap_mean_", name.sheet, "_genes_", dataset.gut, ".pdf"), width = 8, height = 6)
+# save_pheatmap_pdf(p, paste0(figures.dir, "heatmap_scale_", name.sheet, "_genes_", dataset.gut, ".pdf"), width = 8, height = 6)
+
+```
+
+
+## Gene enrichment analysis for topic genes
+This code was provided by Alok Jaiswal to look for gene set enrichment in the genes identified by Miao and Kirk.
+```{r enrichment, eval=TRUE}
+miao <- readxl::read_xlsx("~/Downloads/qtl-genelist-grouped -Miao-for Alok.xlsx", sheet=3,  col_names = F)
+
+#Pathway
+library(clusterProfiler)
+library(msigdbr)
+m_df = msigdbr(species = "Mus musculus", category = "C5", subcategory = "BP")
+m_t2g_goBP = m_df %>% dplyr::select(gs_name, gene_symbol) %>% as.data.frame()
+
+m_df = msigdbr(species = "Mus musculus", category = "C5", subcategory = "MF")
+m_t2g_goMF = m_df %>% dplyr::select(gs_name, gene_symbol) %>% as.data.frame()
+
+m_df_reactome = msigdbr(species =  "Mus musculus", category = "C2", subcategory = "CP:REACTOME")
+m_t2g_reactome = m_df_reactome %>% dplyr::select(gs_name, gene_symbol) %>% as.data.frame()
+
+m_df_kegg = msigdbr(species =  "Mus musculus", category = "C2", subcategory = "CP:KEGG")
+m_t2g_kegg = m_df_kegg %>% dplyr::select(gs_name, gene_symbol) %>% as.data.frame()
+
+m_t2g <- rbind(m_t2g_reactome, m_t2g_goBP)
+
+m_t2g <- m_t2g_goBP
+m_t2g <- m_t2g_goMF
+m_t2g <- m_t2g_kegg
+m_t2g <- m_t2g_reactome
+
+# Add module score
+topic.list <- list()
+for(i in 1:nrow(miao)){
+  topic.name <- miao$...2[i]
+  topic.genes <- miao$...3[i]
+  topic.genes <- unlist(strsplit(topic.genes, "\\,"))
+  topic.list[[topic.name]] <- topic.genes
+}
+
+pVal = 0.05
+qVal = 0.1
+
+#
+topic.pathways.BP <- compareCluster(topic.list, 
+                                    fun           = "enricher", 
+                                    #TERM2GENE     = g2p2m,
+                                    TERM2GENE     = m_t2g,
+                                    pAdjustMethod = "BH",
+                                    pvalueCutoff  = pVal,
+                                    qvalueCutoff  = qVal)
+topic.pathways.BP.df <- topic.pathways.BP@compareClusterResult
+
+#
+topic.pathways.KEGG <- compareCluster(topic.list, 
+                                      fun           = "enricher", 
+                                      #TERM2GENE     = g2p2m,
+                                      TERM2GENE     = m_t2g_kegg,
+                                      pAdjustMethod = "BH",
+                                      pvalueCutoff  = pVal,
+                                      qvalueCutoff  = qVal)
+topic.pathways.KEGG.df <- topic.pathways.KEGG@compareClusterResult
+
+#
+topic.pathways.REACTOME <- compareCluster(topic.list, 
+                                          fun           = "enricher", 
+                                          #TERM2GENE     = g2p2m,
+                                          TERM2GENE     = m_t2g_reactome,
+                                          pAdjustMethod = "BH",
+                                          pvalueCutoff  = pVal,
+                                          qvalueCutoff  = qVal)
+topic.pathways.REACTOME.df <- topic.pathways.REACTOME@compareClusterResult
+
+
+write.table(topic.pathways.BP.df,  file="/Volumes/broad_xavierlab_datadeposit/ajaiswal/Gut_Circuits/analysis/tables/Miao_ILS_Topics_GSEA_GOBP.tsv", sep="\t", row.names =F, quote=F)
+write.table(topic.pathways.KEGG.df,  file="/Volumes/broad_xavierlab_datadeposit/ajaiswal/Gut_Circuits/analysis/tables/Miao_ILS_Topics_GSEA_KEGG.tsv", sep="\t", row.names =F, quote=F)
+write.table(topic.pathways.REACTOME.df,  file="/Volumes/broad_xavierlab_datadeposit/ajaiswal/Gut_Circuits/analysis/tables/Miao_ILS_Topics_GSEA_REACTOME.tsv", sep="\t", row.names =F, quote=F)
+
+```
