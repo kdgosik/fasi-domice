@@ -1,3 +1,9 @@
+#' @title Figure S1B Batch UMAPs
+#' @author Kirk Gosik
+#' @description
+#'
+#'
+
 library(data.table)
 library(ggplot2)
 library(dplyr)

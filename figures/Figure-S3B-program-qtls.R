@@ -1,5 +1,8 @@
-#' Figure 3B Supplementary
-#' 
+#' @title Figure 3B 
+#' @author Kirk Gosik
+#' @description
+#'
+#'
 
 project_path <- "/ahg/regevdata/projects/FASI_DOmice/"
 if( length(dir(project_path)) == 0 ) project_path <- "/Volumes/ahg_regevdata/projects/FASI_DOmice/"

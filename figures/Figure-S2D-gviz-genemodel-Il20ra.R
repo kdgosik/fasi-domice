@@ -1,3 +1,9 @@
+#' @title Figure 2D IL20ra Gene Model
+#' @author Kirk Gosik
+#' @description
+#'
+#'
+
 library(data.table)
 library(dplyr)
 library(tidyr)

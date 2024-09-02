@@ -1,6 +1,8 @@
-#' Figure 2B Proportion qtl
-#' 
-#' 
+#' @title Figure S2B Proportion qtl
+#' @author Kirk Gosik
+#' @description
+#'
+#'
 
 library(data.table)
 library(dplyr)

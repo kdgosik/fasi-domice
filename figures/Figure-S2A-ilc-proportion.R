@@ -1,4 +1,4 @@
-#' @title Figure 2A Cell Proportions
+#' @title Figure S2A Cell Proportions
 #' @author Kirk Gosik
 #' @description
 #'

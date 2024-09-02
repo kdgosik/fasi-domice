@@ -1,3 +1,9 @@
+#' @title Figure 2C Fam21 Gene Model
+#' @author Kirk Gosik
+#' @description
+#'
+#'
+
 library(data.table)
 library(dplyr)
 library(tidyr)
