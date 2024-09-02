@@ -1,0 +1,201 @@
+---
+title: ""
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(Seurat)
+library(reshape2)
+library(circlize)
+library(UpSetR)
+```
+
+```{r}
+# Immune
+load("data/mouseintestineimmune.LP.Rda")
+LP.raw <- gcdata
+load("data/mouseintestineimmune.PP.Rda")
+PP.raw <- gcdata
+# ENS
+load("data/mouseENS.msi.glia.Rda")
+ENS.msi.glia.raw <- gcdata
+load("data/mouseENS.msi.neur.Rda")
+ENS.msi.neur.raw <- gcdata
+load("data/mouseENS.mli.glia.Rda")
+ENS.mli.glia.raw <- gcdata
+load("data/mouseENS.mli.neur.Rda")
+ENS.mli.neur.raw <- gcdata
+# Epi
+load("data/mousecellatlas.Small-Intestinal-Epithelium.Rda")
+Epi.si <- gcdata
+
+# DO
+load("data/mouseDO_subsample.Rda")
+DO <- gcdata
+```
+
+
+```{r}
+get.plot.dat <- function(obj, name, genes, anno, prevalence.thre=0.25, expression.thre=0){
+  plot.dat <- 
+    FetchData(obj, vars = c( "annotation", genes)) %>% 
+    group_by(annotation) %>% 
+    summarise_all(function(x) sum(x>expression.thre)/n()) %>% 
+    column_to_rownames("annotation") %>% t() %>% 
+    data.frame(check.names = F) %>% 
+    rownames_to_column("genes") %>% 
+    melt(id.vars="genes") %>% 
+    filter(value>prevalence.thre) %>% 
+    merge(anno, by="genes") %>% 
+    mutate(label=name)
+  plot.dat
+}
+```
+
+```{r}
+unified.gene.list <- read_csv("trait_by_loci_10kb_window.csv") %>% 
+  filter(ilc1_expressed+ilc2_expressed+ilc3_expressed+lti_expressed==0)
+```
+
+```{r}
+topics <- filter(unified.gene.list, str_detect(trait, "topic")) %>% 
+  select(genes=eQTL_loci_gene_name, trait) %>% distinct()
+topic.genes <- unique(topics$genes)
+
+proportions <- filter(unified.gene.list, str_detect(trait, "ILC[123]_ILC[123]") | str_detect(trait, "ILC[123]_LTi")) %>% 
+  distinct(genes=eQTL_loci_gene_name, trait)
+proportion.genes <- unique(proportions$genes)
+
+eqtl <- filter(unified.gene.list, !str_detect(trait, "ILC[123]_ILC[123]") & !str_detect(trait, "ILC[123]_LTi")) %>% 
+  filter(!str_detect(trait, "topic")) %>% 
+  filter(str_detect(trait, "^ILC")|str_detect(trait, "^LTi")) %>% 
+  mutate(trait=str_remove(trait, "_.*")) %>% 
+  distinct(genes=eQTL_loci_gene_name, trait)
+
+eqtl.genes <- unique(eqtl$genes)
+```
+
+
+## Topic genes
+
+```{r}
+plot.genes <- topic.genes
+trait.anno <- topics
+
+dat <- rbind(
+  get.plot.dat(LP.raw, "LP", plot.genes, anno = trait.anno, prevalence.thre = 0.2) %>% 
+    filter(!str_detect(variable, "[0-9]"), variable!="Ep") %>% 
+    mutate(variable=paste0(label, ":", variable)),
+  get.plot.dat(PP.raw, "PP", plot.genes, anno = trait.anno, prevalence.thre = 0.2) %>% 
+    filter(!str_detect(variable, "[0-9]"), variable!="Ep") %>% 
+    mutate(variable=paste0(label, ":", variable)),
+  get.plot.dat(ENS.msi.glia.raw, "SI glia", plot.genes, anno = trait.anno, prevalence.thre = 0.2)%>% 
+    mutate(variable=paste0(label, ":", variable)),
+  get.plot.dat(ENS.msi.neur.raw, "SI neur", plot.genes, anno = trait.anno, prevalence.thre = 0.2)%>% 
+    mutate(variable=paste0(label, ":", variable)),
+  get.plot.dat(ENS.mli.glia.raw, "LI glia", plot.genes, anno = trait.anno, prevalence.thre = 0.2)%>% 
+    mutate(variable=paste0(label, ":", variable)),
+  get.plot.dat(ENS.mli.neur.raw, "LI neur", plot.genes, anno = trait.anno, prevalence.thre = 0.2)%>% 
+    mutate(variable=paste0(label, ":", variable)),
+  get.plot.dat(Epi.si, "Epi", plot.genes, anno = trait.anno, prevalence.thre = 0.2),
+  get.plot.dat(DO, "DO", plot.genes, anno = trait.anno, prevalence.thre = 0.2) %>% 
+    filter(!str_detect(variable, "Cluster")) 
+)
+
+```
+
+
+
+```{r}
+tmp <- 
+  mutate(dat, label=str_remove(label, ".* ")) %>% 
+  distinct(genes, label) 
+
+#pdf("upset_mouse.pdf", width = 8, height = 4)
+upset(fromList(split(tmp$genes, tmp$label)), nsets = 100, set_size.show = TRUE, set_size.scale_max=1200)
+#dev.off()
+```
+
+## Proportion genes
+
+```{r}
+plot.genes <- proportion.genes
+trait.anno <- proportions
+
+dat <- rbind(
+  get.plot.dat(LP.raw, "LP", plot.genes, anno = trait.anno, prevalence.thre = 0.2) %>% 
+    filter(!str_detect(variable, "[0-9]"), variable!="Ep") %>% 
+    mutate(variable=paste0(label, ":", variable)),
+  get.plot.dat(PP.raw, "PP", plot.genes, anno = trait.anno, prevalence.thre = 0.2) %>% 
+    filter(!str_detect(variable, "[0-9]"), variable!="Ep") %>% 
+    mutate(variable=paste0(label, ":", variable)),
+  get.plot.dat(ENS.msi.glia.raw, "SI glia", plot.genes, anno = trait.anno, prevalence.thre = 0.2)%>% 
+    mutate(variable=paste0(label, ":", variable)),
+  get.plot.dat(ENS.msi.neur.raw, "SI neur", plot.genes, anno = trait.anno, prevalence.thre = 0.2)%>% 
+    mutate(variable=paste0(label, ":", variable)),
+  get.plot.dat(ENS.mli.glia.raw, "LI glia", plot.genes, anno = trait.anno, prevalence.thre = 0.2)%>% 
+    mutate(variable=paste0(label, ":", variable)),
+  get.plot.dat(ENS.mli.neur.raw, "LI neur", plot.genes, anno = trait.anno, prevalence.thre = 0.2)%>% 
+    mutate(variable=paste0(label, ":", variable)),
+  get.plot.dat(Epi.si, "Epi", plot.genes, anno = trait.anno, prevalence.thre = 0.2),
+  get.plot.dat(DO, "DO", plot.genes, anno = trait.anno, prevalence.thre = 0.2) %>% 
+    filter(!str_detect(variable, "Cluster")) 
+)
+```
+
+
+```{r}
+tmp <- 
+  mutate(dat, label=str_remove(label, ".* ")) %>% 
+  distinct(genes, label) 
+
+#pdf("upset_mouse.pdf", width = 8, height = 4)
+upset(fromList(split(tmp$genes, tmp$label)), nsets = 100, set_size.show = TRUE, set_size.scale_max=1200)
+#dev.off()
+```
+
+
+## eQTL genes
+
+```{r}
+plot.genes <- eqtl.genes
+trait.anno <- eqtl
+
+dat <- rbind(
+  get.plot.dat(LP.raw, "LP", plot.genes, anno = trait.anno, prevalence.thre = 0.2) %>% 
+    filter(!str_detect(variable, "[0-9]"), variable!="Ep") %>% 
+    mutate(variable=paste0(label, ":", variable)),
+  get.plot.dat(PP.raw, "PP", plot.genes, anno = trait.anno, prevalence.thre = 0.2) %>% 
+    filter(!str_detect(variable, "[0-9]"), variable!="Ep") %>% 
+    mutate(variable=paste0(label, ":", variable)),
+  get.plot.dat(ENS.msi.glia.raw, "SI glia", plot.genes, anno = trait.anno, prevalence.thre = 0.2)%>% 
+    mutate(variable=paste0(label, ":", variable)),
+  get.plot.dat(ENS.msi.neur.raw, "SI neur", plot.genes, anno = trait.anno, prevalence.thre = 0.2)%>% 
+    mutate(variable=paste0(label, ":", variable)),
+  get.plot.dat(ENS.mli.glia.raw, "LI glia", plot.genes, anno = trait.anno, prevalence.thre = 0.2)%>% 
+    mutate(variable=paste0(label, ":", variable)),
+  get.plot.dat(ENS.mli.neur.raw, "LI neur", plot.genes, anno = trait.anno, prevalence.thre = 0.2)%>% 
+    mutate(variable=paste0(label, ":", variable)),
+  get.plot.dat(Epi.si, "Epi", plot.genes, anno = trait.anno, prevalence.thre = 0.2),
+  get.plot.dat(DO, "DO", plot.genes, anno = trait.anno, prevalence.thre = 0.2) %>% 
+    filter(!str_detect(variable, "Cluster")) 
+)
+
+```
+
+
+
+```{r}
+tmp <- 
+  mutate(dat, label=str_remove(label, ".* ")) %>% 
+  distinct(genes, label) 
+
+#pdf("upset_mouse.pdf", width = 8, height = 4)
+upset(fromList(split(tmp$genes, tmp$label)), nsets = 100, set_size.show = TRUE, set_size.scale_max=1200)
+#dev.off()
+```
