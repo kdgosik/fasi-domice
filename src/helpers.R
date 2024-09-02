@@ -1,5 +1,3 @@
-library(ggplot2)
-
 #'
 #'
 #'
@@ -91,7 +89,7 @@ my_plot <- function( data, column, embedding = "tsne" ) {
                           color = column)) +
     geom_point(shape = 46) + 
     # my_theme_nolegened + 
-    scale_color_gradient(low="lightgrey", high="darkblue") +
+    scale_color_gradient(low="lightgrey", high="darkgreen") +
     labs(title = column)
   
 }
@@ -102,169 +100,6 @@ my_plot <- function( data, column, embedding = "tsne" ) {
 #'
 #'
 #'
-
-
-
-
-#' @title Plot QTL
-#' @author Kirk Gosik
-#' @description 
-#'
-#' @example plot_qtl(qtl_output = out, marker_map = map, varcolumn = "topic0", cutoff = 6, plot_title = "LTi-like - Topic 0")
-
-
-plot_qtl <- function( qtl_output, varcolumn, cutoff = 6, plot_title = "" ) {
-  
-  plotdf <- qtl_output %>%
-    mutate(lods = .data[[varcolumn]])
-  
-  ## get rectangles
-  rectangles <- plotdf %>% 
-    mutate(ymax = max(lods, na.rm=TRUE)) %>% 
-    filter(chr %in% seq(2,20,2)) %>% 
-    group_by(chr) %>% 
-    summarise(xmin = min(xpos, na.rm=T), 
-              xmax = max(xpos, na.rm=T), 
-              xmed = median(xpos, na.rm = TRUE), 
-              ymax = max(ymax)) %>% 
-    ungroup() %>%
-    mutate(ymin = 0,
-           ymax = max(ymax)) %>% 
-    arrange(xmin)
-  
-  ## get chr breaks
-  chr_breaks <- plotdf %>% 
-    filter(chr %in% 1:19) %>% 
-    group_by(chr) %>% 
-    summarise(xmed = median(xpos, na.rm = TRUE)) %>%
-    arrange(xmed) %>%
-    pull(xmed)
-  
-  qtl_plot <- ggplot() + 
-    geom_rect(data = rectangles, 
-              mapping = aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), 
-              fill='gray80', alpha=0.8) +
-    geom_point(data = plotdf, 
-               mapping = aes(x = xpos, y = lods),
-               color = c("gray", "blue")[(plotdf[[varcolumn]] > cutoff)+1]) +
-    geom_line(data = plotdf, 
-              mapping = aes(x = xpos, y = lods)) +
-    geom_hline(yintercept = cutoff, color = "red", linetype = "dashed") + 
-    # geom_label(data = markers_df, 
-    #            aes(x = xpos, y = plot_lods, label = marker), 
-    #            size = 2) +
-    # geom_label_repel(data = snp_lables, 
-    #                  aes(label=as.factor(marker), alpha = 0.7), 
-    #                  size = 2, force = 1.3)
-    scale_x_continuous(breaks = chr_breaks, label = c(as.character(1:19))) + 
-    labs(x = "Chromosome of SNP", 
-         y = "LOD", 
-         title = plot_title) +
-    theme(
-      axis.line=element_blank(),
-      axis.ticks=element_blank(),
-      panel.grid.major = element_blank(),
-      panel.grid.minor = element_blank()
-    )
-  
-  qtl_plot
-  
-}
-
-
-#' @title plot_GWAS results
-#' @author Kirk Gosik
-#' @description 
-#'
-#'
-#'
-
-
-
-
-gwas_plot <- function( gwas_data, plot_title, cutoff ) {
-  
-  ## get rectangles
-  rectangles <- gwas_data %>% 
-    filter(chr %in% seq(2,20,2)) %>% 
-    mutate(ymax = max(lods, na.rm=TRUE)) %>% 
-    group_by(chr) %>% 
-    summarise(xmin = min(xpos, na.rm=T), 
-              xmax = max(xpos, na.rm=T), 
-              xmed = median(xpos, na.rm = TRUE), 
-              ymax = max(ymax)) %>% 
-    mutate(ymin = 0) %>% arrange(xmin)
-  
-  ## get chr breaks
-  chr_breaks <- gwas_data %>% 
-    filter(chr %in% c(as.character(1:19), "X")) %>% 
-    group_by(chr) %>% 
-    summarise(xmed = median(xpos, na.rm = TRUE)) %>%
-    arrange(xmed) %>%
-    pull(xmed)
-  
-  
-  ggplot() + 
-    geom_rect(data = rectangles, 
-              mapping = aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), 
-              fill = 'gray80', alpha = 0.8) +
-    # geom_point(data = gwas_data, 
-    #            mapping = aes(x = xpos, y = lods), shape = 46) +
-    geom_point(data = gwas_data, 
-               mapping = aes(x = xpos, y = lods),
-               color = c("gray", "blue")[(gwas_data$lods > cutoff)+1]) +
-    geom_hline(yintercept = cutoff, color = "red", linetype = "dashed") + 
-    # geom_label(data = markers_df, 
-    #            aes(x = xpos, y = plot_lods, label = marker), 
-    #            size = 2) +
-    # geom_label_repel(data = snp_lables, 
-    #                  aes(label=as.factor(marker), alpha = 0.7), 
-    #                  size = 2, force = 1.3)
-    scale_x_continuous(breaks = chr_breaks, label = c(as.character(1:19), "X")) + 
-    labs(x = "Chromosome of SNP", 
-         y = "P-value(-log10 scale)", 
-         title = plot_title) +
-    theme(
-      axis.line=element_blank(),
-      axis.ticks=element_blank(),
-      panel.grid.major = element_blank(),
-      panel.grid.minor = element_blank()
-    )
-  
-}
-
-
-
-#' @title plot_quantile
-#' @author Kirk Gosik
-#' @description 
-#'
-#'
-#'
-
-
-my_quantile <- function(x) quantile(x, 50:100/100, na.rm=TRUE)
-
-plot_quantile <- function(data, column, names_to) {
-  data.frame(
-    quantile = 50:100/100,
-    AA = my_quantile(data[data[[names_to]]==0, column]), 
-    Aa = my_quantile(data[data[[names_to]]==1, column]),
-    aa = my_quantile(data[data[[names_to]]==2, column])
-  ) %>% 
-    pivot_longer(AA:aa, names_to = names_to) %>% 
-    ggplot(., aes_string("quantile", "value", color = names_to)) + 
-    geom_point() + 
-    geom_line() +
-    labs(title = column)  + 
-    theme(    
-      panel.background=element_blank(),
-      panel.grid.major=element_blank(),
-      panel.grid.minor=element_blank(),
-      plot.background=element_blank()
-    )
-}
-
 
 
 subset_reshape <- function( aprobs, ch, gmap, K, marker ) {
@@ -362,14 +197,4 @@ plot_founder <- function( df, markers ) {
     geom_tile()
   
 }
-
-
-
-
-#'
-#'
-#'
-#'
-#'
-
 
