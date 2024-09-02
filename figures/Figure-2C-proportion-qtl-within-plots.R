@@ -1,7 +1,8 @@
-#' Figure 2C Proportion qtl
-#' 
-#' 
-
+#' @title Figure 2C Proportion qtl
+#' @author Kirk Gosik
+#' @description
+#'
+#'
 library(data.table)
 library(dplyr)
 library(ggplot2)

@@ -1,7 +1,8 @@
-#' Figure 2D Rbpj Gene Model
-#' 
-#' 
-
+#' @title Figure 2D Rbpj Gene Model
+#' @author Kirk Gosik
+#' @description
+#'
+#'
 
 library(data.table)
 library(dplyr)
