@@ -1,7 +1,6 @@
-#' Figure 6B Intrinsic by Trait bar plots
-#'
-#'
-#'
+#' @title Figure 6B Intrinsic by Trait bar plots
+#' @author Kirk Gosik
+#' @description 
 #'
 #'
 

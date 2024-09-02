@@ -1,4 +1,7 @@
-#' Il22ra1 Gene Model
+#' @title Figure 6A Il22ra1 Gene Model
+#' @author Kirk Gosik
+#' @description 
+#'
 #' Chr4: 135,728,172-135,752,140  bp, + strand
 #' https://www.informatics.jax.org/marker/MGI:2663588
 #' 
