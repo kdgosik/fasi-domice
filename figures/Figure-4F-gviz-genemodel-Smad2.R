@@ -1,3 +1,8 @@
+#' @title Figure 4F Gene genemodel Smad2
+#' @author Kirk Gosik
+#' @description
+#'
+
 #' Smad2 Gene Model
 #' Chr18:76374651-76444034 bp, + strand
 #' https://www.informatics.jax.org/marker/MGI:108051

@@ -1,5 +1,6 @@
-#' Figure 4I
-#' 
+#' @title Figure 4I Gene genemodel Bcl2
+#' @author Kirk Gosik
+#' @description
 #' 
 
 library(data.table)

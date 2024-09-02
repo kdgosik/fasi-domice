@@ -1,3 +1,8 @@
+#' @title Figure 4A eQTL program intersection plot
+#' @author Kirk Gosik
+#' @description
+#'
+
 library(tidyverse)
 library(UpSetR)
 library(ComplexUpset)
