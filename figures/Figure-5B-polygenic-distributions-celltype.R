@@ -1,3 +1,9 @@
+#' @title Figure 5B polygenic distribution
+#' @author Kirk Gosik
+#' @description 
+#'
+#'
+
 library(data.table)
 library(tidyverse)
 library(ggpubr)
