@@ -1,0 +1,161 @@
+---
+title: ""
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(Seurat)
+library(reshape2)
+library(circlize)
+library(UpSetR)
+```
+
+```{r}
+# Immune
+load("data/mouseintestineimmune.LP.Rda")
+LP.raw <- gcdata
+load("data/mouseintestineimmune.PP.Rda")
+PP.raw <- gcdata
+# ENS
+load("data/mouseENS.msi.glia.Rda")
+ENS.msi.glia.raw <- gcdata
+load("data/mouseENS.msi.neur.Rda")
+ENS.msi.neur.raw <- gcdata
+load("data/mouseENS.mli.glia.Rda")
+ENS.mli.glia.raw <- gcdata
+load("data/mouseENS.mli.neur.Rda")
+ENS.mli.neur.raw <- gcdata
+# Epi
+load("data/mousecellatlas.Small-Intestinal-Epithelium.Rda")
+Epi.si <- gcdata
+
+# DO
+load("data/mouseDO_subsample.Rda")
+DO <- gcdata
+```
+
+
+```{r}
+get.plot.dat <- function(obj, name, genes, anno, prevalence.thre=0.25, expression.thre=0){
+  plot.dat <- 
+    FetchData(obj, vars = c( "annotation", genes)) %>% 
+    group_by(annotation) %>% 
+    summarise_all(function(x) sum(x>expression.thre)/n()) %>% 
+    column_to_rownames("annotation") %>% t() %>% 
+    data.frame(check.names = F) %>% 
+    rownames_to_column("genes") %>% 
+    melt(id.vars="genes") %>% 
+    filter(value>prevalence.thre) %>% 
+    merge(anno, by="genes") %>% 
+    mutate(label=name)
+  plot.dat
+}
+```
+
+```{r}
+unified.gene.list <- read_csv("trait_by_loci_10kb_window.csv") %>% 
+  filter(ilc1_expressed+ilc2_expressed+ilc3_expressed+lti_expressed==0)
+```
+
+```{r}
+topics <- filter(unified.gene.list, str_detect(trait, "topic")) %>% 
+  select(genes=eQTL_loci_gene_name, trait) %>% distinct()
+topic.genes <- unique(topics$genes)
+
+proportions <- filter(unified.gene.list, str_detect(trait, "ILC[123]_ILC[123]") | str_detect(trait, "ILC[123]_LTi")) %>% 
+  distinct(genes=eQTL_loci_gene_name, trait)
+proportion.genes <- unique(proportions$genes)
+
+eqtl <- filter(unified.gene.list, !str_detect(trait, "ILC[123]_ILC[123]") & !str_detect(trait, "ILC[123]_LTi")) %>% 
+  filter(!str_detect(trait, "topic")) %>% 
+  filter(str_detect(trait, "^ILC")|str_detect(trait, "^LTi")) %>% 
+  mutate(trait=str_remove(trait, "_.*")) %>% 
+  distinct(genes=eQTL_loci_gene_name, trait)
+
+eqtl.genes <- unique(eqtl$genes)
+```
+
+
+## eQTL genes
+
+```{r}
+plot.genes <- eqtl.genes
+trait.anno <- eqtl
+
+dat <- rbind(
+  get.plot.dat(LP.raw, "LP", plot.genes, anno = trait.anno, prevalence.thre = 0.2) %>% 
+    filter(!str_detect(variable, "[0-9]"), variable!="Ep") %>% 
+    mutate(variable=paste0(label, ":", variable)),
+  get.plot.dat(PP.raw, "PP", plot.genes, anno = trait.anno, prevalence.thre = 0.2) %>% 
+    filter(!str_detect(variable, "[0-9]"), variable!="Ep") %>% 
+    mutate(variable=paste0(label, ":", variable)),
+  get.plot.dat(ENS.msi.glia.raw, "SI glia", plot.genes, anno = trait.anno, prevalence.thre = 0.2)%>% 
+    mutate(variable=paste0(label, ":", variable)),
+  get.plot.dat(ENS.msi.neur.raw, "SI neur", plot.genes, anno = trait.anno, prevalence.thre = 0.2)%>% 
+    mutate(variable=paste0(label, ":", variable)),
+  get.plot.dat(ENS.mli.glia.raw, "LI glia", plot.genes, anno = trait.anno, prevalence.thre = 0.2)%>% 
+    mutate(variable=paste0(label, ":", variable)),
+  get.plot.dat(ENS.mli.neur.raw, "LI neur", plot.genes, anno = trait.anno, prevalence.thre = 0.2)%>% 
+    mutate(variable=paste0(label, ":", variable)),
+  get.plot.dat(Epi.si, "Epi", plot.genes, anno = trait.anno, prevalence.thre = 0.2),
+  get.plot.dat(DO, "DO", plot.genes, anno = trait.anno, prevalence.thre = 0.2) %>% 
+    filter(!str_detect(variable, "Cluster")) 
+)
+
+```
+
+
+```{r fig.height=15, fig.width=15}
+adjacencyData <- with(dat, table(trait, variable))
+ 
+tmp <- distinct(dat, variable, label) 
+group <- structure(c(tmp$label, rep("topics", length(unique(dat$trait)))), 
+                   names= c((as.character(tmp$variable)), unique(dat$trait)))
+
+set.seed(11)
+
+grid.col <-  c(rep("pink", length(unique(dat$variable))), rand_color(length(unique(dat$trait)), hue = "monochrome", luminosity = "bright"))
+names(grid.col) <- c(unique(as.character(dat$variable)), unique(dat$trait))
+
+#pdf("plot.pdf", width = 15, height = 15)
+circos.clear()
+# Make the circular plot
+chordDiagram(adjacencyData, transparency = 0.5, group=group,
+                 annotationTrack = c("grid"),
+             annotationTrackHeight = 0.2,
+             grid.col = grid.col,
+    preAllocateTracks = list(
+        track.height = mm_h(4),
+        track.margin = c(mm_h(4), 0)
+  )
+  )
+
+circos.track(track.index = 2, panel.fun = function(x, y) {
+    sector.index = get.cell.meta.data("sector.index")
+    xlim = get.cell.meta.data("xlim")
+    ylim = get.cell.meta.data("ylim")
+    circos.text(mean(xlim), mean(ylim), sector.index, 
+                cex = 0.6, niceFacing = TRUE, facing = "clockwise")
+}, bg.border = NA)
+
+for(i in unique(tmp$label)){
+  highlight.sector(filter(tmp, label==i)$variable, track.index = 1, col = "yellow", #facing = "clockwise",
+    text = i, cex = 0.8, text.col = "black", niceFacing = TRUE)
+}
+#dev.off()
+```
+
+```{r}
+tmp <- 
+  mutate(dat, label=str_remove(label, ".* ")) %>% 
+  distinct(genes, label) 
+
+#pdf("upset_mouse.pdf", width = 8, height = 4)
+upset(fromList(split(tmp$genes, tmp$label)), nsets = 100, set_size.show = TRUE, set_size.scale_max=1200)
+#dev.off()
+```
