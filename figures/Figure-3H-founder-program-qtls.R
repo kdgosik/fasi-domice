@@ -1,6 +1,8 @@
-#' Figure 3H
-#' 
-#' 
+#' @title Figure 3H Founder program QTLs
+#' @author Kirk Gosik
+#' @description
+#'
+
 
 ## Set project directory
 project_path <- "/ahg/regevdata/projects/FASI_DOmice/"

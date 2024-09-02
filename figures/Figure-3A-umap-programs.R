@@ -1,6 +1,8 @@
-#' Figure 3A Supplementary
-#' 
-#' 
+#' @title Figure 3A UMAP Programs
+#' @author Kirk Gosik
+#' @description
+#'
+#'
 
 project_path <- "/ahg/regevdata/projects/FASI_DOmice/"
 if( length(dir(project_path)) == 0 ) project_path <- "/Volumes/ahg_regevdata/projects/FASI_DOmice/"
@@ -22,7 +24,7 @@ for( t in paste0("topic", keep_topics) ) {
     scale_color_gradient(low = "lightgrey", high = "darkblue") +
     my_theme
   
-  ggsave(filename = paste0(figure_path, "Supp.Fig.3A", i, "-tsne-", t, ".pdf"), 
+  ggsave(filename = paste0(figure_path, "Figure-3A-", i, "-tsne-", t, ".pdf"), 
          plot = plot_out,
          height = 7,
          width = 7,
