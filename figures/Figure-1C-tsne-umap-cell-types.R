@@ -1,4 +1,4 @@
-#' @title Figure 1B Cell Atlas
+#' @title Figure 1C Cell Atlas
 #' @author Kirk Gosik
 #' @description
 #'

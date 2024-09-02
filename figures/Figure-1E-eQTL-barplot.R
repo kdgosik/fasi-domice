@@ -1,4 +1,4 @@
-#' @title Figure 1D eQTL map
+#' @title Figure 1E eQTL map
 #' @author Kirk Gosik
 #' 
 #' @description Cell type specific barplot of eQTL types

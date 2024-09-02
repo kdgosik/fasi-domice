@@ -1,7 +1,8 @@
-#' Figure 1 E Muc2 Gene Model
-#' 
-#' 
-
+#' @title Figure 1G Muc2 Gene Model
+#' @author Kirk Gosik
+#' @description
+#'
+#'
 
 library(data.table)
 library(tidyverse)

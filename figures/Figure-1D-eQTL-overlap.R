@@ -1,4 +1,4 @@
-#' @title Figure 1C eQTL Overlap
+#' @title Figure 1D eQTL Overlap
 #' @author Kirk Gosik
 #' @description
 #'
