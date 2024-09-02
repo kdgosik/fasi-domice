@@ -1,0 +1,652 @@
+---
+title: "DO_QTL_read_gut_data.Rmd"
+author: "Orr Ashenberg"
+date: "7/28/2022"
+output: html_document
+---
+
+Load different mouse and human gut scRNA-Seq datasets, for use in QTLs from DO mouse study with Kirk Gosik and Miao Xu. The script normalizes the scRNA-Seq expression data when necessary, and makes a commonly named column with cell type annotations.
+
+The separate script DO_QTL_expression.Rmd loads these datasets and looks at expression of eGenes and other genes involoved in QTLs from DO mouse study.
+
+# Load libraries, set paths, etc. 
+```{r}
+# Load libraries
+rm(list = ls())
+library(ggplot2)
+library(cowplot)
+theme_set(theme_cowplot())
+library(Seurat)
+library(dplyr)
+library(Matrix)
+library(gplots)
+library(GSA)
+library(stringr)
+library(fossil)  # adjusted rand index function
+library(patchwork)
+library(readxl)
+
+# Set directories 
+proj.path <- "/Volumes/broad_kco/projects/GutCircuits"
+proj.FASI.path <- "/Volumes/ahg_regevdata/projects/FASI_DOmice"
+user.path <- "/Volumes/ahg_regevdata/users/orr"
+# proj.path <- "/broad/kco/projects/GutCircuits"
+# proj.FASI.path <- "/ahg/regevdata/projects/FASI_DOmice"
+# user.path <- "/ahg/regevdata/users/orr"
+
+# Set date year_month_day to use in figure directory name and in names for saving Rda objects.
+date <- "2022_06_14"
+
+# Output figures.
+figures.dir <- paste0(proj.path, "/results/", date, "_DO_QTL/")
+
+# Create output directories.
+# out.dir <- c(figures.dir)
+# sapply(c(out.dir), function(i) {if (!dir.exists(i)) {dir.create(i, recursive = T)} })
+
+# Select which DE test implemented in Seurat to use.
+tests <- c("wilcox", "t", "roc", "MAST", "bimod")
+test <- tests[1]
+
+# Load my functions.
+source(paste0(user.path, "/code/R/plotutils.R"))
+source(paste0(user.path, "/code/R/seurat3utils.R"))
+source(paste0(user.path, "/code/R/color.R"))
+
+# knitr settings for code chunks.
+knitr::opts_knit$set(root.dir = proj.path)  # set working directory for all chunks
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(cache = TRUE)
+```
+
+## Read in eQTL gene list
+Miao Xu provided the gene list in an email 4/20/2022 "Here is the QTL gene list which was reorganized. Please check and let Kirk or me know if there is anything not clear to you."
+```{r read_QTL_genes}
+library(readxl)
+library(tidyr)
+
+# Miao Xu provided the gene list in an email 4/19/2022 "the QTL gene list not expressed in ILCs"
+file.QTL <- paste0(proj.path, "/doc/2022_04_19_QTL_genes_not_expressed_in_ILCs_Miao.xlsm")
+name.sheets <- c("eQTL", "proportionQTL", "topicQTL")
+
+name.sheet <- name.sheets[1]
+df <- read_excel(file.QTL, sheet = name.sheet)
+df$...1 <- NULL
+df$...10 <- NULL
+df$...15 <- NULL
+df$...16 <- NULL
+lines <- c()
+for (signature in colnames(df)) {
+  genes <- df[[signature]][!is.na(df[[signature]])]
+  genes <- genes[genes != "NA"]
+  print(genes)
+  # genes <- MouseHumanHomolog(mouse.human, genes, "mouse")
+  genes <- genes[!duplicated(genes)]
+  name.signature <- gsub(" ", "_", signature)
+  newline <- paste0(c(name.signature, name.signature, genes), collapse = "\t")
+  lines <- c(lines, newline)
+}
+# Write gene signatures to gmt file.
+fileConn <- file(paste0(user.path, "/data/genelists/DO_mouse_", name.sheet, "_genes.gmt"))
+writeLines(lines, fileConn)
+close(fileConn)
+
+name.sheet <- name.sheets[2]
+df <- read_excel(file.QTL, sheet = name.sheet)
+df$...7 <- NULL
+df$...8 <- NULL
+df$...11 <- NULL
+lines <- c()
+for (signature in colnames(df)) {
+  genes <- df[[signature]][!is.na(df[[signature]])]
+  genes <- genes[genes != "NA"]
+  print(genes)
+  # genes <- MouseHumanHomolog(mouse.human, genes, "mouse")
+  genes <- genes[!duplicated(genes)]
+  name.signature <- gsub(" ", "_", signature)
+  newline <- paste0(c(name.signature, name.signature, genes), collapse = "\t")
+  lines <- c(lines, newline)
+}
+# Write gene signatures to gmt file.
+fileConn <- file(paste0(user.path, "/data/genelists/DO_mouse_", name.sheet, "_genes.gmt"))
+writeLines(lines, fileConn)
+close(fileConn)
+
+name.sheet <- name.sheets[3]
+df <- read_excel(file.QTL, sheet = name.sheet)
+lines <- c()
+for (signature in colnames(df)) {
+  genes <- df[[signature]][!is.na(df[[signature]])]
+  genes <- genes[genes != "NA"]
+  print(genes)
+  # genes <- MouseHumanHomolog(mouse.human, genes, "mouse")
+  genes <- genes[!duplicated(genes)]
+  if (length(genes) > 0) {
+    name.signature <- gsub(" ", "_", signature)
+    newline <- paste0(c(name.signature, name.signature, genes), collapse = "\t")
+    lines <- c(lines, newline)
+  }
+}
+# Write gene signatures to gmt file.
+fileConn <- file(paste0(user.path, "/data/genelists/DO_mouse_", name.sheet, "_genes.gmt"))
+writeLines(lines, fileConn)
+close(fileConn)
+
+# Read gmt file.
+file.gmt.QTL <- paste0(user.path, "/data/genelists/DO_mouse_", name.sheet, "_genes.gmt")
+invisible(capture.output(gs <- GSA.read.gmt(file.gmt.QTL)))
+```
+
+## Kirk Gosik and Miao Xu DO mouse ILC dataset
+This object from Kirk has no UMAP. I also noticed the Seurat object metadata is missing the rownames, which should be the names of the cells. I took the existing expression matrix, with the metadata with cell names added, and created a new Seurat object. Then I subsampled the data for memory purposes and saved the new object.
+```{r DO_QTL}
+# Kirk Gosik and Miao Xu ILC study
+Rda.path <- paste0(proj.FASI.path, "/kirk/data/seurat/allchannels.rds")  # original object from Kirk
+gcdata <- readRDS(Rda.path)  # no dimensionality reduction, celltypes in called_cell_types_new
+# DimPlot(gcdata, reduction = "umap", group.by = "called_cell_types_new", label = T)  # no umap included
+table(gcdata$called_cell_types_new)
+all.equal(as.character(gcdata$index), colnames(gcdata))
+
+# Metadata is missing the rownames (which are the names of the cells). Create a new Seurat object with 
+# correctly formatted metadata.
+metadata <- gcdata[[]]
+rownames(metadata) <- colnames(gcdata)
+metadata$index <- NULL
+all.equal(rownames(metadata), colnames(gcdata))
+gcdata.new <- CreateSeuratObject(counts = gcdata[["RNA"]]@counts, project = paste0("mouseDO"), meta.data = metadata)
+
+# Downsample the Seurat object by cell type in case it is very large.
+Idents(gcdata.new) <- "called_cell_types_new"
+gcdata <- subset(gcdata.new, downsample = 20000)
+
+# Check if expression data is normalized and log transformed.
+Matrix::colSums(gcdata[['RNA']]@counts[,1:10])  # counts and data same, already normalized
+Matrix::colSums(expm1(gcdata[['RNA']]@data[,1:10]))  # sums to 1e5
+
+# Set a common annotation column to use across all gut datasets.
+gcdata[["annotation"]] <- gcdata$called_cell_types_new
+
+# Save Seurat object.
+Rda.path <- paste0(proj.path, "/src/Rdata/gutreference/mouseDO_subsample.Rda")
+save(gcdata, file = Rda.path)
+```
+
+
+## Tabula Muris
+[Tabula Muris](https://www.nature.com/articles/s41586-018-0590-4) https://figshare.com/projects/Tabula_Muris_Transcriptomic_characterization_of_20_organs_and_tissues_from_Mus_musculus_at_single_cell_resolution/27733
+    - facs_Large_Intestine_seurat_tiss.Robj
+I also received from Alok Jaiswal 8/12/2022 by Slack two files that had all the tissue data from Tabula Muris concatenated together, both plate data and droplet data.
+cp /broad/xavierlab_datadeposit/ajaiswal/Data/Tabula_Muris/data/All_tissue_droplet.rds /broad/kco/projects/GutCircuits/src/Rdata/DO_QTL/TabulaMuris/All_tissue_droplet.rds
+cp /broad/xavierlab_datadeposit/ajaiswal/Data/Tabula_Muris/data/All_tissue_FACS.rds /broad/kco/projects/GutCircuits/src/Rdata/DO_QTL/TabulaMuris/All_tissue_FACS.rds
+
+```{r TabulaMuris}
+# Path to save Seurat object
+Rda.path <- paste0(proj.path, "/src/Rdata/gutreference/mouseTabulaMuris.large.intestine.Rda")
+
+load(paste0(proj.path, "/src/Rdata/DO_QTL/TabulaMuris/facs_Large_Intestine_seurat_tiss.Robj"), verbose = T)
+gcdata <- UpdateSeuratObject(tiss)
+DimPlot(gcdata, reduction = "tsne", group.by = "cell_ontology_class")
+DimPlot(gcdata, reduction = "tsne", group.by = "free_annotation", label = T)
+
+# Check if expression data is normalized and log transformed.
+Matrix::colSums(gcdata[['RNA']]@counts[,1:10])  # looks like raw counts
+Matrix::colSums(expm1(gcdata[['RNA']]@data[,1:10]))  # sums to 1e6
+
+# Set a common annotation column to use across all gut datasets.
+gcdata[["annotation"]] <- gcdata$free_annotation
+  
+# Save Seurat object.
+save(gcdata, file = Rda.path)
+
+# Alok Jaiswal Tabula Muris objects.
+# Path to save Seurat object
+Rda.path <- paste0(proj.path, "/src/Rdata/gutreference/mouseTabulaMuris_droplet.Rda")
+gcdata <- readRDS(paste0(proj.path, "/src/Rdata/DO_QTL/TabulaMuris/All_tissue_droplet.rds"))
+
+Rda.path <- paste0(proj.path, "/src/Rdata/gutreference/mouseTabulaMuris_plate.Rda")
+gcdata <- readRDS(paste0(proj.path, "/src/Rdata/DO_QTL/TabulaMuris/All_tissue_FACS.rds"))
+
+# Check if expression data is normalized and log transformed.
+Matrix::colSums(gcdata[['RNA']]@counts[,1:10])  # looks like raw counts
+Matrix::colSums(expm1(gcdata[['RNA']]@data[,1:10]))  # sums to 1e4 (droplet) or to 1e6 (plate)
+
+# Set a common annotation column to use across all gut datasets.
+# tissue "Bladder", free_annotation "Bladder mesenchymal cell", cell_ontology_class "bladder cell", Cluster "Bladder:bladder cell"
+gcdata[["annotation"]] <- gcdata$Cluster
+
+# Save Seurat object.
+save(gcdata, file = Rda.path)
+```
+
+## Mapping the Mouse Cell Atlas by Microwell-Seq
+[Mapping the Mouse Cell Atlas by Microwell-Seq](https://www.sciencedirect.com/science/article/pii/S0092867418301168)
+
+Two datasets provided. I think both datasets are from the small intestine.
+http://bis.zju.edu.cn/MCA/gallery.html?tissue=Small-Intestinal-Epithelium Data source: Data source: Haber, A., Biton, M., Rogel, N. et al. A single-cell survey of the small intestinal epithelium. Nature (2017).
+http://bis.zju.edu.cn/MCA/gallery.html?tissue=Adult-Intestine Data source: MCA2.0
+```{r MouseCellAtlas}
+# Name of each mouse cell atlas dataset.
+cell.subsets <- list("Small-Intestinal-Epithelium" = "Small-Intestinal-Epithelium", "Adult-Intestine" = "Adult-Intestine")
+
+# Iterate through each single cell portal dataset.
+for (prefix in names(cell.subsets)) {
+  print(prefix)
+
+  # Path to save Seurat object.
+  Rda.path <- paste0(proj.path, "/src/Rdata/gutreference/mousecellatlas.", prefix, ".Rda")
+  
+  # Read all cell metadata.
+  metadata.all <- read.table(paste0(proj.path, "/src/Rdata/DO_QTL/MouseCellAtlas/", prefix, "/", prefix, "_barcodes_anno.csv"), header = TRUE, stringsAsFactors=FALSE, sep = ",", check.names = F)
+  colnames(metadata.all) <- c("NAME", "Idents", "Cluster")
+
+  # Subset metadata to specific experiment.
+  metadata <- metadata.all
+  rownames(metadata) <- metadata$NAME
+  metadata$NAME <- NULL
+  
+  # Read expression matrix and store in Seurat object.
+  expression <- read.table(paste0(proj.path, "/src/Rdata/DO_QTL/MouseCellAtlas/", prefix, "/", prefix, "_dge.csv"), header = TRUE, stringsAsFactors=FALSE, sep = ",", check.names = F)
+  expression <- expression[, 2:ncol(expression)] # first column is for gene symbols
+  genes <- read.table(paste0(proj.path, "/src/Rdata/DO_QTL/MouseCellAtlas/", prefix, "/", prefix, "_gene.csv"), sep = ",", header = T)$x
+  if (length(genes) != nrow(expression)) stop("# genes mismatch")
+  if (!all.equal(rownames(metadata), colnames(expression))) stop("barcode names mismatch")
+  rownames(expression) <- genes
+  metadata <- metadata[rownames(metadata) %in% colnames(expression), ]
+  all.equal(rownames(metadata), colnames(expression))
+  gcdata <- CreateSeuratObject(counts = expression, project = paste0("mousecellatlas.", prefix), meta.data = metadata)
+  
+  # No tSNE or UMAP is provided. Generate the embedding here.
+  gcdata <- NormalizeData(gcdata, normalization.method = "LogNormalize", scale.factor = 10000)
+  gcdata <- FindVariableFeatures(gcdata, selection.method = "vst", nfeatures = 2000)
+  gcdata <- ScaleData(gcdata)
+  gcdata <- RunPCA(gcdata, features = VariableFeatures(object = gcdata))
+  gcdata <- FindNeighbors(gcdata, dims = 1:20)
+  gcdata <- FindClusters(gcdata, resolution = 0.5)
+  gcdata <- RunUMAP(gcdata, dims = 1:20, n.neighbors = 15, min.dist = 0.5, spread = 1, metric = "euclidean", seed.use = 1)  
+  DimPlot(gcdata, reduction = "umap", group.by = "Idents", label = T)
+
+  # Downsample the Seurat object by cell type in case it is very large.
+  Idents(gcdata) <- "Idents"
+  gcdata <- subset(gcdata, downsample = 5000)
+  
+  # Check if expression data is normalized and log transformed.
+  Matrix::colSums(gcdata[['RNA']]@counts[,1:10])  # looks like raw counts
+  Matrix::colSums(expm1(gcdata[['RNA']]@data[,1:10]))  # sums to 1e4
+  
+  # Set a common annotation column to use across all gut datasets.
+  gcdata[["annotation"]] <- gcdata$Idents
+
+  # Save Seurat object.
+  save(gcdata, file = Rda.path)
+  # assign(paste0("gcdata.humanUC.", prefix), gcdata)
+  # rm(gcdata)
+  # save(list = paste0("gcdata.humanUC.", prefix), file = Rda.path)
+}
+
+for (prefix in names(cell.subsets)) {
+  print(prefix)
+
+  # Path to save Seurat object.
+  Rda.path <- paste0(proj.path, "/src/Rdata/gutreference/mousecellatlas.", prefix, ".Rda")
+  load(Rda.path)
+  
+  # Check if expression data is normalized and log transformed.
+  print(Matrix::colSums(gcdata[['RNA']]@counts[,1:10]))  # looks like raw counts
+  print(Matrix::colSums(expm1(gcdata[['RNA']]@data[,1:10])))  # sums to 1e4
+  
+  # Set a common annotation column to use across all gut datasets.
+  gcdata[["annotation"]] <- gcdata$Idents
+  
+  save(gcdata, file = Rda.path)
+}
+```
+
+## Read data from mouse Small intestinal epithelium single cell portal
+[Small intestinal epithelium single cell portal](https://singlecell.broadinstitute.org/single_cell/study/SCP44/small-intestinal-epithelium)
+```{r mouseSI}
+# Path to save Seurat object
+Rda.path <- paste0(proj.path, "/src/Rdata/gutreference/mouseSI.Rda")
+
+# Read cell metadata.
+metadata <- read.table(paste0(proj.path, "/src/Rdata/DO_QTL/SCP44/metadata/atlas_metadata.txt"), stringsAsFactors=FALSE, skip = 2, sep = "\t", check.names = F)
+colnames(metadata) <- c("NAME", "Mouse", "Cluster",	"nGene", "Cellcycle", "Region", "Condition")
+rownames(metadata) <- metadata$NAME
+metadata$NAME <- NULL
+
+# Read expression matrix and store in Seurat object.
+# atlas_Log2Tpm_round2.txt	Expression matrix for cells sampled from the whole gut (Figure 1).
+expression <- read.table(paste0(proj.path, "/src/Rdata/DO_QTL/SCP44/expression/atlas_Log2Tpm_round2.txt"), row.names = "GENE", header = T, check.names = F)
+metadata <- metadata[rownames(metadata) %in% colnames(expression), ]
+all.equal(rownames(metadata), colnames(expression))
+gcdata <- CreateSeuratObject(counts = expression, project = "mouseSI", meta.data = metadata)
+
+# Read tSNE. atlas_tSNE_PCA_update.txt (Atlas of epithelial cells (Figure 1))	Figure 1b: A single-cell expression survey of IECs, n=6 mice
+tsne <- read.table(paste0(proj.path, "/src/Rdata/DO_QTL/SCP44/cluster/atlas_tSNE_PCA_update.txt"), stringsAsFactors=FALSE, skip = 2)
+colnames(tsne) <- c("NAME", "tSNE_1", "tSNE_2", "PC1", "PC2", "PC3", "PC4", "PC5")
+rownames(tsne) <- tsne$NAME
+tsne$NAME <- NULL
+tsne <- as.matrix(tsne)
+gcdata[["tsne"]] <- CreateDimReducObject(embeddings = tsne[, 1:2], key = "tSNE_", assay = DefaultAssay(gcdata))
+DimPlot(gcdata, reduction = "tsne", group.by = "Cluster")
+
+# Check if expression data is normalized and log transformed.
+print(Matrix::colSums(gcdata[['RNA']]@counts[,1:10]))  
+print(Matrix::colSums(2^(gcdata[['RNA']]@data[,1:10])-1))  # sums to 1e4
+
+# Set a common annotation column to use across all gut datasets.
+gcdata[["annotation"]] <- gcdata$Cluster
+
+# Save Seurat object.
+save(gcdata, file = Rda.path)
+# gcdata.mouseSI <- gcdata
+# rm(gcdata)
+# save(gcdata.mouseSI, file = Rda.path)
+```
+
+## The human and mouse enteric nervous system at single cell resolution single cell portal
+[The human and mouse enteric nervous system at single cell resolution single cell portal](https://singlecell.broadinstitute.org/single_cell/study/SCP1038/the-human-and-mouse-enteric-nervous-system-at-single-cell-resolution)
+
+hey orr. there are lots of datasets
+so we have…
+plated-based mouse colon (“ss2”), 10x mouse colon (“mli”) + ileum (“msi”), 10x human colon (“hli”) (edited) 
+and for each of these, we have three analysis objects:
+neuron, glia, and all cells
+the neuron and glia objects contain higher-res clustering info + tsne
+while “all cells” contains analysis of all cells together
+
+
+1) Mouse colon ENS (plate-based SMART-Seq2):
+- 2,657 neurons
+- 3,039 glia
+- File prefixes: ss2 (all cell types), ss2.neur (neurons), ss2.glia (glia)
+
+2) Mouse full colon (droplet-based MIRACL-Seq)
+- 704,314 total nuclei (343,000 highest-quality used for visualization/analyses)
+- 1,938 neurons
+- 1,690 glia"
+- File prefixes: mli (all cell types), mli.neur (neurons), mli.glia (glia)
+
+3) Mouse full ileum (droplet-based MIRACL-Seq)
+- 436,202 total nuclei (79,293 highest-quality used for visualization/analyses)
+- 473 neurons
+- 429 glia
+- File prefixes: msi (all cell types), msi.neur (neurons), msi.glia (glia)
+
+4) Human full colon myenteric plexus (droplet-based MIRACL-Seq)
+- 436,202 total nuclei (146,442 highest-quality used for visualization/analyses)
+- 1,445 neurons
+- 6,054 glia
+- File prefixes: hli (all cell types), hli.neur (neurons), hli.glia (glia)
+```{r mouseENS}
+# Name of each ENS dataset.
+cell.subsets <- list("hli" = "Human colon all cells (10X)", "hli.glia" = "Human colon enteric glia (10X)", "hli.neur" = "Human colon enteric neurons (10X)", "mli" = "Mouse colon all cells (10X)", "mli.glia" = "Mouse colon enteric glia (10X)", "mli.neur" = "Mouse colon enteric neurons (10X)", "ss2.glia" = "Mouse colon enteric glia (Smart-Seq2)", "ss2.neur" = "Mouse colon enteric neurons (Smart-Seq2)", "msi" = "Mouse ileum all cells (10X)", "msi.glia" = "Mouse ileum enteric glia (10X)", "msi.neur" = "Mouse ileum enteric neurons (10X)")
+
+# Read all cell metadata.
+metadata.all <- read.table(paste0(proj.path, "/src/Rdata/DO_QTL/SCP1038/metadata/all.meta.txt"), stringsAsFactors=FALSE, skip = 2, sep = "\t", check.names = F)
+colnames(metadata.all) <- c("NAME", "Age", "Annotation",	"Dataset", "Location_ID", "Mouse_ID", "Overload", "Patient_ID", "Region", "Segment", "Sex", "Time", "Type", "Unique_ID", "nGene", "nUMI")
+
+# Iterate through each single cell portal dataset.
+for (prefix in names(cell.subsets)) {
+  print(prefix)
+
+  # Path to save Seurat object.
+  Rda.path <- paste0(proj.path, "/src/Rdata/gutreference/mouseENS.", prefix, ".Rda")
+  
+  # Subset metadata to specific experiment.
+  metadata <- metadata.all[metadata.all$Dataset == cell.subsets[[prefix]], ]
+  rownames(metadata) <- metadata$NAME
+  metadata$NAME <- NULL
+  
+  # Read expression matrix and store in Seurat object.
+  expression <- Matrix::readMM(file = paste0(proj.path, "/src/Rdata/DO_QTL/SCP1038/expression/gene_sorted-", prefix, ".matrix.mtx"))
+  barcodes <- read.table(paste0(proj.path, "/src/Rdata/DO_QTL/SCP1038/expression/", prefix, ".barcodes.tsv"), sep = "\t", header = F)$V1
+  genes <- read.table(paste0(proj.path, "/src/Rdata/DO_QTL/SCP1038/expression/", prefix, ".genes.tsv"), sep = "\t", header = F)$V1
+  if (length(genes) != nrow(expression)) stop("# genes mismatch")
+  if (length(barcodes) != ncol(expression)) stop("# barcodes mismatch")
+  if (length(barcodes) != nrow(metadata)) stop("metadata and barcodes mismatch")
+  if (grepl("ss2", prefix)) {  # SS2 barcodes need to have the first part of name truncated
+    barcodes <- gsub("^[A-Za-z]+_", "", barcodes, perl=T)
+  }
+  rownames(expression) <- genes
+  colnames(expression) <- barcodes
+  metadata <- metadata[rownames(metadata) %in% colnames(expression), ]
+  all.equal(rownames(metadata), colnames(expression))
+  gcdata <- CreateSeuratObject(counts = expression, project = paste0("mouseENS.", prefix), meta.data = metadata)
+  
+  # Read tSNE. 
+  tsne <- read.table(paste0(proj.path, "/src/Rdata/DO_QTL/SCP1038/cluster/", prefix, ".tsne2.txt"), stringsAsFactors=FALSE, skip = 2)
+  colnames(tsne) <- c("NAME", "tSNE_1", "tSNE_2", "LABEL")
+  rownames(tsne) <- tsne$NAME
+  tsne$NAME <- NULL
+  tsne <- as.matrix(tsne[, 1:2])
+  gcdata[["tsne"]] <- CreateDimReducObject(embeddings = tsne, key = "tSNE_", assay = DefaultAssay(gcdata))
+  DimPlot(gcdata, reduction = "tsne", group.by = "Annotation")
+  
+  # Downsample the Seurat object by cell type in case it is very large.
+  Idents(gcdata) <- "Annotation"
+  gcdata <- subset(gcdata, downsample = 5000)
+  
+  # Save Seurat object.
+  save(gcdata, file = Rda.path)
+  # assign(paste0("gcdata.mouseENS.", prefix), gcdata)
+  # rm(gcdata)
+  # save(list = paste0("gcdata.mouseENS.", prefix), file = Rda.path)
+}
+
+for (prefix in names(cell.subsets)) {
+  print(prefix)
+
+  # Path to save Seurat object.
+  Rda.path <- paste0(proj.path, "/src/Rdata/gutreference/mouseENS.", prefix, ".Rda")
+  load(Rda.path)
+  
+  # Check if expression data is normalized and log transformed.
+  print(Matrix::colSums(gcdata[['RNA']]@counts[,1:10]))  # looks like raw UMI counts for 10x, and not normalized for SMART-Seq2
+  gcdata <- NormalizeData(gcdata, normalization.method = "LogNormalize", scale.factor = 10000)
+  print(Matrix::colSums(expm1(gcdata[['RNA']]@data[,1:10])))  # sums to 1e4
+  
+  # Set a common annotation column to use across all gut datasets.
+  gcdata[["annotation"]] <- gcdata$Annotation
+  
+  save(gcdata, file = Rda.path)
+}
+
+```
+
+## Transcriptional Atlas of Intestinal Immune Cells Reveals that Neuropeptide α-CGRP Modulates Group 2 Innate Lymphoid Cell Responses
+Heping Xu and Jiarui Ding Transcriptional atlas of intestinal immune cells: https://singlecell.broadinstitute.org/single_cell/study/SCP210/fasi-immune-mouse-small-intestine
+- link cluster numbers to cell type annotations in https://bitbucket.org/jerry00/mouse_small_intestine_immune_cell_atlas/src/master/data/cell_count_statistics.rda
+Jiarui: Hi Orr. We analyze the 29 cluster in detail. 
+
+Of the 46 clusters across both LP and PP, only 29 are annotated by cell type. I will leave all the clusters in and label the ones where we have the annotations stored in the bitbucket.
+```{r MouseImmunePPLP}
+# There are 29 annotated clusters in cell.group and cell.type. This links cluster number to annotation.
+load(paste0(proj.path, "/src/Rdata/DO_QTL/SCP210/cell_count_statistics.rda"), verbose = T)
+
+# Name of each UC dataset.
+cell.subsets <- list("LP" = "LP", "PP" = "PP")
+
+# Read all cell metadata.
+metadata.all <- read.table(paste0(proj.path, "/src/Rdata/DO_QTL/SCP210/metadata/Food-Allergy-PP-LP_cluster_v1.txt"), stringsAsFactors=FALSE, skip = 2, sep = "\t", check.names = F)
+colnames(metadata.all) <- c("NAME", "Cluster")
+
+# Iterate through each single cell portal dataset.
+for (prefix in names(cell.subsets)) {
+  print(prefix)
+
+  # Path to save Seurat object.
+  Rda.path <- paste0(proj.path, "/src/Rdata/gutreference/mouseintestineimmune.", prefix, ".Rda")
+  
+  # Subset metadata to specific experiment.
+  metadata <- metadata.all
+  rownames(metadata) <- metadata$NAME
+  metadata$NAME <- NULL
+  
+  # Read expression matrix and store in Seurat object.
+  expression <- read.table(paste0(proj.path, "/src/Rdata/DO_QTL/SCP210/expression/Food-Allergy-", prefix, "_normalized_matrix.txt"), row.names = "GENE", header = T, check.names = F)
+  metadata <- metadata[rownames(metadata) %in% colnames(expression), , drop = FALSE]
+  all.equal(rownames(metadata), colnames(expression))
+  gcdata <- CreateSeuratObject(counts = expression, project = paste0("mouseintestineimmune.", prefix), meta.data = metadata)
+  
+  # Read tSNE. 
+  tsne <- read.table(paste0(proj.path, "/src/Rdata/DO_QTL/SCP210/cluster/Food-Allergy-", prefix, "_coord_2d.txt"), stringsAsFactors=FALSE, skip = 2)
+  colnames(tsne) <- c("NAME", "scvi_1", "scvi_2")
+  rownames(tsne) <- tsne$NAME
+  tsne$NAME <- NULL
+  tsne <- as.matrix(tsne[, 1:2])
+  all.equal(rownames(tsne), colnames(gcdata))
+  gcdata[["scvi"]] <- CreateDimReducObject(embeddings = tsne, key = "scvi_", assay = DefaultAssay(gcdata))
+  DimPlot(gcdata, reduction = "scvi", group.by = "Cluster")
+  
+  # Map the cluster numbers to the annotated cell types.
+  gcdata[["Annotation"]] <- plyr::mapvalues(gcdata$Cluster, from = names(cell.group), to = cell.group)
+  DimPlot(gcdata, reduction = "scvi", group.by = "Annotation", label = T)
+
+  # Downsample the Seurat object by cell type in case it is very large.
+  Idents(gcdata) <- "Annotation"
+  gcdata <- subset(gcdata, downsample = 5000)
+  
+  # Save Seurat object.
+  save(gcdata, file = Rda.path)
+  # assign(paste0("gcdata.humanUC.", prefix), gcdata)
+  # rm(gcdata)
+  # save(list = paste0("gcdata.humanUC.", prefix), file = Rda.path)
+}
+
+for (prefix in names(cell.subsets)) {
+  print(prefix)
+
+  # Path to save Seurat object.
+  Rda.path <- paste0(proj.path, "/src/Rdata/gutreference/mouseintestineimmune.", prefix, ".Rda")
+  load(Rda.path)
+  
+  # Check if expression data is normalized and log transformed.
+  print(Matrix::colSums(gcdata[['RNA']]@counts[,1:10]))  # same as data slot
+  print(Matrix::colSums(2^(gcdata[['RNA']]@data[,1:10])-1))  # sums to 1e4
+  
+  # Set a common annotation column to use across all gut datasets.
+  gcdata[["annotation"]] <- gcdata$Annotation
+  
+  save(gcdata, file = Rda.path)
+}
+```
+
+## Study: Intra- and inter-cellular rewiring of the human colon during ulcerative colitis single cell portal
+[Intra- and inter-cellular rewiring of the human colon during ulcerative colitis](https://singlecell.broadinstitute.org/single_cell/study/SCP259/intra-and-inter-cellular-rewiring-of-the-human-colon-during-ulcerative-colitis)
+In h5ad file, Integrated_05 (fine) and category (coarse) metadata contain cell type annotation.
+```{r humanUC}
+# Name of each UC dataset.
+cell.subsets <- list("Epi" = "Epi", "Fib" = "Fib", "Imm" = "Imm")
+
+# Read all cell metadata.
+metadata.all <- read.table(paste0(proj.path, "/src/Rdata/DO_QTL/SCP259/metadata/all.meta2.txt"), stringsAsFactors=FALSE, skip = 2, sep = "\t", check.names = F)
+colnames(metadata.all) <- c("NAME", "Cluster", "nGene",	"nUMI", "Subject", "Health", "Location", "Sample")
+
+# Iterate through each single cell portal dataset.
+for (prefix in names(cell.subsets)) {
+  print(prefix)
+
+  # Path to save Seurat object.
+  Rda.path <- paste0(proj.path, "/src/Rdata/gutreference/humanUC.", prefix, ".Rda")
+  
+  # Subset metadata to specific experiment.
+  metadata <- metadata.all
+  rownames(metadata) <- metadata$NAME
+  metadata$NAME <- NULL
+  
+  # Read expression matrix and store in Seurat object.
+  expression <- Matrix::readMM(file = paste0(proj.path, "/src/Rdata/DO_QTL/SCP259/expression/gene_sorted-", prefix, ".matrix.mtx")) 
+  barcodes <- read.table(paste0(proj.path, "/src/Rdata/DO_QTL/SCP259/expression/", prefix, ".barcodes2.tsv"), sep = "\t", header = F)$V1
+  genes <- read.table(paste0(proj.path, "/src/Rdata/DO_QTL/SCP259/expression/", prefix, ".genes.tsv"), sep = "\t", header = F)$V1
+  if (length(genes) != nrow(expression)) stop("# genes mismatch")
+  if (length(barcodes) != ncol(expression)) stop("# barcodes mismatch")
+  rownames(expression) <- genes
+  colnames(expression) <- barcodes
+  metadata <- metadata[rownames(metadata) %in% colnames(expression), ]
+  all.equal(rownames(metadata), colnames(expression))
+  gcdata <- CreateSeuratObject(counts = expression, project = paste0("humanUC.", prefix), meta.data = metadata)
+  
+  # Read tSNE. 
+  tsne <- read.table(paste0(proj.path, "/src/Rdata/DO_QTL/SCP259/cluster/", prefix, ".tsne.txt"), stringsAsFactors=FALSE)
+  colnames(tsne) <- c("NAME", "tSNE_1", "tSNE_2")
+  rownames(tsne) <- tsne$NAME
+  tsne$NAME <- NULL
+  tsne <- as.matrix(tsne[, 1:2])
+  all.equal(rownames(tsne), colnames(gcdata))
+  gcdata[["tsne"]] <- CreateDimReducObject(embeddings = tsne, key = "tSNE_", assay = DefaultAssay(gcdata))
+  DimPlot(gcdata, reduction = "tsne", group.by = "Cluster")
+  
+  # Downsample the Seurat object by cell type in case it is very large.
+  Idents(gcdata) <- "Cluster"
+  gcdata <- subset(gcdata, downsample = 5000)
+  
+  # Save Seurat object.
+  save(gcdata, file = Rda.path)
+  # assign(paste0("gcdata.humanUC.", prefix), gcdata)
+  # rm(gcdata)
+  # save(list = paste0("gcdata.humanUC.", prefix), file = Rda.path)
+}
+
+for (prefix in names(cell.subsets)) {
+  print(prefix)
+
+  # Path to save Seurat object.
+  Rda.path <- paste0(proj.path, "/src/Rdata/gutreference/humanUC.", prefix, ".Rda")
+  load(Rda.path)
+  
+  # Check if expression data is normalized and log transformed.
+  print(Matrix::colSums(gcdata[['RNA']]@counts[,1:10]))  # looks like raw UMI counts for 10x, and counts and data are the same
+  gcdata <- NormalizeData(gcdata, normalization.method = "LogNormalize", scale.factor = 10000)
+  print(Matrix::colSums(expm1(gcdata[['RNA']]@data[,1:10])))  # sums to 1e4
+  
+  # Set a common annotation column to use across all gut datasets.
+  gcdata[["annotation"]] <- gcdata$Cluster
+  
+  save(gcdata, file = Rda.path)
+}
+```
+
+## Human gut atlas
+Teichmann human gut atlas [Cells of the human intestinal tract mapped across space and time](https://www.nature.com/articles/s41586-021-03852-1) https://www.gutcellatlas.org/
+- Space-Time Gut Cell Atlas https://cellgeni.cog.sanger.ac.uk/gutcellatlas/Full_obj_raw_counts_nosoupx.h5ad
+- Colon Immune Atlas https://cellgeni.cog.sanger.ac.uk/gutcellatlas/Colon_cell_atlas.h5ad
+
+There does not appear to be a dimensionality reduction embedding, but should double check if it shows up when loading the object in scanpy.
+```{r humangut}
+library(SeuratDisk)
+
+# Path to save Seurat object.
+Rda.path <- paste0(proj.path, "/src/Rdata/gutreference/humangut.Rda")
+
+# h5ad files from gut atlas publication.
+file.h5ad <- paste0(proj.path, "/src/Rdata/DO_QTL/GutAtlas/Full_obj_raw_counts_nosoupx.h5ad")
+file.h5seurat <- gsub("h5ad", "h5seurat", file.h5ad)
+
+# Convert h5ad to Seurat object.
+Convert(file.h5ad, dest = "h5seurat", overwrite = TRUE)
+gcdata <- LoadH5Seurat(file.h5seurat)
+
+# Downsample the Seurat object by cell type in case it is very large.
+Idents(gcdata) <- "Integrated_05"
+gcdata <- subset(gcdata, downsample = 5000)
+#DimPlot(gcdata, reduction = "scvi", group.by = "category")
+#ggsave(paste0(proj.path, "/src/Rdata/DO_QTL/GutAtlas/temp.png"), width = 6, height = 6)
+       
+# Save Seurat object.
+save(gcdata, file = Rda.path)
+
+# Path to save Seurat object.
+Rda.path <- paste0(proj.path, "/src/Rdata/gutreference/humangut.Rda")
+load(Rda.path)
+
+# Check if expression data is normalized and log transformed.
+print(Matrix::colSums(gcdata[['RNA']]@counts[,1:10]))  # looks like raw UMI counts for 10x, and counts and data are the same
+gcdata <- NormalizeData(gcdata, normalization.method = "LogNormalize", scale.factor = 10000)
+print(Matrix::colSums(expm1(gcdata[['RNA']]@data[,1:10])))  # sums to 1e4
+
+# Set a common annotation column to use across all gut datasets.
+gcdata[["annotation"]] <- gcdata$category
+
+save(gcdata, file = Rda.path)
+
+```
