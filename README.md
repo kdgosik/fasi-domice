@@ -1,5 +1,5 @@
 ## Overview
-Repository for figure and code tracking for fasi-domice project.  All relevant code to generate figures are in the figures directory.
+Repository for figure and code tracking for "Prevalent cross-cell type QTL trans-regulatory genetic effects impacting innate lymphoid cells in the small intestine".  All relevant code to generate figures are in the figures directory.
 
 ## Quickstart Environment Setup
 
