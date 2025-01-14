@@ -1,4 +1,4 @@
-#' @title Figure 7B Gene UMAPs
+#' @title Figure 6F Gene UMAPs
 #' @author Kirk Gosik
 #' @description
 #'
@@ -17,9 +17,8 @@ plot_df <- fread(paste0(data_dir, "manuscript-plot-data.csv.gz"), data.table = F
 
 ## UMAP ########################################
 
-
 ## genes
-lapply(c("Ccl17", "Ccr4"), function(i) {
+lapply(c("Nmu", "Nmur1"), function(i) {
   
   ## topic plots
   p1 <- plot_df %>%
@@ -33,7 +32,7 @@ lapply(c("Ccl17", "Ccr4"), function(i) {
          color = "")
   
   
-  ggsave(filename = paste0(figure_dir, "gene-umaps/Figure-7B-umap-all-cells-gene-", i, ".pdf"),
+  ggsave(filename = paste0(figure_dir, "gene-umaps/Figure-6F-umap-all-cells-gene-", i, ".pdf"),
          plot = p1,
          dpi = 330,
          width = 7,

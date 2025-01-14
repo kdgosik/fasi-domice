@@ -1,4 +1,4 @@
-#' @title Figure 5H  Muc4 Gene Model
+#' @title Figure 6I  Muc4 Gene Model
 #' @author Kirk Gosik
 #' @description 
 #'

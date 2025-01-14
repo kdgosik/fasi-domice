@@ -1,4 +1,4 @@
-#' @title Figure 7A Ccl17 Gene Model
+#' @title Figure 6A Ccl17 Gene Model
 #' @author Kirk Gosik
 #' @description 
 #'

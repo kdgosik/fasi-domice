@@ -1,4 +1,4 @@
-#' @title Figure 5B polygenic distribution
+#' @title Figure 4J polygenic distribution
 #' @author Kirk Gosik
 #' @description 
 #'

@@ -1,4 +1,4 @@
-#' @title Figure 7D Gene UMAPs
+#' @title Figure 6D Gene UMAPs
 #' @author Kirk Gosik
 #' @description
 #'
@@ -32,7 +32,7 @@ lapply(c("Sox9", "Il22"), function(i) {
          color = "")
   
   
-  ggsave(filename = paste0(figure_dir, "gene-umaps/Figure-7D-umap-all-cells-gene-", i, ".pdf"),
+  ggsave(filename = paste0(figure_dir, "gene-umaps/Figure-6D-umap-all-cells-gene-", i, ".pdf"),
          plot = p1,
          dpi = 330,
          width = 7,

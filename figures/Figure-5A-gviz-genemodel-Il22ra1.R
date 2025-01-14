@@ -1,4 +1,4 @@
-#' @title Figure 6A Il22ra1 Gene Model
+#' @title Figure 5A Il22ra1 Gene Model
 #' @author Kirk Gosik
 #' @description 
 #'

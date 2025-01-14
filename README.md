@@ -12,12 +12,13 @@ To build image and run from scratch:
 
   - Install docker
     - Build the docker image, docker build -t kdgosik/main-gitpod:latest .
-    - This takes 10-15 mins to build
-    - Launch the container to go into mgcpy's dev env, docker run -it --rm --name mgcpy-env mgcpy:latest
+    - This takes 20-30 mins to build
+    - Launch the container using `docker run -it -v $PWD:/workspace/fasi-domice -p 8787:8787 kdgosik/main-gitpod bash`
   - Pull image from Dockerhub and run:
     - docker pull kdgosik/main-gitpod:latest
     - `docker run -it -v $PWD:/workspace/fasi-domice -p 8787:8787 kdgosik/main-gitpod bash`
   - To run demo Rstudio (from within Docker):
+    - `cd /workspace/fasi-domice`
     - `bin/rstudio.sh`
     - enter the set user name: `gitpod` and password: `gitpod`
     - got to port 8787 in you browser to access rstudio

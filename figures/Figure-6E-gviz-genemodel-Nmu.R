@@ -1,4 +1,4 @@
-#' @title Figure 7E Nmu locus Gene Model
+#' @title Figure 6E Nmu locus Gene Model
 #' @author Kirk Gosik
 #' @description 
 #'

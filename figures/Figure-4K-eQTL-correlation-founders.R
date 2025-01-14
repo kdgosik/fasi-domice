@@ -1,9 +1,8 @@
-#' @title Figure 5D eQTL Founders
+#' @title Figure 4K polygenic distribution
 #' @author Kirk Gosik
 #' @description 
 #'
 #'
-
 # project_path <- "/ahg/regevdata/projects/FASI_DOmice/"
 # if( length(dir(project_path)) == 0 ) project_path <- "/Volumes/ahg_regevdata/projects/FASI_DOmice/"
 project_path <- my_path <-"./domice/"
@@ -86,6 +85,13 @@ fobs <- rbind(f1obs, f2obs)
 fobs %>% 
   filter(best_clean2 != "nan") %>%
   ggplot(., aes(best_clean2, topic3_scale)) + geom_point()
+
+
+topic_coefs %>%
+  filter(topic == "topic3") %>%
+  # mutate(predicted = scale(value)) %>%
+  ggplot(., aes(best_clean, predicted, color = X)) + geom_point()
+
 
 
 
@@ -200,249 +206,31 @@ merge_genes <- outdf %>%
 
 
 
-# Tmx1
-p1 <- fX %>% 
-  filter(cell_type=="LTi", best_clean != "nan", best_clean !="AMB") %>%
-  # group_by(best_clean) %>%
-  # summarise(Tmx1 =mean(Tmx1)) %>%
-  ggplot(.,aes(best_clean, Tmx1)) + 
-  geom_boxplot(fill = "lightgray") +
-  geom_point() + 
-  labs(x = "Founder")
+foundercor <- merge_genes %>%
+  split(.$gene) %>%
+  map_dbl(~cor(.x$pred_exp, .x$expression)) %>%
+  as.data.frame() %>%
+  dplyr::rename(correlation = .data[["."]]) %>%
+  rownames_to_column("gene") %>% 
+  left_join(outdf)
 
-p2 <- merge_genes %>% 
-  filter(cell_type=="LTi", gene == "Tmx1") %>% 
-  mutate(predicted= scale(pred_exp)) %>% 
-  ggplot(.,aes(best_clean, predicted)) + 
-  geom_point() + 
-  labs(x = "Founder",
-       y = "Predicted")
+p1 <- foundercor %>%
+  # filter(value_adj > 10) %>%
+  # dplyr::select(cell_type, gene, marker, correlation, cis_effect) %>%
+  left_join(GM_snps, by = "marker") %>%
+  dplyr::group_by(gene, marker, pos, cis_effect)  %>%
+  summarise(correlation = mean(correlation)) %>%
+  unique %>%
+  ggplot(., aes(x = correlation, fill = factor(cis_effect))) +
+  geom_density(alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "eQTL Prediction Correlation with Founder Strain", fill = "Cis Effect")
 
-tmx1_plot <- p1 / p2
-
-ggsave(filename = paste0("results/figures/pdf/figure-3f-founder-eQTL-validation-Tmx1.pdf"),
-       plot = tmx1_plot,
-       dpi = 330,
-       width = 7,
-       height = 5)
-
-
-# Ywhah
-p1 <- fX %>% 
-  filter(cell_type=="ILC1", best_clean != "nan", best_clean !="AMB") %>%
-  # group_by(best_clean) %>%
-  # summarise(Tmx1 =mean(Tmx1)) %>%
-  ggplot(.,aes(best_clean, Ywhah)) + 
-  geom_boxplot(fill = "lightgray") +
-  geom_point() + 
-  labs(x = "Founder")
-
-p2 <- merge_genes %>% 
-  filter(cell_type=="ILC1", gene == "Ywhah") %>% 
-  mutate(predicted= scale(pred_exp)) %>% 
-  ggplot(.,aes(best_clean, predicted)) + 
-  geom_point() + 
-  labs(x = "Founder",
-       y = "Predicted")
-
-ywhah_plot <- p1 / p2
-
-ggsave(filename = paste0("results/figures/pdf/figure-3f-founder-eQTL-validation-Ywhah.pdf"),
-       plot = ywhah_plot,
-       dpi = 330,
-       width = 7,
-       height = 5)
-
-
-# Ywhag
-p1 <- fX %>% 
-  filter(cell_type=="LTi", best_clean != "nan", best_clean !="AMB") %>%
-  # group_by(best_clean) %>%
-  # summarise(Tmx1 =mean(Tmx1)) %>%
-  ggplot(.,aes(best_clean, Ywhag)) + 
-  geom_boxplot(fill = "lightgray") +
-  geom_point() + 
-  labs(x = "Founder")
-
-p2 <- merge_genes %>% 
-  filter(cell_type=="LTi", gene == "Ywhag") %>% 
-  mutate(predicted= scale(pred_exp)) %>% 
-  ggplot(.,aes(best_clean, predicted)) + 
-  geom_point() + 
-  labs(x = "Founder",
-       y = "Predicted")
-
-ywhag_plot <- p1 / p2
-
-ggsave(filename = paste0("results/figures/pdf/figure-3f-founder-eQTL-validation-Ywhag.pdf"),
-       plot = ywhag_plot,
-       dpi = 330,
-       width = 7,
-       height = 5)
-
-
-# Hopx
-p1 <- fX %>% 
-  filter(cell_type=="ILC1", best_clean != "nan", best_clean !="AMB") %>%
-  group_by(best_clean) %>%
-  summarise(Hopx =mean(Hopx)) %>%
-  ggplot(.,aes(best_clean, Hopx)) + 
-  geom_boxplot(fill = "lightgray") +
-  geom_point() + 
-  labs(x = "Founder")
-
-p2 <- merge_genes %>% 
-  filter(cell_type=="ILC1", gene == "Hopx") %>% 
-  mutate(predicted= scale(pred_exp)) %>% 
-  ggplot(.,aes(best_clean, predicted)) + 
-  geom_point() + 
-  labs(x = "Founder",
-       y = "Predicted")
-
-hopx_plot <- p1 / p2
-
-ggsave(filename = paste0("results/figures/pdf/figure-3f-founder-eQTL-validation-Hopx.pdf"),
-       plot = hopx_plot,
-       dpi = 330,
-       width = 7,
-       height = 5)
-
-
-
-## other relevant genes
-# Aim2
-p1 <- fX %>% 
-  filter(cell_type=="ILC1", best_clean != "nan", best_clean !="AMB") %>% 
-  group_by(best_clean) %>%
-  summarise(Aim2 =mean(Aim2)) %>%
-  ggplot(.,aes(best_clean, Aim2)) + 
-  geom_boxplot(fill = "lightgray") +
-  geom_point() + 
-  labs(x = "Founder")
-
-p2 <- merge_genes %>% 
-  filter(cell_type=="ILC1", gene == "Aim2") %>% 
-  mutate(predicted= scale(pred_exp)) %>% 
-  ggplot(.,aes(best_clean, predicted)) + 
-    geom_point() + 
-    labs(x = "Founder",
-         y = "Predicted")
-
-aim2_plot <- p1 / p2
-
-ggsave(filename = paste0("results/figures/pdf/figure-3f-founder-eQTL-validation-Aim2.pdf"),
-       plot = aim2_plot,
-       dpi = 330,
-       width = 7,
-       height = 5)
-
-
-
-# Bcl2
-p1 <- fX %>% 
-  filter(cell_type=="ILC1", best_clean != "nan", best_clean !="AMB") %>% 
-  ggplot(.,aes(best_clean, Bcl2l11)) + 
-  geom_point() +
-  geom_violin() +
-  geom_jitter()
-
-p2 <- merge_genes %>% 
-  filter(cell_type=="ILC1", gene == "Bcl2l11") %>% 
-  mutate(predicted= scale(pred_exp)) %>% 
-  ggplot(.,aes(best_clean, predicted, color = marker)) + 
-  geom_point() + theme(legend.position = "none")
-
-
-# Cnn2
-p1 <- fX %>% 
-  filter(cell_type=="ILC1", best_clean != "nan", best_clean !="AMB") %>% 
-  group_by(best_clean) %>%
-  summarise(Cnn2 =mean(Cnn2)) %>%
-  ggplot(.,aes(best_clean, Cnn2)) + 
-  geom_boxplot(fill = "lightgray") +
-  geom_point() + 
-  labs(x = "Founder")
-
-p2 <- merge_genes %>% 
-  filter(cell_type=="ILC1", gene == "Cnn2", marker == "UNC4488618") %>% 
-  mutate(predicted= scale(pred_exp)) %>% 
-  ggplot(.,aes(best_clean, predicted)) + 
-  geom_point() + 
-  theme(legend.position = "none") + 
-  labs(x = "Founder",
-       y = "Predicted")
-
-cnn2_plot <- p1 / p2
-
-ggsave(filename = paste0("results/figures/pdf/figure-3f-founder-eQTL-validation-Cnn2.pdf"),
-       plot = cnn2_plot,
-       dpi = 330,
-       width = 7,
-       height = 5)
-
-
-
-
-ccn2_plot <- fX %>% 
-  filter(cell_type=="ILC1", best_clean != "nan", best_clean != "AMB") %>% 
-  ggplot(.,aes(best_clean, Cnn2)) + 
-  geom_boxplot(color = "gray") +
-  labs(title = "Founder Gene Expression: Ccn2",
-       x = "Founder Strain",
-       y = "Expression")
-
-ggsave(filename = paste0(data_path, "founder-expression-ccn2.pdf"),
-       plot = ccn2_plot,
+ggsave(filename = "results/figures/figure-4K-eqtl-founderstrain.png",
+       plot = p1,
        dpi = 330)
 
-areg_plot <- fX %>% 
-  filter(cell_type=="ILC1", best_clean != "nan", best_clean != "AMB") %>% 
-  ggplot(.,aes(best_clean, Areg)) + 
-  geom_boxplot(color = "gray") +
-  labs(title = "Founder Gene Expression: Ccn2",
-       x = "Founder Strain",
-       y = "Expression")
-
-ggsave(filename = paste0(data_path, "founder-expression-areg.pdf"),
-       plot = areg_plot,
+ggsave(filename = "results/figures/figure-4K-eqtl-founderstrain.pdf",
+       plot = p1,
        dpi = 330)
-
-
-aim2_plot <- fX %>% 
-  filter(cell_type=="ILC1", best_clean != "nan", best_clean != "AMB") %>% 
-  ggplot(.,aes(best_clean, Aim2)) + 
-  geom_boxplot(color = "gray") +
-  labs(title = "Founder Gene Expression: Aim2",
-       x = "Founder Strain",
-       y = "Expression")
-
-ggsave(filename = paste0(data_path, "founder-expression-aim2.pdf"),
-       plot = aim2_plot,
-       dpi = 330)
-
-
-
-
-## Fgl2
-plotout <-merge_genes %>% 
-  filter(gene == "Fgl2") %>% 
-  group_by(founder) %>% 
-  summarise(expression = mean(expression),
-            predicted_expression = mean(pred_exp))
-
-
-ggplot(plotout, aes(founder, expression)) + 
-  geom_point() + 
-  geom_point(aes(founder, predicted_expression),color = "red") +
-  labs(title = "Fgl2 Plots")
-
-
-
-ggplot(plotout, aes(expression, predicted_expression)) + 
-    geom_point() + 
-    geom_label(aes(label = founder, color = founder_color)) +
-    # geom_abline(slope=1, color = "red") +
-    xlim(0,1) + ylim(0.5,1.5)
-
-
 
