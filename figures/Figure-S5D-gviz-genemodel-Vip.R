@@ -1,4 +1,4 @@
-#' @title Figure S6B Vip Gene Model
+#' @title Figure S5B Vip Gene Model
 #' @author Kirk Gosik
 #' @description
 #'

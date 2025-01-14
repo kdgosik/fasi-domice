@@ -1,4 +1,4 @@
-#' @title Figure S6E Gene UMAPs
+#' @title Figure S5E Gene UMAPs
 #' @author Kirk Gosik
 #' @description
 #'
@@ -32,7 +32,7 @@ lapply(c("Vipr2"), function(i) {
          color = "")
   
   
-  ggsave(filename = paste0(figure_dir, "gene-umaps/Figure-7D-umap-all-cells-gene-", i, ".pdf"),
+  ggsave(filename = paste0(figure_dir, "gene-umaps/Figure-S5E-umap-all-cells-gene-", i, ".pdf"),
          plot = p1,
          dpi = 330,
          width = 7,

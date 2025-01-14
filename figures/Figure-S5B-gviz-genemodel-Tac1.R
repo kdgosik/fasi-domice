@@ -1,4 +1,4 @@
-#' @title Figure S6B Tac1 Gene Model
+#' @title Figure S5B Tac1 Gene Model
 #' @author Kirk Gosik
 #' @description
 #'

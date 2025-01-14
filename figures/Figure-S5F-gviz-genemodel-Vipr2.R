@@ -1,4 +1,4 @@
-#' @title Figure S6F Vipr2 Gene Model
+#' @title Figure S5F Vipr2 Gene Model
 #' @author Kirk Gosik
 #' @description
 #'
@@ -214,7 +214,7 @@ p2 <- plotdf %>%
   theme_void() +
   labs(title = "Rpl35")
 
-ggsave(filename = paste0(resultsdir, "figures/Figure-6-umap-all-cells-Rpl35.pdf"),
+ggsave(filename = paste0(resultsdir, "figures/Figure-S5F-umap-all-cells-Rpl35.pdf"),
        plot = p2,
        width = 7,
        height = 5,

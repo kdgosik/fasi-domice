@@ -1,4 +1,4 @@
-#' @title Figure 3B Program Scores Embeddings
+#' @title Figure 3A Program Scores Embeddings
 #' @author Kirk Gosik
 #' @description
 #'
@@ -87,7 +87,7 @@ lapply(colnames(plot_df)[c(2:84,196:246)], function(i) {
          color = "")
   
   
-  ggsave(filename = paste0(figure_path, "gene-umaps/Figure-3B-umap-all-cells-gene-", i, ".pdf"),
+  ggsave(filename = paste0(figure_path, "gene-umaps/Figure-3A-umap-all-cells-gene-", i, ".pdf"),
          plot = p1,
          dpi = 330,
          width = 7,

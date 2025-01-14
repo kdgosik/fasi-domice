@@ -1,4 +1,4 @@
-#' @title Figure S6C Gene UMAPs
+#' @title Figure S5A Gene UMAPs
 #' @author Kirk Gosik
 #' @description
 #'
@@ -18,7 +18,7 @@ plot_df <- fread(paste0(data_dir, "manuscript-plot-data.csv.gz"), data.table = F
 ## UMAP ########################################
 
 ## genes
-lapply(c("Vip"), function(i) {
+lapply(c("Tac1"), function(i) {
   
   ## topic plots
   p1 <- plot_df %>%
@@ -32,7 +32,7 @@ lapply(c("Vip"), function(i) {
          color = "")
   
   
-  ggsave(filename = paste0(figure_dir, "gene-umaps/Figure-7D-umap-all-cells-gene-", i, ".pdf"),
+  ggsave(filename = paste0(figure_dir, "gene-umaps/Figure-S5A-umap-all-cells-gene-", i, ".pdf"),
          plot = p1,
          dpi = 330,
          width = 7,
