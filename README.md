@@ -23,3 +23,5 @@ To build image and run from scratch:
     - enter the set user name: `gitpod` and password: `gitpod`
     - got to port 8787 in you browser to access rstudio
   - Then open download-files.R
+    - run `setup.R` to create necessary directory locations
+    - run `download-files.R` to pull files from the google drive.
