@@ -23,7 +23,8 @@ RUN rm -rf rstudio-server-2022.07.2-576-amd64.deb
 
 # Base R packages
 RUN R -e 'install.packages(c("tidyverse", "BiocManager"))'
-RUN R -e 'install.packages(c("languageserver", "shiny", "reticulate", "remotes", "kableExtra", "ggrepel"))'
+RUN R -e 'install.packages(c("languageserver", "shiny", "reticulate", "remotes", "kableExtra", "ggrepel","qtl2"))'
+RUN R -e 'install.packages(c("Seurat"))'
 RUN R -e 'BiocManager::install(c("rtracklayer", "Gviz","TxDb.Mmusculus.UCSC.mm10.knownGene","GenomicRanges","GenomicFeatures","BSgenome.Mmusculus.UCSC.mm10"))'
 
 # Reset gitpod user credentials (for Rstudio login)
@@ -35,17 +36,17 @@ RUN echo "session-default-working-dir=/workspace/fasi-domice" | sudo tee -a /etc
     echo "session-default-new-project-dir=/workspace/fasi-domice" | sudo tee -a /etc/rstudio/rsession.conf
 
 # Base Python packages
-RUN pip install --no-cache-dir \
-    numpy \
-    pandas \
-    polars \
-    scipy \
-    matplotlib \
-    scanpy \
-    jupyterlab \
-    rpy2 \
-    pygraphviz \
-    awscli \
-    colour \
-    pyscenic \
-    adjustText
+# RUN pip install --no-cache-dir \
+#     numpy \
+#     pandas \
+#     polars \
+#     scipy \
+#     matplotlib \
+#     scanpy \
+#     jupyterlab \
+#     rpy2 \
+#     pygraphviz \
+#     awscli \
+#     colour \
+#     pyscenic \
+#     adjustText
