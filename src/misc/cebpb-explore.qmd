@@ -1,0 +1,60 @@
+---
+title: "Untitled"
+format: html
+editor: visual
+---
+
+
+## Setup
+
+```{r}
+library(dplyr)
+library(readr)
+library(stringr)
+library(ggplot2)
+
+source('/workspace/fasi-domice/setup.R')
+```
+
+
+## Reviews
+
+### PBP 4
+
+4. Can the authors clarify whether Ebp indeed encodes the transcription factor C/EBPδ? The canonical gene name for C/EBPδ is Cebpd, while Ebp encodes a cholesterol isomerase, which, according to the ImmGen database, is not expressed in ILC2s. The authors should also verify that reference 43 is cited correctly and clearly distinguish between E-protein transcription factors and CCAAT-enhancer-binding protein (C/EBP) transcription factors in ILC2 development and function.
+
+Response: 
+Ebp/cebpd? Their expression in our data?
+The Reviewer is correct to point out that Cebpd is the correct gene encoding C/EBPδ. We will check the gene locus and revise the figures and text accordingly.
+
+```{r}
+vardf <- readr::read_csv(paste0(data_dir, "allchannels/vars.csv"))
+vardf %>% filter(str_detect(index,"Ebp|Cebpb"))
+```
+
+
+### PBP 5
+
+5. The authors should clarify whether the genes discussed are specific to certain ILC subsets or expressed broadly across multiple cell types. For example, Muc2 overlaps a trans-eQTL that affects Stub1 and Ift20 expression in ILC1s, but Stub1 and Ift20 are ubiquitous proteins. What is the significance of these genes in relation to ILC1 function or biology?
+
+Response: 
+We will include the expression data for Muc2, Stub1, and Ift20 in ILC1s and other cell types, along with a discussion on their potential significance in ILC1 biology.
+
+
+```{r}
+
+```
+
+
+
+### PBP 10
+
+Interestingly, the analysis of QTL suggest that cross-cell type circuits might exist and propose a number of potential interactions that are Wsupported by published data. In extending this work, human orthologs of genes overlapping different QTL were examined that might be associated with autoimmune disease risk. It seems assumed that the genes would be shared between the two species (and this is likely in many settings) although one would argue that this might not be the case. It is unclear from the manuscript the supporting evidence.
+
+Response: We agree that there are difference between human and mouse in QTL gene expression. To further address the reviewer’s comment, we will try to compare the expression dynamics of these QTL genes across different intestinal cell types between human and mice. 
+
+
+```{r}
+
+```
+

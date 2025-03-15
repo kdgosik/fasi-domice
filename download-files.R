@@ -21,6 +21,18 @@ drive_download(as_id("18hjkwig-CYFzVmkmqqll8ujDNQEvqoCY"),
 
 
 
+# drive_download(as_id("1ujf3IbLvjeRlsDNnWseDnzdDXQpeCrew"), 
+#                path=paste0(data_dir, "allchannels/allchannels.rds"))
+# 
+# 
+# drive_download(as_id("1jQ1nN7JtE9gC6VaHlnhJwTGhiMmg4Fv0"),
+#                path=paste0(data_dir, "allchannels/fasi-do-mice-seurat-gene-expression.mtx.gz"))
+# 
+# 
+# 
+# drive_download(as_id("1MAmtYzvWr04qNyLkI__xpPXKkp-KAQE0"), 
+#                path=paste0(data_dir, "allchannels/allchannels.h5ad"))
+
 
 
 # 
