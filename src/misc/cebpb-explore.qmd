@@ -4,57 +4,87 @@ format: html
 editor: visual
 ---
 
-
 ## Setup
 
 ```{r}
+library(data.table)
+library(tibble)
 library(dplyr)
 library(readr)
 library(stringr)
 library(ggplot2)
 
+library(Seurat)
+
 source('/workspace/fasi-domice/setup.R')
 ```
 
-
 ## Reviews
+
+```{r}
+plot_df <- fread(paste0(data_dir, "manuscript-plot-data.csv.gz"), data.table=FALSE)
+```
+
+### PBP 3
+
+3.  Is the representation of different ILC subsets skewed in any of the DO mouse strains analyzed? How do ILC3s in the NOD background compare to those in C57BL/6 mice? In Figure 2, the authors show the representation of different ILC subsets by mouse ID, but not by strain. This information would be valuable.
+
+Response: We used DO mice, each mouse has a different genetic background that is different from the 8 founder strains. So each DO mouse can be considered as a different "strain".
+
+Regarding the difference of ILC3s between the NOD and C57BL/6 mouse strains, we could provide a direct comparison between NOD and C57BL/6 mice through the sc-RNA seq data in 8 founder strains.
+
+```{r}
+
+```
 
 ### PBP 4
 
-4. Can the authors clarify whether Ebp indeed encodes the transcription factor C/EBPδ? The canonical gene name for C/EBPδ is Cebpd, while Ebp encodes a cholesterol isomerase, which, according to the ImmGen database, is not expressed in ILC2s. The authors should also verify that reference 43 is cited correctly and clearly distinguish between E-protein transcription factors and CCAAT-enhancer-binding protein (C/EBP) transcription factors in ILC2 development and function.
+4.  Can the authors clarify whether Ebp indeed encodes the transcription factor C/EBPδ? The canonical gene name for C/EBPδ is Cebpd, while Ebp encodes a cholesterol isomerase, which, according to the ImmGen database, is not expressed in ILC2s. The authors should also verify that reference 43 is cited correctly and clearly distinguish between E-protein transcription factors and CCAAT-enhancer-binding protein (C/EBP) transcription factors in ILC2 development and function.
 
-Response: 
-Ebp/cebpd? Their expression in our data?
-The Reviewer is correct to point out that Cebpd is the correct gene encoding C/EBPδ. We will check the gene locus and revise the figures and text accordingly.
+Response: Ebp/cebpd? Their expression in our data? The Reviewer is correct to point out that Cebpd is the correct gene encoding C/EBPδ. We will check the gene locus and revise the figures and text accordingly.
 
 ```{r}
-vardf <- readr::read_csv(paste0(data_dir, "allchannels/vars.csv"))
+vardf <- readr::read_csv(paste0(data_dir, "allchannels/var.csv"))
 vardf %>% filter(str_detect(index,"Ebp|Cebpb"))
 ```
 
+```{r}
+
+obj <- readRDS(paste0(data_dir, "allchannels/ilc-seurat-object.rds"))
+```
+
+```{r}
+cebpb_df <- data.frame(obj@assays$RNA$counts["Cebpb",]) %>%
+  dplyr::rename(Cebpb = `obj.assays.RNA.counts..Cebpb....`) %>%
+  tibble::rownames_to_column("index")
+```
+
+```{r}
+plot_df <- plot_df %>%
+  left_join({cebpb_df %>% tibble::rownames_to_column("index")})
+```
+
+```{r}
+p1 <- ggplot(plot_df, aes(X_umap1, X_umap2, color = Cebpb)) + geom_point(shape=46)
+ggsave('results/umap_cebpb.png')
+```
 
 ### PBP 5
 
-5. The authors should clarify whether the genes discussed are specific to certain ILC subsets or expressed broadly across multiple cell types. For example, Muc2 overlaps a trans-eQTL that affects Stub1 and Ift20 expression in ILC1s, but Stub1 and Ift20 are ubiquitous proteins. What is the significance of these genes in relation to ILC1 function or biology?
+5.  The authors should clarify whether the genes discussed are specific to certain ILC subsets or expressed broadly across multiple cell types. For example, Muc2 overlaps a trans-eQTL that affects Stub1 and Ift20 expression in ILC1s, but Stub1 and Ift20 are ubiquitous proteins. What is the significance of these genes in relation to ILC1 function or biology?
 
-Response: 
-We will include the expression data for Muc2, Stub1, and Ift20 in ILC1s and other cell types, along with a discussion on their potential significance in ILC1 biology.
-
+Response: We will include the expression data for Muc2, Stub1, and Ift20 in ILC1s and other cell types, along with a discussion on their potential significance in ILC1 biology.
 
 ```{r}
-
+genes_to_check <- c("Muc2", "Stub1", "Ift20")
 ```
-
-
 
 ### PBP 10
 
 Interestingly, the analysis of QTL suggest that cross-cell type circuits might exist and propose a number of potential interactions that are Wsupported by published data. In extending this work, human orthologs of genes overlapping different QTL were examined that might be associated with autoimmune disease risk. It seems assumed that the genes would be shared between the two species (and this is likely in many settings) although one would argue that this might not be the case. It is unclear from the manuscript the supporting evidence.
 
-Response: We agree that there are difference between human and mouse in QTL gene expression. To further address the reviewer’s comment, we will try to compare the expression dynamics of these QTL genes across different intestinal cell types between human and mice. 
-
+Response: We agree that there are difference between human and mouse in QTL gene expression. To further address the reviewer's comment, we will try to compare the expression dynamics of these QTL genes across different intestinal cell types between human and mice.
 
 ```{r}
 
 ```
-

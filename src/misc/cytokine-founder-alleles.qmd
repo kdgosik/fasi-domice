@@ -1,0 +1,336 @@
+---
+title: "cytokine-founder-alleles"
+format: html
+editor: visual
+---
+
+## Cytokine Loci by Founder Allele
+
+```{r setup}
+library(qtl2)
+library(data.table)
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+domice_dir <- "/workspace/fasi-domice/"
+data_dir <- paste0(domice_dir, "data/")
+results_dir <- paste0(domice_dir, "results/")
+figure_dir <- paste0(domice_dir, "figures/")
+```
+
+```{r config_reference}
+# project_path <- "/ahg/regevdata/projects/FASI_DOmice/"
+# if( length(dir(project_path)) == 0 ) project_path <- "/Volumes/ahg_regevdata/projects/FASI_DOmice/"
+source(paste0(domice_dir, "src/helpers.R"))
+
+load(paste0(data_dir, "genotype/GM_snps.Rdata"))
+## founder key
+founderdf <- data.frame(founder_letter = LETTERS[1:8], 
+                        founder_color = qtl2::CCcolors, 
+                        founder = names(qtl2::CCcolors),
+                        best_clean = c("A_J", "C57BL_6NJ", "129S1_SvImJ", "NOD_ShiLtJ",
+                                       "NZO_HlLtJ", "CAST_EiJ", "PWK_PhJ", "WSB_EiJ"),
+                        stringsAsFactors = FALSE)
+```
+
+```{r lods_df}
+lods <- fread(paste0(results_dir,"cytokines/qtl-steady-cytokines-lods.csv.gz"))
+```
+
+```{r}
+load(paste0(data_dir, "genotype/alleleprobs.Rdata"))
+antibody <- read_csv(paste0(data_dir, "phenotype/pheno_batch4_processed.csv"))
+cytokines <- readxl::read_excel(paste0(data_dir, "phenotype/cytokine production -steady state.xlsx"))
+
+```
+
+```{r alleleprobs}
+aprob_rnames <- rownames(aprobs[[1]])
+
+name_vec <- sapply(cytokines$mouse_id, function(x) grep(x, aprob_rnames, value=T))
+
+name_map <- data.frame(full_id = sapply(name_vec, last)) %>% 
+  tibble::rownames_to_column("mouse_id") %>% 
+  dplyr::filter(!is.na(full_id))
+```
+
+```{r format_cytokine_df}
+cytokines_qtl_df <- cytokines %>%
+  dplyr::left_join(name_map) %>%
+  dplyr::filter(!is.na(full_id))
+```
+
+```{r}
+keep_ids <- intersect(aprob_rnames, cytokines_qtl_df$full_id)
+```
+
+```{r}
+cytokines_qtl_df <- cytokines_qtl_df %>%
+  filter(full_id %in% keep_ids)
+  
+```
+
+```{r}
+cores <- 2
+## Load Phenotypes (all females)
+pheno <- cytokines_qtl_df %>% as.data.frame()
+rownames(pheno) <- pheno$full_id
+
+
+## Sync sample names
+length(keep_ids)
+
+pheno <- pheno[keep_ids, ,drop = FALSE]
+for( chr in names(aprobs) ) {
+  aprobs[[chr]] <- aprobs[[chr]][keep_ids, , ]
+}
+
+
+# Creating kinship matrix
+# kinship_loco
+K <- calc_kinship(probs = aprobs, type = "loco", cores = cores)
+```
+
+```{r}
+ccre <- read_csv(paste0(data_dir, "references/GM_SNPS_Consequence_cCRE.csv"))
+marker_map <- readRDS(paste0(data_dir, "genotype/Regev_map_20171221.rds"))
+xpos <- qtl2:::map_to_xpos(marker_map, gap = 25)
+xchrbound <- qtl2:::map_to_boundaries(marker_map, gap = 25)
+
+## Make Marker Reference Dataset
+MarkerRef <- data.frame(marker = names(xpos), xpos = xpos, stringsAsFactors = FALSE) %>%
+  left_join(
+    {ccre %>% dplyr::select(marker, chr)}
+  )
+
+```
+
+## IgE
+
+```{r}
+ige <- pheno$IgE
+names(ige) <- pheno$full_id
+# IgE - https://www.informatics.jax.org/marker/MGI:2685746
+# Chromosome 12: 113,269,260-113,273,248 reverse strand.
+c2blup <- scan1blup(aprobs[,"12"], ige, K[["12"]])
+coef_df <- as.data.frame(c2blup)
+```
+
+```{r}
+p1 <- coef_df %>%
+  tibble::rownames_to_column("X") %>%
+  dplyr::rename(marker = X) %>%
+  left_join(data.frame(marker = names(xpos), 
+                       xpos = xpos, stringsAsFactors = FALSE)) %>%
+  dplyr::select(-intercept) %>%
+  pivot_longer(cols = A:H, names_to = "founder_letter") %>%
+  left_join(founderdf, by = "founder_letter") %>%
+  filter(xpos > 2009, xpos < 2010) %>%
+  ggplot(., aes(x = xpos, y = value, color = founder)) +
+    geom_line() + 
+    scale_color_manual(values = qtl2::CCcolors) +
+    scale_x_continuous(breaks = apply(xchrbound, 2, median), label = c(as.character(1:19), "X")) +
+    # geom_vline(xintercept = 2009)
+    labs(x = "Chromosome of SNP", y = "LOD", title = "IgE") +
+    theme(
+      axis.line=element_blank(),
+      axis.ticks=element_blank(),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank()
+    ) +
+    theme_minimal()
+```
+
+## Do Mice Cytokines
+
+### Reference Dataframe
+
+This part is the reference data from specific to cytokine location of the cytokines for the mm10 (GRCm38 reference) positions.
+
+```{r ref_data}
+cytokine_loci <- data.frame(
+  Cytokine = c("IFNg", "IL-5", "TNFa", "IL-2", "IL-6",
+               "IL-4", "IL-10", "IL-9", "IL-17A", "IL-17F",
+               "IL-22", "IL-13"),
+  Chromosome = c("10", "11", "17", "3", "5",
+                 "11", "1", "13", "1", "1",
+                 "10", "11"),
+  Genomic_Position = c(
+    "118441046-118445892",
+    "53720794-53725106",
+    "35199381-35202007", 
+    "37120523-37125959",
+    "30013114-30019981",
+    "53602982-53618669",
+    "131019845-131024974",
+    "56479277-56482246",
+    "20730905-20734496",
+    "20777146-20790617",
+    "118204942-118210047",
+    "53631324-53634702"
+  ),
+  stringsAsFactors = FALSE
+)
+
+cnames <- cytokine_loci$Cytokine
+```
+
+This next chunk is to specify the cytokine to focus on and take the above reference positions to grab the makrers in the GigaMUGA array that correspond to the cytokine location.
+
+```{r marker_list}
+cname <- "IFNg"
+
+pvec <- pheno[,cname]
+names(pvec) <- pheno$full_id
+pchr <- cytokine_loci %>% 
+  filter(Cytokine == cname) %>% 
+  pull(Chromosome)
+genomic_position <- cytokine_loci %>% 
+  filter(Cytokine == cname) %>% 
+  pull(Genomic_Position)
+
+pos_start <- stringr::str_split(genomic_position,'-',simplify = T)[1]
+pos_start <- floor(as.numeric(pos_start)/10e4)*10e4
+pos_end <- stringr::str_split(genomic_position,'-',simplify = T)[2]
+pos_end <- ceiling(as.numeric(pos_end)/10e4)*10e4
+marker_list <- ccre %>% 
+  filter(pos > pos_start, 
+         pos < pos_end,
+         chr == pchr) %>% 
+  pull(marker)
+```
+
+
+This part extracts the cytokine region markers from the allele probs array and averages them across the DO mice and predicted founder allele probabilities.  This outputs a dataframe where the rows are the DO mouse, the columns are the Founder Allele (A-H) and the entries are the average probability across all the markers at the cytokine location.
+
+```{r mean_df}
+out_df <- aprobs[["10"]][,,aprob_chr10_markers]
+# Compute mean across all data frames
+mean_df <- apply(out_df,c(1,2),mean) %>% as.data.frame() %>%
+  tibble::rownames_to_column("full_id")
+```
+
+This part takes the maximum probability and imputes that as the founder allele. Maybe think of how to collapse to genoprobs (e.g two founder alleles per mouse) or upload the genoprobs matrix also
+
+```{r}
+# Add a column with the name of the column that has the max value in each row
+df_with_max_col <- mean_df %>%
+  rowwise() %>%
+  mutate(founder_letter = names(.)[-1][which.max(c_across(A:H))]) %>%
+  ungroup() %>%
+  dplyr::left_join(dplyr::select(pheno, full_id, !!cname)) %>%
+  dplyr::left_join(founderdf)
+```
+
+Averaging across the imputed founder allele to see cytokine levels for each allele.  This can be used to match with the founder cytokine data provided.
+
+```{r}
+df_with_max_col %>% 
+  group_by(founder) %>% 
+  summarize(IFNg = mean(IFNg, na.rm=T))
+```
+
+Plotting DO mice imputed alleles by cytokine levels.
+
+```{r}
+founder_colors <- founderdf$founder_color
+names(founder_colors) <- founderdf$founder
+
+ggplot(df_with_max_col, aes(founder, IFNg, color = founder)) + 
+  geom_violin() +
+  geom_jitter() +
+  scale_color_manual(values = founder_colors)
+
+dev.off()
+```
+
+### QTL Analysis
+
+Running QTL analysis to get coefficient of predicted founder alleles impact at each cytokine location for that cytokine region. (cis-cytokine predictions.)
+
+```{r}
+for( cname in cnames) {
+  pvec <- pheno[,cname]
+  names(pvec) <- pheno$full_id
+  pchr <- cytokine_loci %>% 
+    filter(Cytokine == cname) %>% 
+    pull(Chromosome)
+  genomic_position <- cytokine_loci %>% 
+    filter(Cytokine == cname) %>% 
+    pull(Genomic_Position)
+  
+  pos_start <- stringr::str_split(genomic_position,'-',simplify = T)[1]
+  pos_start <- floor(as.numeric(pos_start)/10e4)*10e4
+  pos_end <- stringr::str_split(genomic_position,'-',simplify = T)[2]
+  pos_end <- ceiling(as.numeric(pos_end)/10e4)*10e4
+  marker_list <- ccre %>% 
+    filter(pos > pos_start, 
+           pos < pos_end,
+           chr == pchr) %>% 
+    pull(marker)
+  
+  pxpos <- MarkerRef %>% 
+    filter(marker %in% marker_list, chr == pchr) %>%
+    pull(xpos) %>% 
+    round %>% 
+    first
+  
+  # IgE - https://www.informatics.jax.org/marker/MGI:2685746
+  # Chromosome 12: 113,269,260-113,273,248 reverse strand.
+  c2blup <- scan1blup(aprobs[,pchr], pvec, K[[pchr]])
+  coef_df <- as.data.frame(c2blup)
+  write.csv(coef_df, paste0(results_dir, "cytokines/founder_coef_", cname, ".csv"))
+  
+  ## plot results
+  p1 <- coef_df %>%
+    tibble::rownames_to_column("X") %>%
+    dplyr::rename(marker = X) %>%
+    dplyr::left_join(data.frame(marker = names(xpos), 
+                                xpos = xpos, stringsAsFactors = FALSE)) %>%
+    dplyr::select(-intercept) %>%
+    tidyr::pivot_longer(cols = A:H, names_to = "founder_letter") %>%
+    dplyr::left_join(founderdf, by = "founder_letter") %>%
+    dplyr::filter(xpos > (pxpos-1), xpos < (pxpos+1)) %>%
+    ggplot(., aes(x = xpos, y = value, color = founder)) +
+      geom_line() + 
+      scale_color_manual(values = qtl2::CCcolors) +
+      scale_x_continuous(breaks = apply(xchrbound, 2, median), label = c(as.character(1:19), "X")) +
+    # geom_vline(xintercept = 2009)
+      labs(x = "Chromosome of SNP", y = "LOD", title = cname) +
+      theme(
+        axis.line=element_blank(),
+        axis.ticks=element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
+      ) +
+      theme_minimal()
+  ggsave(paste0("founder_loci_plot_", cname, ".png"), p1)
+
+}
+```
+
+
+
+## Founder Cytokines
+
+This all needs processing to get it in an analyzable format.  Things to consider
+  - Figure out the concentration calculations used
+  - Match / reproduce what is in the slide deck
+  - think of a way of standardizing cytokine concentraions across the disparate experiments for comparison.
+    - maybe just report raw correlations as the metric (ignore scaling)
+
+
+```{r}
+
+## standard curve info
+founder_cytokines <- readxl::read_excel(paste0(data_dir,"cytokines/founders/TMD_Plate1_report_2025-05-30.xlsx"), sheet = 1)
+
+## predicted concentrations
+founder_cytokines <- readxl::read_excel(paste0(data_dir,"cytokines/founders/TMD_Plate1_report_2025-05-30.xlsx"), sheet = 2)
+
+## raw output readings
+founder_cytokines <- readxl::read_excel(paste0(data_dir,"cytokines/founders/TMD_Plate1_report_2025-05-30.xlsx"), sheet = 3)
+
+```
+

@@ -1,0 +1,185 @@
+---
+title: "TwoSampleMR"
+format: html
+editor: visual
+---
+
+## Two Sample MR Test Data
+
+```{r}
+library(TwoSampleMR)
+
+bmi2_file <- system.file("extdata/bmi.csv", package = "TwoSampleMR")
+
+bmi_exp_dat <- read_exposure_data(
+  filename = bmi2_file,
+  sep = ",",
+  snp_col = "rsid",
+  beta_col = "effect",
+  se_col = "SE",
+  effect_allele_col = "a1",
+  other_allele_col = "a2",
+  eaf_col = "a1_freq",
+  pval_col = "p-value",
+  units_col = "Units",
+  gene_col = "Gene",
+  samplesize_col = "n"
+)
+
+
+# Get instruments
+bmi_exp_dat
+
+# Get effects of instruments on outcome
+outcome_dat <- extract_outcome_data(snps=bmi_exp_dat$SNP, outcomes = "ieu-a-7")
+
+# Harmonise the exposure and outcome data
+dat <- harmonise_data(bmi_exp_dat, outcome_dat)
+
+# Perform MR
+res <- mr(dat)
+```
+
+## Random Data
+
+```{r}
+
+random_df <- data.frame(
+  SNP = c("rs1", "rs2"),
+  beta = c(1, 2),
+  se = c(1, 2),
+  effect_allele = c("A", "T")
+)
+random_df
+
+random_exp_dat <- format_data(random_df, type = "exposure")
+
+random_out_dat <- format_data(random_df, type = "outcome")
+
+# Harmonise the exposure and outcome data
+dat <- harmonise_data(random_exp_dat, random_out_dat)
+
+# Perform MR
+res <- mr(dat)
+```
+
+
+
+
+
+## Cytokine QTLs
+
+```{r}
+library(qtl2)
+library(data.table)
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+domice_dir <- "/workspace/fasi-domice/"
+data_dir <- paste0(domice_dir, "data/")
+results_dir <- paste0(domice_dir, "results/")
+figure_dir <- paste0(domice_dir, "figures/")
+```
+
+
+```{r}
+# project_path <- "/ahg/regevdata/projects/FASI_DOmice/"
+# if( length(dir(project_path)) == 0 ) project_path <- "/Volumes/ahg_regevdata/projects/FASI_DOmice/"
+source(paste0(domice_dir, "src/helpers.R"))
+
+load(paste0(data_dir, "genotype/GM_snps.Rdata"))
+## founder key
+founderdf <- data.frame(founder_letter = LETTERS[1:8], 
+                        founder_color = qtl2::CCcolors, 
+                        founder = names(qtl2::CCcolors),
+                        best_clean = c("A_J", "C57BL_6NJ", "129S1_SvImJ", "NOD_ShiLtJ",
+                                       "NZO_HlLtJ", "CAST_EiJ", "PWK_PhJ", "WSB_EiJ"),
+                        stringsAsFactors = FALSE)
+```
+
+```{r}
+cytokine_lods <- fread(paste0(results_dir,"cytokines/qtl-steady-cytokines-lods.csv.gz"), data.table=FALSE)
+```
+
+
+```{r}
+ilc2_lods <- fread(paste0(results_dir,"eqtl/qtl-plot-lods-ILC2-cv.csv.gz"), data.table=FALSE)
+```
+
+
+```{r}
+
+ilc2_lods_df <- ilc2_lods %>%
+  dplyr::filter(marker_chr==1, gene_chr==1, value > 10) %>%
+  dplyr::left_join({GM_snps %>% dplyr::select(marker, rsID, A1)}) %>%
+  dplyr::rename(SNP = rsID, effect_allele = A1) %>%
+  dplyr::mutate(pval = exp(-value)) %>%
+  dplyr::select(SNP, effect_allele, pval)
+
+
+exp_dat <- format_data(ilc2_lods_df, type = "exposure", pval_col = "pval")
+
+cytokine_lods_df <- cytokine_lods %>%
+  dplyr::filter(IL2 > 5) %>%
+  dplyr::left_join({GM_snps %>% dplyr::select(marker, rsID, A1)}) %>%
+  dplyr::rename(SNP = rsID, effect_allele = A1) %>%
+  dplyr::mutate(pval = exp(-IL2)) %>%
+  dplyr::select(SNP, effect_allele, pval)
+
+
+out_dat <- format_data(cytokine_lods_df, type = "outcome", pval_col = "pval")
+
+# Harmonise the exposure and outcome data
+dat <- harmonise_data(random_exp_dat, random_out_dat)
+
+# Perform MR
+res <- mr(dat)
+
+```
+
+
+https://www.bios.unc.edu/research/genomic_software/Matrix_eQTL/runit.html
+
+
+https://kbroman.org/qtl2/assets/vignettes/user_guide.html#SNP_association
+
+```{r}
+file <- "https://raw.githubusercontent.com/rqtl/qtl2data/main/DOex/DOex.zip"
+DOex <- read_cross2(file)
+pr <- calc_genoprob(DOex, error_prob=0.002)
+apr <- genoprob_to_alleleprob(pr)
+k <- calc_kinship(apr, "loco")
+sex <- (DOex$covar$Sex == "male")*1
+names(sex) <- rownames(DOex$covar)
+sex <- setNames( (DOex$covar$Sex == "male")*1, rownames(DOex$covar) )
+out <- scan1(apr, DOex$pheno, k, sex)
+out
+coef_c2 <- scan1coef(apr[,"2"], DOex$pheno, k[["2"]], sex)
+par(mar=c(4.1, 4.1, 0.6, 0.6))
+plot_coefCC(coef_c2, DOex$gmap["2"], bgcolor="gray95", legend="bottomleft")
+dev.off()
+download.file("https://ndownloader.figshare.com/files/18533342", "cc_variants.sqlite")
+out_snps <- scan1snps(pr, DOex$pmap, DOex$pheno, k[["2"]], sex, query_func=query_variants,
+chr=2, start=peak_Mbp-1, end=peak_Mbp+1, keep_all_snps=TRUE)
+query_variants <- create_variant_query_func("~/Data/CCdb/cc_variants.sqlite")
+out_snps <- scan1snps(pr, DOex$pmap, DOex$pheno, k[["2"]], sex, query_func=query_variants,
+chr=2, start=peak_Mbp-1, end=peak_Mbp+1, keep_all_snps=TRUE)
+peak_Mbp <- max(out, DOex$pmap)$pos
+out_snps <- scan1snps(pr, DOex$pmap, DOex$pheno, k[["2"]], sex, query_func=query_variants,
+chr=2, start=peak_Mbp-1, end=peak_Mbp+1, keep_all_snps=TRUE)
+query_variants <- create_variant_query_func("/workspace/fasi-domice/cc_variants.sqlite")
+out_snps <- scan1snps(pr, DOex$pmap, DOex$pheno, k[["2"]], sex, query_func=query_variants,
+chr=2, start=peak_Mbp-1, end=peak_Mbp+1, keep_all_snps=TRUE)
+download.file("https://ndownloader.figshare.com/files/18533342", "cc_variants.sqlite")
+out_snps <- scan1snps(pr, DOex$pmap, DOex$pheno, k[["2"]], sex, query_func=query_variants,
+chr=2, start=peak_Mbp-1, end=peak_Mbp+1, keep_all_snps=TRUE)
+out_snps <- scan1snps(pr, DOex$pmap, DOex$pheno, k[["2"]], sex, query_func=query_variants,
+chr=2, start=peak_Mbp-1, end=peak_Mbp+1, keep_all_snps=TRUE)
+out_snps
+?scan1snps
+out_snps$lod
+out_snps$snpinfo
+
+```
+

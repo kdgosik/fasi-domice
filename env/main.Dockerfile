@@ -14,7 +14,7 @@ RUN wget -qO- https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc |
     add-apt-repository "deb https://cloud.r-project.org/bin/linux/ubuntu $(lsb_release -cs)-cran40/"
 
 RUN apt-get update && \
-    apt-get install -y gdebi-core r-base r-base-dev s3fs lftp graphviz graphviz-dev
+    apt-get install -y gdebi-core r-base r-base-dev s3fs lftp graphviz graphviz-dev cmake
 
 # Install RStudio
 RUN wget https://download2.rstudio.org/server/bionic/amd64/rstudio-server-2022.07.2-576-amd64.deb
@@ -26,6 +26,7 @@ RUN R -e 'install.packages(c("tidyverse", "BiocManager"))'
 RUN R -e 'install.packages(c("languageserver", "shiny", "reticulate", "remotes", "kableExtra", "ggrepel","qtl2"))'
 RUN R -e 'install.packages(c("Seurat"))'
 RUN R -e 'BiocManager::install(c("rtracklayer", "Gviz","TxDb.Mmusculus.UCSC.mm10.knownGene","GenomicRanges","GenomicFeatures","BSgenome.Mmusculus.UCSC.mm10"))'
+RUN R -e 'remotes::install_github("MRCIEU/TwoSampleMR")'
 
 # Reset gitpod user credentials (for Rstudio login)
 RUN echo "gitpod:gitpod" | chpasswd
