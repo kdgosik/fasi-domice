@@ -63,10 +63,6 @@ dat <- harmonise_data(random_exp_dat, random_out_dat)
 res <- mr(dat)
 ```
 
-
-
-
-
 ## Cytokine QTLs
 
 ```{r}
@@ -81,7 +77,6 @@ data_dir <- paste0(domice_dir, "data/")
 results_dir <- paste0(domice_dir, "results/")
 figure_dir <- paste0(domice_dir, "figures/")
 ```
-
 
 ```{r}
 # project_path <- "/ahg/regevdata/projects/FASI_DOmice/"
@@ -102,11 +97,9 @@ founderdf <- data.frame(founder_letter = LETTERS[1:8],
 cytokine_lods <- fread(paste0(results_dir,"cytokines/qtl-steady-cytokines-lods.csv.gz"), data.table=FALSE)
 ```
 
-
 ```{r}
 ilc2_lods <- fread(paste0(results_dir,"eqtl/qtl-plot-lods-ILC2-cv.csv.gz"), data.table=FALSE)
 ```
-
 
 ```{r}
 
@@ -138,9 +131,7 @@ res <- mr(dat)
 
 ```
 
-
 https://www.bios.unc.edu/research/genomic_software/Matrix_eQTL/runit.html
-
 
 https://kbroman.org/qtl2/assets/vignettes/user_guide.html#SNP_association
 
@@ -182,4 +173,3 @@ out_snps$lod
 out_snps$snpinfo
 
 ```
-

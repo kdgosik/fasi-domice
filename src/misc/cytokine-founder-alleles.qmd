@@ -28,9 +28,14 @@ load(paste0(data_dir, "genotype/GM_snps.Rdata"))
 ## founder key
 founderdf <- data.frame(founder_letter = LETTERS[1:8], 
                         founder_color = qtl2::CCcolors, 
-                        founder = names(qtl2::CCcolors),
-                        best_clean = c("A_J", "C57BL_6NJ", "129S1_SvImJ", "NOD_ShiLtJ",
-                                       "NZO_HlLtJ", "CAST_EiJ", "PWK_PhJ", "WSB_EiJ"),
+                        founder_domice = names(qtl2::CCcolors),
+                        founder_cytokine_name = c("A","B6","129s",
+                                                  "NOD", "NZO",
+                                                  "CAST","PWK","WSB"),
+                        best_clean = c("A_J", "C57BL_6NJ",
+                                       "129S1_SvImJ", "NOD_ShiLtJ",
+                                       "NZO_HlLtJ", "CAST_EiJ", 
+                                       "PWK_PhJ", "WSB_EiJ"),
                         stringsAsFactors = FALSE)
 ```
 
@@ -38,14 +43,14 @@ founderdf <- data.frame(founder_letter = LETTERS[1:8],
 lods <- fread(paste0(results_dir,"cytokines/qtl-steady-cytokines-lods.csv.gz"))
 ```
 
-```{r}
+```{r alleleprobs}
 load(paste0(data_dir, "genotype/alleleprobs.Rdata"))
 antibody <- read_csv(paste0(data_dir, "phenotype/pheno_batch4_processed.csv"))
 cytokines <- readxl::read_excel(paste0(data_dir, "phenotype/cytokine production -steady state.xlsx"))
 
 ```
 
-```{r alleleprobs}
+```{r alleleprobs_filtering}
 aprob_rnames <- rownames(aprobs[[1]])
 
 name_vec <- sapply(cytokines$mouse_id, function(x) grep(x, aprob_rnames, value=T))
@@ -61,17 +66,17 @@ cytokines_qtl_df <- cytokines %>%
   dplyr::filter(!is.na(full_id))
 ```
 
-```{r}
+```{r select_ids}
 keep_ids <- intersect(aprob_rnames, cytokines_qtl_df$full_id)
 ```
 
-```{r}
+```{r qtl_df}
 cytokines_qtl_df <- cytokines_qtl_df %>%
   filter(full_id %in% keep_ids)
   
 ```
 
-```{r}
+```{r kinship_matrix}
 cores <- 2
 ## Load Phenotypes (all females)
 pheno <- cytokines_qtl_df %>% as.data.frame()
@@ -179,77 +184,201 @@ cnames <- cytokine_loci$Cytokine
 This next chunk is to specify the cytokine to focus on and take the above reference positions to grab the makrers in the GigaMUGA array that correspond to the cytokine location.
 
 ```{r marker_list}
-cname <- "IFNg"
+cname <- "IL-2"
 
-pvec <- pheno[,cname]
-names(pvec) <- pheno$full_id
-pchr <- cytokine_loci %>% 
-  filter(Cytokine == cname) %>% 
-  pull(Chromosome)
-genomic_position <- cytokine_loci %>% 
-  filter(Cytokine == cname) %>% 
-  pull(Genomic_Position)
-
-pos_start <- stringr::str_split(genomic_position,'-',simplify = T)[1]
-pos_start <- floor(as.numeric(pos_start)/10e4)*10e4
-pos_end <- stringr::str_split(genomic_position,'-',simplify = T)[2]
-pos_end <- ceiling(as.numeric(pos_end)/10e4)*10e4
-marker_list <- ccre %>% 
-  filter(pos > pos_start, 
-         pos < pos_end,
-         chr == pchr) %>% 
-  pull(marker)
+extract_marker_list <- function(cname) {
+  
+  pvec <- pheno[,cname]
+  names(pvec) <- pheno$full_id
+  pchr <- cytokine_loci %>% 
+    filter(Cytokine == cname) %>% 
+    pull(Chromosome)
+  genomic_position <- cytokine_loci %>% 
+    filter(Cytokine == cname) %>% 
+    pull(Genomic_Position)
+  
+  pos_start <- stringr::str_split(genomic_position,'-',simplify = T)[1]
+  pos_start <- floor(as.numeric(pos_start)/10e4)*10e4
+  pos_end <- stringr::str_split(genomic_position,'-',simplify = T)[2]
+  pos_end <- ceiling(as.numeric(pos_end)/10e4)*10e4
+  marker_list <- ccre %>% 
+    filter(pos > pos_start, 
+           pos < pos_end,
+           chr == pchr) %>% 
+    pull(marker)
+  
+  marker_list
+  
+}
 ```
 
-
-This part extracts the cytokine region markers from the allele probs array and averages them across the DO mice and predicted founder allele probabilities.  This outputs a dataframe where the rows are the DO mouse, the columns are the Founder Allele (A-H) and the entries are the average probability across all the markers at the cytokine location.
+This part extracts the cytokine region markers from the allele probs array and averages them across the DO mice and predicted founder allele probabilities. This outputs a dataframe where the rows are the DO mouse, the columns are the Founder Allele (A-H) and the entries are the average probability across all the markers at the cytokine location.
 
 ```{r mean_df}
+aprob_chr10_markers <- intersect(dimnames(aprobs[["10"]])[[3]], marker_list)
 out_df <- aprobs[["10"]][,,aprob_chr10_markers]
+
 # Compute mean across all data frames
 mean_df <- apply(out_df,c(1,2),mean) %>% as.data.frame() %>%
   tibble::rownames_to_column("full_id")
 ```
 
+```{r}
+l <- sapply(cnames, function(cname) {
+  pchr <- cytokine_loci %>% 
+    filter(Cytokine == cname) %>% 
+    pull(Chromosome)
+  
+  marker_list <- extract_marker_list(cname)
+  aprob_markers <- intersect(dimnames(aprobs[[pchr]])[[3]], marker_list)
+  out_df <- aprobs[[pchr]][,,aprob_markers]
+  
+  # Compute mean across all data frames
+  mean_df <- apply(out_df,c(1,2),mean) %>% 
+    as.data.frame() %>%
+    tibble::rownames_to_column("full_id")
+  
+  mean_df
+  
+}, USE.NAMES = TRUE, simplify = FALSE)
+```
+
+```{r}
+get_columns_above_threshold <- function(df, threshold = 0.4) {
+
+  # For each row, return column names with value == 1 and mean > threshold
+  apply(df, 1, function(row) {
+    cols <- colnames(df)[row > threshold]
+    if (length(cols) == 1) {
+      paste0(rep(cols,2),  collapse="") }
+    else paste0(cols,  collapse="")
+    
+  })
+}
+
+```
+
 This part takes the maximum probability and imputes that as the founder allele. Maybe think of how to collapse to genoprobs (e.g two founder alleles per mouse) or upload the genoprobs matrix also
 
 ```{r}
-# Add a column with the name of the column that has the max value in each row
-df_with_max_col <- mean_df %>%
-  rowwise() %>%
-  mutate(founder_letter = names(.)[-1][which.max(c_across(A:H))]) %>%
-  ungroup() %>%
-  dplyr::left_join(dplyr::select(pheno, full_id, !!cname)) %>%
-  dplyr::left_join(founderdf)
+
+create_founder_call <- function(l, cname) {
+  
+  # Add a column with the name of the column that has the max value in each row
+  df_with_max_col <- l[[cname]] %>%
+    rowwise() %>%
+    mutate(founder_letter = names(.)[-1][which.max(c_across(A:H))]) %>%
+    ungroup() %>%
+    dplyr::left_join(dplyr::select(pheno, full_id, !!cname)) %>%
+    dplyr::left_join(dplyr::rename(founderdf, founder = founder_domice))
+  
+  df_with_max_col$founder_geno <- get_columns_above_threshold(l[[cname]][,2:9])
+  df_with_max_col
+  
+}
 ```
 
-Averaging across the imputed founder allele to see cytokine levels for each allele.  This can be used to match with the founder cytokine data provided.
+Averaging across the imputed founder allele to see cytokine levels for each allele. This can be used to match with the founder cytokine data provided.
 
 ```{r}
-df_with_max_col %>% 
-  group_by(founder) %>% 
-  summarize(IFNg = mean(IFNg, na.rm=T))
+
+summarize_by_allele <- function(df_with_max_col, cname) {
+  
+  domice_df <- df_with_max_col %>% 
+    group_by(founder = best_clean) %>% 
+    summarize(across(all_of(cname), ~mean(.x, na.rm = TRUE)))
+  
+  domice_df
+  
+}
+```
+
+```{r}
+cname <-  names(l)[1]
+cat(cname,'\n')
+df_with_max_col <- create_founder_call(l, cname)
+plot_df_domice <- summarize_by_allele(df_with_max_col, cname)
+```
+
+### Founder Correlations
+
+Geno Calc Correlations:
+IFNg: -0.579258
+IL-5: 0.02514933
+TNFa: -0.248
+IL-2: 0.678
+IL-6: -0.575
+IL-4: -0.23
+IL-10: NA
+IL-9: 0.267
+IL-17A: -0.425
+IL-17F : NA
+IL-22: NA
+IL-13: NA
+
+```{r genos_cor}
+cor_df <- df_with_max_col %>%
+  dplyr::mutate(across(A:H, function(x) as.numeric(x>0.4))) %>%
+  dplyr::select(sym(cname), A:H) %>%
+  tidyr::pivot_longer(!sym(cname)) %>%
+  dplyr::filter(value==1) %>%
+  dplyr::group_by(name) %>%
+  dplyr::summarise(domice_cytokine = mean(.data[[cname]], na.rm=T)) %>%
+  dplyr::left_join(dplyr::select(founderdf, name = founder_letter,
+                                 founder = best_clean)) %>% 
+  left_join({
+    broad_founder_all %>%
+      mutate(founder_cytokine = as.numeric(.data[[cname]])) %>% 
+      group_by(founder = best_clean) %>% 
+      summarise(founder_cytokine = mean(founder_cytokine, na.rm=TRUE)) 
+    })
+
+cor(cor_df[,c('domice_cytokine','founder_cytokine')], use='pairwise.complete')
+```
+
+
+```{r}
+
+df <- plot_df_domice %>% 
+  left_join({
+    broad_founder_all %>%
+      mutate(cytokine = as.numeric(`IFNg`)) %>% 
+      group_by(founder = best_clean) %>% 
+      summarise(cytokine = mean(cytokine, na.rm=TRUE)) 
+    })
+
+cor(df[,2:3], use='pairwise.complete')
+plot(df[,2:3])
 ```
 
 Plotting DO mice imputed alleles by cytokine levels.
 
-```{r}
+```{r domice_founder_plot}
+founder_order <- c("A_J", "C57BL_6NJ", "129S1_SvImJ", "NOD_ShiLtJ", 
+                   "NZO_HlLtJ", "CAST_EiJ", "PWK_PhJ", "WSB_EiJ")
+
 founder_colors <- founderdf$founder_color
-names(founder_colors) <- founderdf$founder
+names(founder_colors) <- founderdf$best_clean
 
-ggplot(df_with_max_col, aes(founder, IFNg, color = founder)) + 
-  geom_violin() +
-  geom_jitter() +
-  scale_color_manual(values = founder_colors)
+df_with_max_col %>%
+  mutate(best_clean = factor(best_clean, levels = founder_order)) %>%
+  ggplot(aes(best_clean, .data[[cname]], color = best_clean)) + 
+    geom_violin() +
+    geom_jitter() +
+    scale_color_manual(values = founder_colors) +
+    theme_minimal() +
+    labs(title = "Cytokine Profile by Predicted Founder Allele",
+         x = "Founder (Predicted)",
+         y = paste0(cname, " (pg/ml)"),
+         color = "Founder")
 
-dev.off()
 ```
 
 ### QTL Analysis
 
 Running QTL analysis to get coefficient of predicted founder alleles impact at each cytokine location for that cytokine region. (cis-cytokine predictions.)
 
-```{r}
+```{r run_qtl_coef}
 for( cname in cnames) {
   pvec <- pheno[,cname]
   names(pvec) <- pheno$full_id
@@ -310,27 +439,138 @@ for( cname in cnames) {
 }
 ```
 
-
-
 ## Founder Cytokines
 
-This all needs processing to get it in an analyzable format.  Things to consider
-  - Figure out the concentration calculations used
-  - Match / reproduce what is in the slide deck
-  - think of a way of standardizing cytokine concentraions across the disparate experiments for comparison.
-    - maybe just report raw correlations as the metric (ignore scaling)
+### Previous Publications
 
+Whereas cellular composition was shaped by interactions between genotype and environment, cytokine response heterogeneity including IFNγ concentrations was primarily driven by genotype with consequence on worm burden
+
+https://pmc.ncbi.nlm.nih.gov/articles/PMC11224019/#MOESM29
 
 ```{r}
+founder_map <- data.frame(
+  Genotype = c("C57BL/6","129S1",  "PWK/PhJ"),
+  founder = c("C57BL_6NJ", "129S1_SvImJ","PWK_PhJ")
+)
 
-## standard curve info
-founder_cytokines <- readxl::read_excel(paste0(data_dir,"cytokines/founders/TMD_Plate1_report_2025-05-30.xlsx"), sheet = 1)
+public_cytokines <- readxl::read_excel(paste0(data_dir, "cytokines/41590_2024_1862_MOESM10_ESM.xlsx"), skip = 1) %>%
+  rename(IFNg = `IFN-gamma`,
+         TNFa = `TNF-a`) %>%
+  dplyr::left_join(founder_map)
+  
+```
 
-## predicted concentrations
-founder_cytokines <- readxl::read_excel(paste0(data_dir,"cytokines/founders/TMD_Plate1_report_2025-05-30.xlsx"), sheet = 2)
+```{r public_plot}
+#founder_order <- c("C57BL_6NJ", "129S1_SvImJ", "PWK_PhJ")
 
-## raw output readings
-founder_cytokines <- readxl::read_excel(paste0(data_dir,"cytokines/founders/TMD_Plate1_report_2025-05-30.xlsx"), sheet = 3)
+public_cytokines %>%
+  dplyr::mutate(Sample = factor(PrincetonID),
+                founder = factor(founder, levels = founder_order)) %>%
+  dplyr::filter(InfectionStatus == "Uninfected") %>%
+  ggplot(aes(Sample, .data[[cname]], fill = founder)) +
+    geom_col(position='dodge') +
+    geom_point(aes(Sample, .data[[cname]]), color = "black") +
+    scale_fill_manual(values = founder_colors) +
+    facet_wrap(~founder, scales = 'free_x') +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    labs(title = "Cytokine Profile by Founder (Oyesola 2024)",
+         x = "Founder",
+         y = paste0(cname, " (pg/ml)"),
+         color = "Founder")
+```
+
+### Broad Generation
+
+This all needs processing to get it in an analyzable format. Things to consider - Figure out the concentration calculations used - Match / reproduce what is in the slide deck - think of a way of standardizing cytokine concentraions across the disparate experiments for comparison. - maybe just report raw correlations as the metric (ignore scaling)
+
+```{r read_founder_cytokine}
+## read legened
+legend_df = read.csv(paste0(data_dir,"cytokines/founders/Legendplex_plate_maps_05292025 - Legend plex plate maps.csv"))
+
+## plate1 - standard curve info
+founder_plate1_cytokines_standard <- readxl::read_excel(paste0(data_dir,"cytokines/founders/TMD_Plate1_report_2025-05-30.xlsx"), sheet = 1)
+
+## plate1 - predicted concentrations
+founder_plate1_cytokines <- readxl::read_excel(paste0(data_dir,"cytokines/founders/TMD_Plate1_report_2025-05-30.xlsx"), sheet = 2)
+
+## plate1 - raw output readings
+founder_plate1_cytokines_raw <- readxl::read_excel(paste0(data_dir,"cytokines/founders/TMD_Plate1_report_2025-05-30.xlsx"), sheet = 3)
+
+
+## plate2 - standard curve info
+founder_plate2_cytokines_standard <- readxl::read_excel(paste0(data_dir,"cytokines/founders/TMD_Plate2_report_2025-05-30.xlsx"), sheet = 1)
+
+## plate2 - predicted concentrations
+founder_plate2_cytokines <- readxl::read_excel(paste0(data_dir,"cytokines/founders/TMD_Plate2_report_2025-05-30.xlsx"), sheet = 2)
+
+## plate2 - raw output readings
+founder_plate2_cytokines_raw <- readxl::read_excel(paste0(data_dir,"cytokines/founders/TMD_Plate2_report_2025-05-30.xlsx"), sheet = 3)
 
 ```
 
+```{r founder_dataframe}
+
+broad_founder_all <- rbind(founder_plate1_cytokines,founder_plate2_cytokines) %>%
+  dplyr::rename(fcs = well) %>%
+  dplyr::left_join(legend_df) %>%
+  dplyr::select(fcs, Sample, 
+                IFNg = `IFN-γ (A4)`,
+                `IL-5` = `IL-5 (A5)`,
+                TNFa = `TNF-α (A6)`,
+                `IL-2` = `IL-2 (A7)`,
+                `IL-6` = `IL-6 (A8)`,
+                `IL-4` = `IL-4 (A10)`,
+                `IL-10` = `IL-10 (B2)`,
+                `IL-9` = `IL-9 (B3)`,
+                `IL-17A` = `IL-17A (B4)`,
+                `IL-17F` = `IL-17F (B5)`,
+                `IL-22` = `IL-22 (B7)`,
+                `IL-13` = `IL-13 (B9)`) %>%
+  dplyr::mutate(founder_cytokine_name = stringr::str_split(Sample, '-', simplify = TRUE)[,1]) %>%
+  dplyr::left_join(founderdf)
+```
+
+```{r broad_plot}
+sample_order <- c(
+  'A-J-30002', 'A-J-30003', 'A-J-30004', 'A-J-30005', 
+  'A-J-30006', 'A-J-30007','A-J-30008', 
+  'B6-30009', 'B6-30010', 'B6-30011', 'B6-30012', 
+  '129s-30013', '129s-30014', '129s-30015', '129s-30016', '129s-30017',
+  '129s-30018', '129s-30019', '129s-30020', '129s-30021', '129s-30022', 
+  'NOD-30023', 'NOD-30024', 'NOD-30025', 'NOD-30026', 
+  'NOD-30027', 'NOD-30028', 'NOD-30029', 'NOD-30030', 'NOD-30031',
+  'NZO-30032', 'NZO-30033', 
+  'CAST-30035', 'CAST-30036', 'CAST-30037', 'CAST-30038', 'CAST-30039',
+  'CAST-30044', 'CAST-30045', 'CAST-30046', 'CAST-30047', 
+  'PWK-30040', 'PWK-30041', 'PWK-30042', 'PWK-30043', 
+  'WSB-30048', 'WSB-30049', 'WSB-30050', 'WSB-30051', 
+  'WSB-30052', 'WSB-30053', 'WSB-30054', 'WSB-30055')
+
+broad_founder_all %>% 
+  dplyr::mutate(Sample = factor(Sample, levels=sample_order),
+                cytokine = as.numeric(.data[[cname]]),
+                best_clean = factor(best_clean, levels = founder_order)) %>% 
+  tidyr::replace_na(replace = list(cytokine = 0)) %>%
+  dplyr::group_by(Sample) %>%
+  dplyr::mutate(cytokine_sample_mean = mean(cytokine)) %>%
+  dplyr::filter(!is.na(best_clean)) %>%
+  ggplot(aes(Sample, cytokine_sample_mean, fill = best_clean)) +
+    geom_col(position='dodge') +
+    scale_fill_manual(values = founder_colors) +
+    geom_point(aes(Sample, cytokine), color = "black") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    labs(title = "Cytokine Profile by Founder (Broad)",
+         x = "Founder",
+         y = paste0(cname, " (pg/ml)"),
+         fill = "Founder")
+
+```
+
+```{r}
+ifng_founder_df <- ifng_founder_all %>%
+  dplyr::filter(!is.na(best_clean)) %>%
+  group_by(founder = best_clean) %>%
+  summarize(IFNg = mean(IFNg))
+```
