@@ -302,19 +302,7 @@ plot_df_domice <- summarize_by_allele(df_with_max_col, cname)
 
 ### Founder Correlations
 
-Geno Calc Correlations:
-IFNg: -0.579258
-IL-5: 0.02514933
-TNFa: -0.248
-IL-2: 0.678
-IL-6: -0.575
-IL-4: -0.23
-IL-10: NA
-IL-9: 0.267
-IL-17A: -0.425
-IL-17F : NA
-IL-22: NA
-IL-13: NA
+Geno Calc Correlations: IFNg: -0.579258 IL-5: 0.02514933 TNFa: -0.248 IL-2: 0.678 IL-6: -0.575 IL-4: -0.23 IL-10: NA IL-9: 0.267 IL-17A: -0.425 IL-17F : NA IL-22: NA IL-13: NA
 
 ```{r genos_cor}
 cor_df <- df_with_max_col %>%
@@ -335,7 +323,6 @@ cor_df <- df_with_max_col %>%
 
 cor(cor_df[,c('domice_cytokine','founder_cytokine')], use='pairwise.complete')
 ```
-
 
 ```{r}
 
