@@ -5,26 +5,29 @@ editor: visual
 ---
 
 ## COMMENT:
-In the revised manuscript, we will:
-  (1) provide analysis of differentially expressed genes 
-between these two populations; 
-  (2) quantify ILC3 signature genes between Rorc high and 
-Rorc low populations, to show the appropriate signature in both; and 
-  (3) check the existence of the population of NKp46-CCR6-DN ILC3s in our dataset.
+
+In the revised manuscript, we will: (1) provide analysis of differentially expressed genes between these two populations; (2) quantify ILC3 signature genes between Rorc high and Rorc low populations, to show the appropriate signature in both; and (3) check the existence of the population of NKp46-CCR6-DN ILC3s in our dataset.
 
 ## Set Paths
 
+
+```{r}
 # Load necessary libraries
+
 # If you don't have these installed, run:
 # install.packages("Seurat")
 # install.packages("dplyr")
 # install.packages("ggplot2")
-# BiocManager::install("GSVA") # For Gene Set Variation Analysis (optional, for more advanced scoring)
+# BiocManager::install("GSVA") \# For Gene Set Variation Analysis (optional, for more advanced scoring)
+```
+
 
 ```{r setup}
 library(Seurat)
 library(dplyr)
+library(forcats)
 library(ggplot2)
+library(data.table)
 # library(GSVA) # Uncomment if you plan to use GSVA for gene set scoring
 
 domice_dir <- "/workspace/fasi-domice/"
@@ -33,32 +36,75 @@ results_dir <- paste0(domice_dir, "results/")
 figure_dir <- paste0(domice_dir, "figures/")
 ```
 
-
 ## Config
 
 ```{r config}
 source(paste0(domice_dir, "src/helpers.R"))
 ```
 
+```{r}
+plot_df <- fread(paste0(data_dir, "manuscript-plot-data.csv.gz"), 
+                 data.table = FALSE)
+
+## subsetting to ILC populations
+plot_df <- plot_df %>%
+  # filter(louvain_labels %in% (c(1,2,3,4,5,8))) %>%
+  mutate(cell_types = factor(louvain_labels)) %>%
+  mutate(cell_types = fct_recode(cell_types,
+                                 "LTi-like/CCR6_low" = "1",
+                                 "ILC3/RORgt_low" = "2",
+                                 "ILC2" = "3",
+                                 "ILC3/RORgt_high" = "4",
+                                 "LTi-like/CCR6_high" = "5",
+                                 "ILC1" = "8"))
+  
+label_df <- plot_df %>%
+  dplyr::group_by(cell_types) %>%
+  dplyr:: summarise(X_tsne1 = median(X_tsne1),
+            X_tsne2 = median(X_tsne2),
+            X_umap1 = median(X_umap1),
+            X_umap2 = median(X_umap2))
+
+
+p_umap <- plot_df %>%
+  ggplot(aes(X_umap1, X_umap2, color = cell_types)) + 
+  geom_point(shape = 46) + 
+  geom_label(mapping = aes(X_umap1, X_umap2, label = cell_types), data = label_df) +
+  theme_void() +
+  theme(legend.position = "none") +
+  labs(color = "Cell Type") + 
+  guides(color = guide_legend(override.aes = list(size=5, shape=20)))
+```
 
 ## Load Data
 
 ```{r load_data}
 obj <- readRDS(paste0(data_dir, "allchannels/ilc-seurat-object.rds"))
+obj_subset <- subset(obj, subset = louvain_labels %in% c(2,4))
+
+```
+
+```{r}
+obj_subset@meta.data <- obj_subset@meta.data %>%
+  mutate(cell_types = factor(louvain_labels)) %>%
+  mutate(Rorc_status = fct_recode(cell_types,
+                                 "Rorc_low" = "2",
+                                 "Rorc_high" = "4"))
 ```
 
 ```{r}
 # Set the identity of cells based on Rorc_status for DEG analysis
-Idents(your_seurat_object) <- "Rorc_status"
+Idents(obj_subset) <- "Rorc_status"
 ```
 
+## Start Analysis
 
-
+### Find Markers
 
 ```{r}
 print("Performing differential expression analysis between Rorc_high and Rorc_low populations...")
 deg_results <- FindMarkers(
-  your_seurat_object,
+  obj_subset,
   ident.1 = "Rorc_high",
   ident.2 = "Rorc_low",
   logfc.threshold = 0.25, # Minimum log2 fold-change
@@ -68,14 +114,13 @@ deg_results <- FindMarkers(
 ```
 
 
-
+### 1.3 View and save DEG results
 
 ```{r}
 # 1.3 View and save DEG results
 print("Differential Expression Results (top 10):")
 print(head(deg_results, 10))
 ```
-
 
 ```{r}
 # You can filter for significant genes (e.g., adjusted p-value < 0.05)
@@ -90,20 +135,27 @@ print("Full DEG results saved to 'DEGs_Rorc_high_vs_Rorc_low.csv'")
 
 ```
 
-
 ```{r}
 # To create a volcano plot, you'll need the EnhancedVolcano package or custom ggplot2 code.
 # install.packages("EnhancedVolcano")
-# library(EnhancedVolcano)
-# EnhancedVolcano(deg_results,
-#                 lab = rownames(deg_results),
-#                 x = 'avg_log2FC',
-#                 y = 'p_val_adj',
-#                 title = 'Rorc_high vs Rorc_low DEGs',
-#                 pCutoff = 0.05,
-#                 FCcutoff = 0.25)
+library(EnhancedVolcano)
+EnhancedVolcano(deg_results,
+                lab = rownames(deg_results),
+                x = 'avg_log2FC',
+                y = 'p_val_adj',
+                title = 'Rorc_high vs Rorc_low DEGs',
+                pCutoff = 0.05,
+                FCcutoff = 0.25)
+
+ggsave(filename = paste0(results_dir,"vocano.png"),
+      width = 5,
+      height=5)
+```
 
 
+## 2.1 Quantify ILC3 signature genes
+
+```{r}
 # --- Reviewer Question 2: Quantify ILC3 signature genes ---
 # Goal: Calculate and compare an ILC3 gene signature score between Rorc high and Rorc low populations.
 
@@ -113,7 +165,7 @@ print("Full DEG results saved to 'DEGs_Rorc_high_vs_Rorc_low.csv'")
 ILC3_signature_genes <- c("Rorc", "Il7r", "Cd127", "Il2ra", "Gata3", "Id2", "Tcf7", "Ahr", "Stat3", "Il1rl1")
 
 # Filter the signature gene list to only include genes present in your dataset
-ILC3_signature_genes_present <- ILC3_signature_genes[ILC3_signature_genes %in% rownames(your_seurat_object)]
+ILC3_signature_genes_present <- ILC3_signature_genes[ILC3_signature_genes %in% rownames(obj_subset)]
 if (length(ILC3_signature_genes_present) == 0) {
     stop("None of the specified ILC3 signature genes were found in your dataset. Please check gene names.")
 } else if (length(ILC3_signature_genes_present) < length(ILC3_signature_genes)) {
@@ -122,16 +174,15 @@ if (length(ILC3_signature_genes_present) == 0) {
 }
 ```
 
-
-
+### 2.2 Calculate gene signature score
 
 ```{r}
 # 2.2 Calculate gene signature score
 # Seurat's AddModuleScore is a good way to do this. It calculates the average expression
 # of features in a gene set, subtracted by the aggregated expression of control feature sets.
 print("Calculating ILC3 gene signature score...")
-your_seurat_object <- AddModuleScore(
-    object = your_seurat_object,
+obj_subset <- AddModuleScore(
+    object = obj_subset,
     features = list(ILC3_signature_genes_present),
     ctrl = 100, # Number of control genes to randomly select
     name = 'ILC3_Signature' # Name of the new metadata column for the score
@@ -149,7 +200,7 @@ obj$ILC3_Score <- abj$ILC3_Signature1
 # 2.3 Quantify and visualize the scores
 # Use violin plots or box plots to compare scores between Rorc high and Rorc low populations.
 print("Visualizing ILC3 signature scores...")
-p_ilc3_score <- VlnPlot(obj,
+p_ilc3_score <- VlnPlot(obj_subset,
                         features = "ILC3_Score",
                         group.by = "Rorc_status",
                         pt.size = 0.1, # Adjust point size for visualization
@@ -186,6 +237,88 @@ wilcox_test_ilc3 <- wilcox.test(ILC3_Score ~ Rorc_status, data = your_seurat_obj
 print("\nWilcoxon Rank Sum test for ILC3 Score difference:")
 print(wilcox_test_ilc3)
 ```
+
+
+
+
+
+## Gene enrichment analysis for topic genes
+This code was provided by Alok Jaiswal to look for gene set enrichment in the genes identified by Miao and Kirk.
+```{r enrichment, eval=TRUE}
+miao <- readxl::read_xlsx("~/Downloads/qtl-genelist-grouped -Miao-for Alok.xlsx", sheet=3,  col_names = F)
+
+#Pathway
+library(clusterProfiler)
+library(msigdbr)
+m_df = msigdbr(species = "Mus musculus", category = "C5", subcategory = "BP")
+m_t2g_goBP = m_df %>% dplyr::select(gs_name, gene_symbol) %>% as.data.frame()
+
+m_df = msigdbr(species = "Mus musculus", category = "C5", subcategory = "MF")
+m_t2g_goMF = m_df %>% dplyr::select(gs_name, gene_symbol) %>% as.data.frame()
+
+m_df_reactome = msigdbr(species =  "Mus musculus", category = "C2", subcategory = "CP:REACTOME")
+m_t2g_reactome = m_df_reactome %>% dplyr::select(gs_name, gene_symbol) %>% as.data.frame()
+
+m_df_kegg = msigdbr(species =  "Mus musculus", category = "C2", subcategory = "CP:KEGG")
+m_t2g_kegg = m_df_kegg %>% dplyr::select(gs_name, gene_symbol) %>% as.data.frame()
+
+m_t2g <- rbind(m_t2g_reactome, m_t2g_goBP)
+
+m_t2g <- m_t2g_goBP
+m_t2g <- m_t2g_goMF
+m_t2g <- m_t2g_kegg
+m_t2g <- m_t2g_reactome
+
+# Add module score
+topic.list <- list()
+for(i in 1:nrow(miao)){
+  topic.name <- miao$...2[i]
+  topic.genes <- miao$...3[i]
+  topic.genes <- unlist(strsplit(topic.genes, "\\,"))
+  topic.list[[topic.name]] <- topic.genes
+}
+
+pVal = 0.05
+qVal = 0.1
+
+#
+topic.pathways.BP <- compareCluster(topic.list, 
+                                    fun           = "enricher", 
+                                    #TERM2GENE     = g2p2m,
+                                    TERM2GENE     = m_t2g,
+                                    pAdjustMethod = "BH",
+                                    pvalueCutoff  = pVal,
+                                    qvalueCutoff  = qVal)
+topic.pathways.BP.df <- topic.pathways.BP@compareClusterResult
+
+#
+topic.pathways.KEGG <- compareCluster(topic.list, 
+                                      fun           = "enricher", 
+                                      #TERM2GENE     = g2p2m,
+                                      TERM2GENE     = m_t2g_kegg,
+                                      pAdjustMethod = "BH",
+                                      pvalueCutoff  = pVal,
+                                      qvalueCutoff  = qVal)
+topic.pathways.KEGG.df <- topic.pathways.KEGG@compareClusterResult
+
+#
+topic.pathways.REACTOME <- compareCluster(topic.list, 
+                                          fun           = "enricher", 
+                                          #TERM2GENE     = g2p2m,
+                                          TERM2GENE     = m_t2g_reactome,
+                                          pAdjustMethod = "BH",
+                                          pvalueCutoff  = pVal,
+                                          qvalueCutoff  = qVal)
+topic.pathways.REACTOME.df <- topic.pathways.REACTOME@compareClusterResult
+
+
+write.table(topic.pathways.BP.df,  file="/Volumes/broad_xavierlab_datadeposit/ajaiswal/Gut_Circuits/analysis/tables/Miao_ILS_Topics_GSEA_GOBP.tsv", sep="\t", row.names =F, quote=F)
+write.table(topic.pathways.KEGG.df,  file="/Volumes/broad_xavierlab_datadeposit/ajaiswal/Gut_Circuits/analysis/tables/Miao_ILS_Topics_GSEA_KEGG.tsv", sep="\t", row.names =F, quote=F)
+write.table(topic.pathways.REACTOME.df,  file="/Volumes/broad_xavierlab_datadeposit/ajaiswal/Gut_Circuits/analysis/tables/Miao_ILS_Topics_GSEA_REACTOME.tsv", sep="\t", row.names =F, quote=F)
+```
+
+
+
 
 
 
@@ -288,6 +421,3 @@ print("\n--- Script Finished ---")
 print("Remember to review the generated CSV files and plots, and adjust thresholds or parameters as needed for your specific dataset.")
 
 ```
-
-
-

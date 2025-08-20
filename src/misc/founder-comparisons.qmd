@@ -1,0 +1,69 @@
+---
+title: "Untitled"
+format: html
+editor: visual
+---
+
+## Reviewer Comments
+
+First, to clarify, in the analysis in Fig. 2 we showed DO mice. Each DO mouse has a different genetics and mixture as the mouse are outbred (not inbred strains) and each is its own “strain”.
+
+
+```{r setup}
+library(qtl2)
+library(data.table)
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+domice_dir <- "/workspace/fasi-domice/"
+data_dir <- paste0(domice_dir, "data/")
+results_dir <- paste0(domice_dir, "results/")
+figure_dir <- paste0(domice_dir, "figures/")
+```
+
+
+```{r alleleprobs}
+load(paste0(data_dir, "genotype/alleleprobs.Rdata"))
+antibody <- read_csv(paste0(data_dir, "phenotype/pheno_batch4_processed.csv"))
+cytokines <- readxl::read_excel(paste0(data_dir, "phenotype/cytokine production -steady state.xlsx"))
+
+```
+
+```{r alleleprobs_filtering}
+aprob_rnames <- rownames(aprobs[[1]])
+
+name_vec <- sapply(cytokines$mouse_id, function(x) grep(x, aprob_rnames, value=T))
+
+name_map <- data.frame(full_id = sapply(name_vec, last)) %>% 
+  tibble::rownames_to_column("mouse_id") %>% 
+  dplyr::filter(!is.na(full_id))
+```
+
+## DO Mice Founder Allele Contributions
+
+In the revised manuscript, we will provide a new analysis showing the percent of each founder's haplotype that contributes to each of the DO mice genetic makeup.
+
+
+TODO: Edit the following code.  Count/Average allele prevalence of each founder strain and plot per DO mouse.
+
+```{r mean_df}
+aprob_chr10_markers <- intersect(dimnames(aprobs[["10"]])[[3]], marker_list)
+out_df <- aprobs[["10"]][,,aprob_chr10_markers]
+
+# Compute mean across all data frames
+mean_df <- apply(out_df,c(1,2),mean) %>% as.data.frame() %>%
+  tibble::rownames_to_column("full_id")
+```
+
+
+
+## Founder Mice ILC3 Comparisons
+
+Second, we have profiled by scRNA-seq the 8 founder strains, and in the revised manuscript, we will show the difference between ILC3s from NOD and C57BL/6 mice.
+
+
+TODO: Look at the scRNAseq founder data and the ILC3 cell type calls to quantify this.
+
+
+
