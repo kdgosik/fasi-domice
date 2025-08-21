@@ -6,8 +6,7 @@ editor: visual
 
 ## Reviewer Comments
 
-First, to clarify, in the analysis in Fig. 2 we showed DO mice. Each DO mouse has a different genetics and mixture as the mouse are outbred (not inbred strains) and each is its own “strain”.
-
+First, to clarify, in the analysis in Fig. 2 we showed DO mice. Each DO mouse has a different genetics and mixture as the mouse are outbred (not inbred strains) and each is its own "strain".
 
 ```{r setup}
 library(qtl2)
@@ -22,39 +21,25 @@ results_dir <- paste0(domice_dir, "results/")
 figure_dir <- paste0(domice_dir, "figures/")
 ```
 
-
 ```{r alleleprobs}
 load(paste0(data_dir, "genotype/alleleprobs.Rdata"))
-antibody <- read_csv(paste0(data_dir, "phenotype/pheno_batch4_processed.csv"))
-cytokines <- readxl::read_excel(paste0(data_dir, "phenotype/cytokine production -steady state.xlsx"))
-
 ```
 
-```{r alleleprobs_filtering}
-aprob_rnames <- rownames(aprobs[[1]])
-
-name_vec <- sapply(cytokines$mouse_id, function(x) grep(x, aprob_rnames, value=T))
-
-name_map <- data.frame(full_id = sapply(name_vec, last)) %>% 
-  tibble::rownames_to_column("mouse_id") %>% 
-  dplyr::filter(!is.na(full_id))
-```
 
 ## DO Mice Founder Allele Contributions
 
 In the revised manuscript, we will provide a new analysis showing the percent of each founder's haplotype that contributes to each of the DO mice genetic makeup.
 
+TODO: Edit the following code. Count/Average allele prevalence of each founder strain and plot per DO mouse.
 
-TODO: Edit the following code.  Count/Average allele prevalence of each founder strain and plot per DO mouse.
+Running `founder-comparison.R` as a background job
 
-```{r mean_df}
-aprob_chr10_markers <- intersect(dimnames(aprobs[["10"]])[[3]], marker_list)
-out_df <- aprobs[["10"]][,,aprob_chr10_markers]
 
-# Compute mean across all data frames
-mean_df <- apply(out_df,c(1,2),mean) %>% as.data.frame() %>%
-  tibble::rownames_to_column("full_id")
+```{r read_allele_df}
+allele_df <- read_csv("founder_allele_counts.csv")
 ```
+
+
 
 
 
@@ -62,8 +47,51 @@ mean_df <- apply(out_df,c(1,2),mean) %>% as.data.frame() %>%
 
 Second, we have profiled by scRNA-seq the 8 founder strains, and in the revised manuscript, we will show the difference between ILC3s from NOD and C57BL/6 mice.
 
-
 TODO: Look at the scRNAseq founder data and the ILC3 cell type calls to quantify this.
 
+
+```{r}
+obs_f1 <- read_csv(paste0(data_dir, "founders1-louvain_labels-labels-transfer/obs.csv"))
+```
+
+```{r}
+obs_f1 %>% 
+  filter(best_clean %in% c("C57BL_6NJ","NOD_ShiLtJ")) %>%
+  group_by(best_clean, called_cell_types_new) %>%
+  count() %>%
+  group_by(best_clean) %>%
+  mutate(proportion = n / sum(n)) %>%
+  filter(called_cell_types_new %in% c(paste0("ILC",1:3),"ILC3(LTi-like)")) %>%
+  tidyr::pivot_wider(id_cols = called_cell_types_new, 
+                     names_from = best_clean,
+                     values_from = c(n, proportion)) %>%
+  gt()
+  
+```
+
+
+```{r}
+p1 <- obs_f1 %>% 
+  filter(best_clean %in% c("C57BL_6NJ","NOD_ShiLtJ")) %>%
+  group_by(best_clean, called_cell_types_new) %>%
+  count() %>%
+  group_by(best_clean) %>%
+  mutate(proportion = n / sum(n)) %>%
+  filter(called_cell_types_new %in% c(paste0("ILC",1:3),"ILC3(LTi-like)")) %>%
+  ggplot(aes(x = called_cell_types_new, y = proportion, fill = best_clean)) +
+    geom_bar(stat="identity", position="dodge") +
+    labs(x = "Cell Type", 
+         y = "Proportion", 
+         fill = "Founder",
+         title = "ILC Prevalence Comparison") +
+    scale_fill_manual(values = c("C57BL_6NJ"="#555555","NOD_ShiLtJ"="#0072B2")) +
+    theme_minimal()
+
+p1
+
+ggsave(filename = paste0(results_dir, "founders/NOD_B6_ILC_comparison.png"),
+      plot = p1)
+  
+```
 
 

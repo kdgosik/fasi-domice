@@ -10,7 +10,6 @@ In the revised manuscript, we will: (1) provide analysis of differentially expre
 
 ## Set Paths
 
-
 ```{r}
 # Load necessary libraries
 
@@ -20,7 +19,6 @@ In the revised manuscript, we will: (1) provide analysis of differentially expre
 # install.packages("ggplot2")
 # BiocManager::install("GSVA") \# For Gene Set Variation Analysis (optional, for more advanced scoring)
 ```
-
 
 ```{r setup}
 library(Seurat)
@@ -113,7 +111,6 @@ deg_results <- FindMarkers(
 )
 ```
 
-
 ### 1.3 View and save DEG results
 
 ```{r}
@@ -151,7 +148,6 @@ ggsave(filename = paste0(results_dir,"vocano.png"),
       width = 5,
       height=5)
 ```
-
 
 ## 2.1 Quantify ILC3 signature genes
 
@@ -195,7 +191,6 @@ obj$ILC3_Score <- abj$ILC3_Signature1
 
 ```
 
-
 ```{r}
 # 2.3 Quantify and visualize the scores
 # Use violin plots or box plots to compare scores between Rorc high and Rorc low populations.
@@ -212,8 +207,6 @@ p_ilc3_score <- VlnPlot(obj_subset,
 
 print(p_ilc3_score)
 ```
-
-
 
 ```{r}
 # Save the plot
@@ -238,12 +231,10 @@ print("\nWilcoxon Rank Sum test for ILC3 Score difference:")
 print(wilcox_test_ilc3)
 ```
 
-
-
-
-
 ## Gene enrichment analysis for topic genes
+
 This code was provided by Alok Jaiswal to look for gene set enrichment in the genes identified by Miao and Kirk.
+
 ```{r enrichment, eval=TRUE}
 miao <- readxl::read_xlsx("~/Downloads/qtl-genelist-grouped -Miao-for Alok.xlsx", sheet=3,  col_names = F)
 
@@ -316,12 +307,6 @@ write.table(topic.pathways.BP.df,  file="/Volumes/broad_xavierlab_datadeposit/aj
 write.table(topic.pathways.KEGG.df,  file="/Volumes/broad_xavierlab_datadeposit/ajaiswal/Gut_Circuits/analysis/tables/Miao_ILS_Topics_GSEA_KEGG.tsv", sep="\t", row.names =F, quote=F)
 write.table(topic.pathways.REACTOME.df,  file="/Volumes/broad_xavierlab_datadeposit/ajaiswal/Gut_Circuits/analysis/tables/Miao_ILS_Topics_GSEA_REACTOME.tsv", sep="\t", row.names =F, quote=F)
 ```
-
-
-
-
-
-
 
 ```{r}
 # --- Reviewer Question 3: Check existence of NKp46-CCR6-DN ILC3s ---
