@@ -6,7 +6,10 @@ editor: visual
 
 ## COMMENT:
 
-In the revised manuscript, we will: (1) provide analysis of differentially expressed genes between these two populations; (2) quantify ILC3 signature genes between Rorc high and Rorc low populations, to show the appropriate signature in both; and (3) check the existence of the population of NKp46-CCR6-DN ILC3s in our dataset.
+In the revised manuscript, we will: 
+(1) provide analysis of differentially expressed genes between these two populations; 
+(2) quantify ILC3 signature genes between Rorc high and Rorc low populations, to show the appropriate signature in both; and 
+(3) check the existence of the population of NKp46-CCR6-DN ILC3s in our dataset.
 
 ## Set Paths
 
@@ -74,6 +77,11 @@ p_umap <- plot_df %>%
   guides(color = guide_legend(override.aes = list(size=5, shape=20)))
 ```
 
+```{r}
+p_umap
+```
+
+
 ## Load Data
 
 ```{r load_data}
@@ -122,7 +130,7 @@ print(head(deg_results, 10))
 ```{r}
 # You can filter for significant genes (e.g., adjusted p-value < 0.05)
 significant_degs <- deg_results %>%
-  filter(p_val_adj < 0.05)
+  filter(p_val_adj < 0.01)
 
 print(paste("Number of significant DEGs (adj. p-value < 0.05):", nrow(significant_degs)))
 
@@ -134,7 +142,7 @@ print("Full DEG results saved to 'DEGs_Rorc_high_vs_Rorc_low.csv'")
 
 ```{r}
 # To create a volcano plot, you'll need the EnhancedVolcano package or custom ggplot2 code.
-# install.packages("EnhancedVolcano")
+# BiocManager::install("EnhancedVolcano")
 library(EnhancedVolcano)
 EnhancedVolcano(deg_results,
                 lab = rownames(deg_results),
@@ -158,7 +166,7 @@ ggsave(filename = paste0(results_dir,"vocano.png"),
 # 2.1 Define ILC3 signature genes
 # Replace with your actual list of ILC3 signature genes.
 # Ensure these gene names match the gene names in your Seurat object.
-ILC3_signature_genes <- c("Rorc", "Il7r", "Cd127", "Il2ra", "Gata3", "Id2", "Tcf7", "Ahr", "Stat3", "Il1rl1")
+ILC3_signature_genes <- rownames(deg_results)
 
 # Filter the signature gene list to only include genes present in your dataset
 ILC3_signature_genes_present <- ILC3_signature_genes[ILC3_signature_genes %in% rownames(obj_subset)]
@@ -180,13 +188,13 @@ print("Calculating ILC3 gene signature score...")
 obj_subset <- AddModuleScore(
     object = obj_subset,
     features = list(ILC3_signature_genes_present),
-    ctrl = 100, # Number of control genes to randomly select
-    name = 'ILC3_Signature' # Name of the new metadata column for the score
+    ctrl = 10, # Number of control genes to randomly select
+    name = 'ILC3_Signature', # Name of the new metadata column for the score
 )
 
 # The scores will be added to the metadata slot, e.g., 'ILC3_Signature1'
 # Rename for clarity
-obj$ILC3_Score <- abj$ILC3_Signature1
+obj_subset@meta.data$ILC3_Score <- obj_subset$ILC3_Signature1
 
 
 ```
@@ -198,7 +206,7 @@ print("Visualizing ILC3 signature scores...")
 p_ilc3_score <- VlnPlot(obj_subset,
                         features = "ILC3_Score",
                         group.by = "Rorc_status",
-                        pt.size = 0.1, # Adjust point size for visualization
+                        pt.size = 0.01, # Adjust point size for visualization
                         cols = c("lightblue", "lightcoral")) + # Customize colors
     ggtitle("ILC3 Signature Score by Rorc Status") +
     ylab("ILC3 Signature Score") +
@@ -214,7 +222,7 @@ ggsave("ILC3_Signature_Score_ViolinPlot.png", plot = p_ilc3_score, width = 6, he
 print("ILC3 signature score violin plot saved to 'ILC3_Signature_Score_ViolinPlot.png'")
 
 # Calculate mean and standard deviation of ILC3 scores for each group
-ILC3_score_summary <- your_seurat_object@meta.data %>%
+ILC3_score_summary <- obj_subset@meta.data %>%
     group_by(Rorc_status) %>%
     summarise(
         Mean_ILC3_Score = mean(ILC3_Score),
@@ -226,10 +234,53 @@ print("\nSummary of ILC3 Signature Scores:")
 print(ILC3_score_summary)
 
 # Optional: Perform a statistical test (e.g., Wilcoxon) to compare scores
-wilcox_test_ilc3 <- wilcox.test(ILC3_Score ~ Rorc_status, data = your_seurat_object@meta.data)
+wilcox_test_ilc3 <- wilcox.test(ILC3_Score ~ Rorc_status, data = obj_subset@meta.data)
 print("\nWilcoxon Rank Sum test for ILC3 Score difference:")
 print(wilcox_test_ilc3)
 ```
+
+
+
+```{r}
+metadata <- obj_subset@meta.data %>%
+  dplyr::select(index,Rorc_status, ILC3_Signature1, ILC3_Score)
+
+
+plot_df <- plot_df %>%
+  left_join(metadata)
+```
+
+
+```{r}
+plot_df %>%
+  filter(!is.na(Rorc_status)) %>%
+  ggplot(aes(Rorc_status, ILC3_Score, color = Rorc_status)) +
+    geom_violin() +
+    geom_jitter(size = 0.01)
+```
+
+
+
+```{r}
+p_umap <- plot_df %>%
+  filter(louvain_labels %in% (c(1,2,3,4,5,8))) %>%
+  ggplot(aes(X_umap1, X_umap2, color = ILC3_Score)) + 
+  geom_point(shape = 46) + 
+  # geom_label(mapping = aes(X_umap1, X_umap2, label = cell_types), data = label_df) +
+  theme_void() +
+  # theme(legend.position = "none") +
+  labs(color = "Rorc Score",
+       title = "Rorc Status Score") +
+  # scale_color_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0)
+  # scale_color_gradient(low = "lightgrey", high = "darkred")
+  scale_color_viridis_c(option = "plasma") 
+  # guides(color = guide_legend(override.aes = list(size=5, shape=20)))
+  
+p_umap
+ggsave(filename = "umap_rorc_status_score.png",
+       plot = p_umap)
+```
+
 
 ## Gene enrichment analysis for topic genes
 

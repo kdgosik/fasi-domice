@@ -25,7 +25,6 @@ figure_dir <- paste0(domice_dir, "figures/")
 load(paste0(data_dir, "genotype/alleleprobs.Rdata"))
 ```
 
-
 ## DO Mice Founder Allele Contributions
 
 In the revised manuscript, we will provide a new analysis showing the percent of each founder's haplotype that contributes to each of the DO mice genetic makeup.
@@ -35,10 +34,68 @@ TODO: Edit the following code. Count/Average allele prevalence of each founder s
 Running `founder-comparison.R` as a background job
 
 
-```{r read_allele_df}
-allele_df <- read_csv("founder_allele_counts.csv")
+```{r}
+founderdf <- data.frame(founder_letter = LETTERS[1:8], 
+                        founder_color = qtl2::CCcolors, 
+                        founder_domice = names(qtl2::CCcolors),
+                        founder_cytokine_name = c("A","B6","129s",
+                                                  "NOD", "NZO",
+                                                  "CAST","PWK","WSB"),
+                        best_clean = c("A_J", "C57BL_6NJ",
+                                       "129S1_SvImJ", "NOD_ShiLtJ",
+                                       "NZO_HlLtJ", "CAST_EiJ", 
+                                       "PWK_PhJ", "WSB_EiJ"),
+                        stringsAsFactors = FALSE)
 ```
 
+
+```{r, allele_df}
+allele_df <- map_df(grep("founder_allele", dir("/workspace/fasi-domice/src/misc"), value = TRUE), read_csv)
+```
+
+
+
+```{r}
+plot_df <- allele_df %>%
+  group_by(Var1,Var2) %>%
+  summarize(n = sum(n)) %>%
+  group_by(Var1) %>%
+  mutate(proportion = n / sum(n))
+  
+```
+
+```{r}
+color_vec <- qtl2::CCcolors
+names(color_vec) <- LETTERS[1:8]
+
+
+p_founder <- ggplot(plot_df, aes(proportion, fill = Var2)) +
+  geom_density() +
+  facet_wrap(~Var2, nrow = 2) +
+  scale_fill_manual(values = color_vec) +
+  theme_minimal() +
+  labs(x = "Founder Proportion", 
+       y = "Density", 
+       fill = "Founder",
+       title = "DO Mice Founder Allele Contributions")
+
+ggsave(filename = paste0(results_dir, "density_founder_allele_contribution.png"),
+       plot = p_founder)
+  
+```
+
+
+```{r}
+plot_df %>%
+  group_by(founder_letter = Var2) %>%
+  summarize(Proportion_mean = round(mean(proportion), 4),
+            Proportion_sd = round(sd(proportion), 4)) %>%
+  left_join(founderdf) %>%
+  dplyr::select(Founder = best_clean,
+                Allele = founder_letter,
+                Proportion_mean,
+                Proportion_sd)
+```
 
 
 
@@ -48,7 +105,6 @@ allele_df <- read_csv("founder_allele_counts.csv")
 Second, we have profiled by scRNA-seq the 8 founder strains, and in the revised manuscript, we will show the difference between ILC3s from NOD and C57BL/6 mice.
 
 TODO: Look at the scRNAseq founder data and the ILC3 cell type calls to quantify this.
-
 
 ```{r}
 obs_f1 <- read_csv(paste0(data_dir, "founders1-louvain_labels-labels-transfer/obs.csv"))
@@ -68,7 +124,6 @@ obs_f1 %>%
   gt()
   
 ```
-
 
 ```{r}
 p1 <- obs_f1 %>% 
@@ -93,5 +148,3 @@ ggsave(filename = paste0(results_dir, "founders/NOD_B6_ILC_comparison.png"),
       plot = p1)
   
 ```
-
-
