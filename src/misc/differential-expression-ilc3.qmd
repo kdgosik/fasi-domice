@@ -6,10 +6,7 @@ editor: visual
 
 ## COMMENT:
 
-In the revised manuscript, we will: 
-(1) provide analysis of differentially expressed genes between these two populations; 
-(2) quantify ILC3 signature genes between Rorc high and Rorc low populations, to show the appropriate signature in both; and 
-(3) check the existence of the population of NKp46-CCR6-DN ILC3s in our dataset.
+In the revised manuscript, we will: (1) provide analysis of differentially expressed genes between these two populations; (2) quantify ILC3 signature genes between Rorc high and Rorc low populations, to show the appropriate signature in both; and (3) check the existence of the population of NKp46-CCR6-DN ILC3s in our dataset.
 
 ## Set Paths
 
@@ -49,9 +46,14 @@ plot_df <- fread(paste0(data_dir, "manuscript-plot-data.csv.gz"),
 
 ## subsetting to ILC populations
 plot_df <- plot_df %>%
-  # filter(louvain_labels %in% (c(1,2,3,4,5,8))) %>%
-  mutate(cell_types = factor(louvain_labels)) %>%
-  mutate(cell_types = fct_recode(cell_types,
+  dplyr::filter(louvain_labels %in% (c(1,2,3,4,5,8))) %>%
+  dplyr::mutate(NKp46_CCR6_DN = case_when(
+    !{louvain_labels %in% c(2,4)} ~ "Other Cells",
+    louvain_labels %in% c(2,4) & Ncr1 == 0 & Ccr6 == 0 ~ "ILC3 - NKp46_CCR6_DN",
+    louvain_labels %in% c(2,4) & {Ncr1 > 0 | Ccr6 > 0} ~ "ILC3 - non-NKp46_CCR6_DN",
+                                          TRUE ~ "Other Cells")) %>%
+  dplyr::mutate(cell_types = factor(louvain_labels)) %>%
+  dplyr::mutate(cell_types = fct_recode(cell_types,
                                  "LTi-like/CCR6_low" = "1",
                                  "ILC3/RORgt_low" = "2",
                                  "ILC2" = "3",
@@ -79,6 +81,39 @@ p_umap <- plot_df %>%
 
 ```{r}
 p_umap
+```
+
+```{r}
+plot_df %>%
+  ggplot(aes(X_umap1, X_umap2, color = cell_types == "ILC3/RORgt_high")) + 
+  geom_point(shape = 46) + 
+  theme_void() +
+  labs(color = "ILC3 - NKp46_CCR6_DN") + 
+  guides(color = guide_legend(override.aes = list(size=5, shape=20)))
+```
+
+```{r}
+color_guides <- c("ILC3 - NKp46_CCR6_DN" = "blue",
+                  "ILC3 - non-NKp46_CCR6_DN" = "red",
+                  "Other Cells" = "lightgray")
+plot_df %>%
+  ggplot(aes(X_umap1, X_umap2, color = NKp46_CCR6_DN)) + 
+  geom_point(shape = 46) + 
+  theme_void() +
+  labs(title = "NKp46-CCR6-DN ILC3 Population",
+       color = "ILC3 - NKp46_CCR6_DN") + 
+  scale_color_manual(values = color_guides) +
+  guides(color = guide_legend(override.aes = list(size=5, shape=20)))
+ggsave(filename = "NKp46-CCR6-DN_ILC3-population.png")
+```
+
+```{r}
+tabdf <- plot_df %>%
+  dplyr::filter(louvain_labels %in% c(2,4)) %>%
+  dplyr::mutate(cell_types = droplevels(cell_types))
+
+table(tabdf$cell_types, tabdf$NKp46_CCR6_DN)
+round(prop.table(table(tabdf$cell_types, tabdf$NKp46_CCR6_DN), margin=1), 3)
 ```
 
 
@@ -239,8 +274,6 @@ print("\nWilcoxon Rank Sum test for ILC3 Score difference:")
 print(wilcox_test_ilc3)
 ```
 
-
-
 ```{r}
 metadata <- obj_subset@meta.data %>%
   dplyr::select(index,Rorc_status, ILC3_Signature1, ILC3_Score)
@@ -250,7 +283,6 @@ plot_df <- plot_df %>%
   left_join(metadata)
 ```
 
-
 ```{r}
 plot_df %>%
   filter(!is.na(Rorc_status)) %>%
@@ -258,8 +290,6 @@ plot_df %>%
     geom_violin() +
     geom_jitter(size = 0.01)
 ```
-
-
 
 ```{r}
 p_umap <- plot_df %>%
@@ -280,7 +310,6 @@ p_umap
 ggsave(filename = "umap_rorc_status_score.png",
        plot = p_umap)
 ```
-
 
 ## Gene enrichment analysis for topic genes
 

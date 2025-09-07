@@ -33,7 +33,6 @@ TODO: Edit the following code. Count/Average allele prevalence of each founder s
 
 Running `founder-comparison.R` as a background job
 
-
 ```{r}
 founderdf <- data.frame(founder_letter = LETTERS[1:8], 
                         founder_color = qtl2::CCcolors, 
@@ -48,12 +47,9 @@ founderdf <- data.frame(founder_letter = LETTERS[1:8],
                         stringsAsFactors = FALSE)
 ```
 
-
 ```{r, allele_df}
 allele_df <- map_df(grep("founder_allele", dir("/workspace/fasi-domice/src/misc"), value = TRUE), read_csv)
 ```
-
-
 
 ```{r}
 plot_df <- allele_df %>%
@@ -84,7 +80,6 @@ ggsave(filename = paste0(results_dir, "density_founder_allele_contribution.png")
   
 ```
 
-
 ```{r}
 plot_df %>%
   group_by(founder_letter = Var2) %>%
@@ -96,9 +91,6 @@ plot_df %>%
                 Proportion_mean,
                 Proportion_sd)
 ```
-
-
-
 
 ## Founder Mice ILC3 Comparisons
 
