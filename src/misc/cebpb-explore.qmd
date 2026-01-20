@@ -39,9 +39,9 @@ Regarding the difference of ILC3s between the NOD and C57BL/6 mouse strains, we 
 
 ### PBP 4
 
-4.  Can the authors clarify whether Ebp indeed encodes the transcription factor C/EBPδ? The canonical gene name for C/EBPδ is Cebpd, while Ebp encodes a cholesterol isomerase, which, according to the ImmGen database, is not expressed in ILC2s. The authors should also verify that reference 43 is cited correctly and clearly distinguish between E-protein transcription factors and CCAAT-enhancer-binding protein (C/EBP) transcription factors in ILC2 development and function.
+4.  Can the authors clarify whether Ebp indeed encodes the transcription factor C/EBP-delta? The canonical gene name for C/EBP-delta is Cebpd, while Ebp encodes a cholesterol isomerase, which, according to the ImmGen database, is not expressed in ILC2s. The authors should also verify that reference 43 is cited correctly and clearly distinguish between E-protein transcription factors and CCAAT-enhancer-binding protein (C/EBP) transcription factors in ILC2 development and function.
 
-Response: Ebp/cebpd? Their expression in our data? The Reviewer is correct to point out that Cebpd is the correct gene encoding C/EBPδ. We will check the gene locus and revise the figures and text accordingly.
+Response: Ebp/cebpd? Their expression in our data? The Reviewer is correct to point out that Cebpd is the correct gene encoding C/EBP-delta. We will check the gene locus and revise the figures and text accordingly.
 
 ```{r}
 vardf <- readr::read_csv(paste0(data_dir, "allchannels/var.csv"))
@@ -50,7 +50,8 @@ vardf %>% filter(str_detect(index,"Ebp|Cebpb"))
 
 ```{r}
 
-obj <- readRDS(paste0(data_dir, "allchannels/ilc-seurat-object.rds"))
+# obj <- readRDS(paste0(data_dir, "allchannels/ilc-seurat-object.rds"))
+obj <- readRDS(paste0(data_dir, "allchannels/allchannels.rds"))
 ```
 
 ```{r}
@@ -68,6 +69,30 @@ plot_df <- plot_df %>%
 p1 <- ggplot(plot_df, aes(X_umap1, X_umap2, color = Cebpb)) + geom_point(shape=46)
 ggsave('results/umap_cebpb.png')
 ```
+
+```{r}
+ebp_df <- data.frame(obj@assays$RNA$counts["Ebp",]) %>%
+  dplyr::rename(Ebp = `obj.assays.RNA.counts..Ebp....`) %>%
+  tibble::rownames_to_column("index")
+```
+
+```{r}
+plot_df <- plot_df %>%
+  left_join(ebp_df)
+```
+
+```{r}
+cell_type_vec <- c("ILC1", "ILC2", "ILC3", "ILC3(LTi-like)","Enterocyte","NK","NKT","DCs")
+
+plot_df %>% 
+  group_by(called_cell_types_new) %>% 
+  summarise(mean_Ebp = round(mean(Ebp), 3),
+            pct_nonzero_Ebp = 100 * round(mean(Ebp > 0), 3),
+            mean_nonzero_Ebp = round(sum(Ebp) / sum(Ebp > 0), 3)) %>%
+  dplyr::rename(cell_type = called_cell_types_new) %>%
+  arrange(match(cell_type, cell_type_vec))
+```
+
 
 ### PBP 5
 

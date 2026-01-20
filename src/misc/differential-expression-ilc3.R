@@ -1,0 +1,269 @@
+# COMMENT:
+#   In the revised manuscript, we will (1) provide analysis of differentially expressed genes 
+#   between these two populations; (2) quantify ILC3 signature genes between Rorc high and 
+#   Rorc low populations, to show the appropriate signature in both; and 
+#   (3) check the existence of the population of NKp46-CCR6-DN ILC3s in our dataset.
+
+
+# Load necessary libraries
+# If you don't have these installed, run:
+# install.packages("Seurat")
+# install.packages("dplyr")
+# install.packages("ggplot2")
+# BiocManager::install("GSVA") # For Gene Set Variation Analysis (optional, for more advanced scoring)
+
+library(Seurat)
+library(dplyr)
+library(ggplot2)
+# library(GSVA) # Uncomment if you plan to use GSVA for gene set scoring
+
+# --- Section 0: Load your Seurat object ---
+# Replace 'path/to/your/seurat_object.rds' with the actual path to your data.
+# If your data is not a Seurat object, you'll need to adapt the loading
+# and data access methods accordingly (e.g., matrix, data.frame).
+# For example, if you have a count matrix and metadata:
+# counts_matrix <- read.csv("counts.csv", row.names = 1)
+# metadata_df <- read.csv("metadata.csv", row.names = 1)
+# your_seurat_object <- CreateSeuratObject(counts = counts_matrix, meta.data = metadata_df)
+# Then proceed with normalization, scaling, and dimensionality reduction if not already done.
+
+your_seurat_object <- readRDS("path/to/your/seurat_object.rds")
+
+# Ensure your 'Rorc' expression status (high/low) is in the metadata.
+# Let's assume you have a metadata column named 'Rorc_status' with values 'Rorc_high' and 'Rorc_low'.
+# If you don't have this, you'll need to create it based on Rorc expression.
+# Example:
+# your_seurat_object$Rorc_expression <- GetAssayData(your_seurat_object, slot = "data")["Rorc", ]
+# your_seurat_object$Rorc_status <- ifelse(your_seurat_object$Rorc_expression > quantile(your_seurat_object$Rorc_expression, 0.5), "Rorc_high", "Rorc_low")
+# You might want to define high/low based on a more rigorous method than a simple median split.
+
+
+# --- Reviewer Question 1: Analysis of differentially expressed genes (DEGs) ---
+# Goal: Find genes that are significantly different between Rorc high and Rorc low populations.
+
+# 1.1 Subset the Seurat object into Rorc high and Rorc low populations
+# Ensure the metadata column 'Rorc_status' exists and correctly labels your cells.
+if (!"Rorc_status" %in% colnames(your_seurat_object@meta.data)) {
+  stop("Please create a 'Rorc_status' metadata column in your Seurat object.
+        This column should categorize cells into 'Rorc_high' and 'Rorc_low'.")
+}
+
+# Set the identity of cells based on Rorc_status for DEG analysis
+Idents(your_seurat_object) <- "Rorc_status"
+
+# 1.2 Perform differential expression analysis
+# We'll use Seurat's FindMarkers function, which is suitable for single-cell data.
+# Adjust 'min.pct', 'logfc.threshold', and 'test.use' as appropriate for your data.
+# Common tests: "wilcox" (Wilcoxon Rank Sum test, default, non-parametric), "MAST" (for sparse data), "DESeq2" (if you have counts and want to use DESeq2's model, often slower for many cells).
+
+print("Performing differential expression analysis between Rorc_high and Rorc_low populations...")
+deg_results <- FindMarkers(
+  your_seurat_object,
+  ident.1 = "Rorc_high",
+  ident.2 = "Rorc_low",
+  logfc.threshold = 0.25, # Minimum log2 fold-change
+  min.pct = 0.1,          # Minimum percentage of cells expressing the gene
+  test.use = "wilcox"     # Statistical test to use
+)
+
+# 1.3 View and save DEG results
+print("Differential Expression Results (top 10):")
+print(head(deg_results, 10))
+
+# You can filter for significant genes (e.g., adjusted p-value < 0.05)
+significant_degs <- deg_results %>%
+  filter(p_val_adj < 0.05)
+
+print(paste("Number of significant DEGs (adj. p-value < 0.05):", nrow(significant_degs)))
+
+# Save the full DEG results to a CSV file
+write.csv(deg_results, "DEGs_Rorc_high_vs_Rorc_low.csv", row.names = TRUE)
+print("Full DEG results saved to 'DEGs_Rorc_high_vs_Rorc_low.csv'")
+
+# Optional: Visualize DEGs (e.g., Volcano Plot)
+# To create a volcano plot, you'll need the EnhancedVolcano package or custom ggplot2 code.
+# install.packages("EnhancedVolcano")
+# library(EnhancedVolcano)
+# EnhancedVolcano(deg_results,
+#                 lab = rownames(deg_results),
+#                 x = 'avg_log2FC',
+#                 y = 'p_val_adj',
+#                 title = 'Rorc_high vs Rorc_low DEGs',
+#                 pCutoff = 0.05,
+#                 FCcutoff = 0.25)
+
+
+# --- Reviewer Question 2: Quantify ILC3 signature genes ---
+# Goal: Calculate and compare an ILC3 gene signature score between Rorc high and Rorc low populations.
+
+# 2.1 Define ILC3 signature genes
+# Replace with your actual list of ILC3 signature genes.
+# Ensure these gene names match the gene names in your Seurat object.
+ILC3_signature_genes <- c("Rorc", "Il7r", "Cd127", "Il2ra", "Gata3", "Id2", "Tcf7", "Ahr", "Stat3", "Il1rl1")
+
+# Filter the signature gene list to only include genes present in your dataset
+ILC3_signature_genes_present <- ILC3_signature_genes[ILC3_signature_genes %in% rownames(your_seurat_object)]
+if (length(ILC3_signature_genes_present) == 0) {
+  stop("None of the specified ILC3 signature genes were found in your dataset. Please check gene names.")
+} else if (length(ILC3_signature_genes_present) < length(ILC3_signature_genes)) {
+  print(paste("Warning: Not all ILC3 signature genes were found in your dataset. Using only:",
+              paste(ILC3_signature_genes_present, collapse = ", ")))
+}
+
+
+# 2.2 Calculate gene signature score
+# Seurat's AddModuleScore is a good way to do this. It calculates the average expression
+# of features in a gene set, subtracted by the aggregated expression of control feature sets.
+print("Calculating ILC3 gene signature score...")
+your_seurat_object <- AddModuleScore(
+  object = your_seurat_object,
+  features = list(ILC3_signature_genes_present),
+  ctrl = 100, # Number of control genes to randomly select
+  name = 'ILC3_Signature' # Name of the new metadata column for the score
+)
+
+# The scores will be added to the metadata slot, e.g., 'ILC3_Signature1'
+# Rename for clarity
+your_seurat_object$ILC3_Score <- your_seurat_object$ILC3_Signature1
+
+
+# Optional: Using GSVA for more sophisticated gene set scoring (if appropriate for your data structure)
+# If using GSVA, you typically work with an expression matrix and define groups.
+# expression_matrix <- as.matrix(GetAssayData(your_seurat_object, slot = "data"))
+# gene_sets <- list(ILC3_Signature = ILC3_signature_genes_present)
+# gsva_results <- gsva(expression_matrix, gene_sets, method="gsva", kcdf="Gaussian", abs.ranking=FALSE)
+# your_seurat_object$ILC3_GSVA_Score <- gsva_results["ILC3_Signature", colnames(expression_matrix)]
+
+
+# 2.3 Quantify and visualize the scores
+# Use violin plots or box plots to compare scores between Rorc high and Rorc low populations.
+print("Visualizing ILC3 signature scores...")
+p_ilc3_score <- VlnPlot(your_seurat_object,
+                        features = "ILC3_Score",
+                        group.by = "Rorc_status",
+                        pt.size = 0.1, # Adjust point size for visualization
+                        cols = c("lightblue", "lightcoral")) + # Customize colors
+  ggtitle("ILC3 Signature Score by Rorc Status") +
+  ylab("ILC3 Signature Score") +
+  xlab("Rorc Status") +
+  theme_minimal()
+
+print(p_ilc3_score)
+
+# Save the plot
+ggsave("ILC3_Signature_Score_ViolinPlot.png", plot = p_ilc3_score, width = 6, height = 5, dpi = 300)
+print("ILC3 signature score violin plot saved to 'ILC3_Signature_Score_ViolinPlot.png'")
+
+# Calculate mean and standard deviation of ILC3 scores for each group
+ILC3_score_summary <- your_seurat_object@meta.data %>%
+  group_by(Rorc_status) %>%
+  summarise(
+    Mean_ILC3_Score = mean(ILC3_Score),
+    SD_ILC3_Score = sd(ILC3_Score),
+    Median_ILC3_Score = median(ILC3_Score),
+    IQR_ILC3_Score = IQR(ILC3_Score)
+  )
+print("\nSummary of ILC3 Signature Scores:")
+print(ILC3_score_summary)
+
+# Optional: Perform a statistical test (e.g., Wilcoxon) to compare scores
+wilcox_test_ilc3 <- wilcox.test(ILC3_Score ~ Rorc_status, data = your_seurat_object@meta.data)
+print("\nWilcoxon Rank Sum test for ILC3 Score difference:")
+print(wilcox_test_ilc3)
+
+
+# --- Reviewer Question 3: Check existence of NKp46-CCR6-DN ILC3s ---
+# Goal: Identify and quantify cells with low/negative expression of NKp46 and CCR6,
+# while retaining ILC3 characteristics (e.g., Rorc high).
+
+# 3.1 Define gene names for NKp46 and CCR6
+# Replace with the actual gene names in your dataset (case-sensitive).
+NKp46_gene <- "Ncr1" # Often referred to as Ncr1 in mouse, NKp46 in human
+CCR6_gene <- "Ccr6"
+
+# Check if these genes exist in your object
+if (!all(c(NKp46_gene, CCR6_gene) %in% rownames(your_seurat_object))) {
+  stop(paste("Genes", NKp46_gene, "or", CCR6_gene, "not found in your Seurat object. Please check gene names."))
+}
+
+# 3.2 Extract expression data for relevant genes
+# Use normalized data ('data' slot) for thresholds or visualization.
+ncr1_expression <- GetAssayData(your_seurat_object, slot = "data")[NKp46_gene, ]
+ccr6_expression <- GetAssayData(your_seurat_object, slot = "data")[CCR6_gene, ]
+
+# Add expression to metadata for easier plotting/subsetting
+your_seurat_object$NKp46_expression <- ncr1_expression
+your_seurat_object$CCR6_expression <- ccr6_expression
+
+# 3.3 Define thresholds for "negative" expression
+# This is crucial and depends on your data and biological context.
+# A common approach is to consider "negative" as expression below a certain percentile,
+# or below a minimal detectable level after normalization.
+# For example, cells with expression values close to 0 or below a low quantile.
+# Here, we'll use a simple threshold (e.g., < 0.1 for normalized data, adjust as needed).
+# You might want to visualize the distribution of these genes first to pick a threshold:
+# hist(your_seurat_object$NKp46_expression[your_seurat_object$Rorc_status == "Rorc_high"])
+# hist(your_seurat_object$CCR6_expression[your_seurat_object$Rorc_status == "Rorc_high"])
+
+threshold_ncr1_negative <- 0.1 # Example threshold
+threshold_ccr6_negative <- 0.1 # Example threshold
+
+# 3.4 Identify NKp46-CCR6-DN ILC3s
+# These are cells that are Rorc_high AND have low NKp46 AND low CCR6 expression.
+your_seurat_object$ILC3_subtype <- "Other ILC3" # Default category
+
+your_seurat_object@meta.data <- your_seurat_object@meta.data %>%
+  mutate(
+    ILC3_subtype = case_when(
+      Rorc_status == "Rorc_high" & NKp46_expression < threshold_ncr1_negative & CCR6_expression < threshold_ccr6_negative ~ "NKp46-CCR6-DN ILC3",
+      TRUE ~ ILC3_subtype # Keep existing "Other ILC3" or other categories
+    )
+  )
+
+# 3.5 Quantify the proportion of this population
+dn_ilc3_counts <- table(your_seurat_object$ILC3_subtype)
+print("\nCounts of ILC3 subtypes:")
+print(dn_ilc3_counts)
+
+proportion_dn_ilc3 <- dn_ilc3_counts["NKp46-CCR6-DN ILC3"] / sum(dn_ilc3_counts)
+print(paste0("Proportion of NKp46-CCR6-DN ILC3s among all ILC3-related cells: ", round(proportion_dn_ilc3 * 100, 2), "%"))
+
+# 3.6 Visualize the existence of this population on a UMAP/t-SNE
+# Assuming you have a UMAP reduction already computed in your Seurat object.
+# If not, run:
+# your_seurat_object <- RunUMAP(your_seurat_object, dims = 1:30) # Adjust dims as needed
+
+print("Visualizing NKp46-CCR6-DN ILC3 population on UMAP...")
+p_dn_ilc3_umap <- DimPlot(your_seurat_object,
+                          reduction = "umap",
+                          group.by = "ILC3_subtype",
+                          label = TRUE,
+                          repel = TRUE,
+                          cols = c("NKp46-CCR6-DN ILC3" = "darkgreen", "Other ILC3" = "grey")) +
+  ggtitle("ILC3 Subpopulations on UMAP") +
+  theme_minimal()
+
+print(p_dn_ilc3_umap)
+
+# Save the plot
+ggsave("NKp46_CCR6_DN_ILC3_UMAP.png", plot = p_dn_ilc3_umap, width = 8, height = 7, dpi = 300)
+print("UMAP plot showing NKp46-CCR6-DN ILC3 population saved to 'NKp46_CCR6_DN_ILC3_UMAP.png'")
+
+# Optional: Feature plots to show expression of NKp46 and CCR6
+p_ncr1_feature <- FeaturePlot(your_seurat_object, features = NKp46_gene, reduction = "umap") +
+  ggtitle(paste0("Expression of ", NKp46_gene, " on UMAP"))
+print(p_ncr1_feature)
+
+p_ccr6_feature <- FeaturePlot(your_seurat_object, features = CCR6_gene, reduction = "umap") +
+  ggtitle(paste0("Expression of ", CCR6_gene, " on UMAP"))
+print(p_ccr6_feature)
+
+# Combine and save feature plots (requires 'patchwork' package)
+# install.packages("patchwork")
+# library(patchwork)
+# combined_feature_plots <- p_ncr1_feature + p_ccr6_feature
+# ggsave("NKp46_CCR6_FeaturePlots.png", plot = combined_feature_plots, width = 12, height = 6, dpi = 300)
+
+
+print("\n--- Script Finished ---")
+print("Remember to review the generated CSV files and plots, and adjust thresholds or parameters as needed for your specific dataset.")
