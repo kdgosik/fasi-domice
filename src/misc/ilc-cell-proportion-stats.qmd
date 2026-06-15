@@ -1,0 +1,88 @@
+---
+title: "ILC Cell Proportion Stats"
+format: html
+editor: visual
+---
+
+---
+title: "Untitled"
+format: html
+editor: visual
+---
+
+## COMMENT:
+
+Importantly, analysis before and after contaminant removal per batch showed no significant changes in ILC subset proportions, confirming that contamination did not bias our study and were consistent across batches (Extended Data Fig. XX, and line YY).
+
+## Set Paths
+
+```{r setup}
+library(Seurat)
+library(dplyr)
+library(forcats)
+library(ggplot2)
+library(data.table)
+# library(GSVA) # Uncomment if you plan to use GSVA for gene set scoring
+
+domice_dir <- "/workspace/fasi-domice/"
+data_dir <- paste0(domice_dir, "data/")
+results_dir <- paste0(domice_dir, "results/")
+figure_dir <- paste0(domice_dir, "figures/")
+```
+
+## Config
+
+```{r config}
+source(paste0(domice_dir, "src/helpers.R"))
+```
+
+```{r}
+plot_df <- fread(paste0(data_dir, "manuscript-plot-data.csv.gz"), 
+                 data.table = FALSE)
+
+## subsetting to ILC populations
+plot_df <- plot_df %>%
+  dplyr::mutate(ILC_indicator = louvain_labels %in% (c(1,2,3,4,5,8))) %>%
+  dplyr::mutate(cell_types = factor(louvain_labels)) %>%
+  dplyr::mutate(cell_types = fct_recode(cell_types,
+                                 "LTi-like/CCR6_low" = "1",
+                                 "ILC3/RORgt_low" = "2",
+                                 "ILC2" = "3",
+                                 "ILC3/RORgt_high" = "4",
+                                 "LTi-like/CCR6_high" = "5",
+                                 "ILC1" = "8")) %>%
+  dplyr::mutate(cell_types_expanded = case_when(
+    ILC_indicator ~ cell_types,
+    TRUE ~ "contaminant"
+    ))
+    
+```
+
+```{r}
+plot_df %>%
+  dplyr::filter(ILC_indicator) %>%
+  dplyr::group_by(Channel, cell_types) %>%
+  # dplyr::group_by(BestCall, cell_types) %>%
+  dplyr::count() %>%
+  group_by(Channel) %>%
+  dplyr::mutate(proportion = n / sum(n))
+  # tidyr::pivot_wider(id_cols = Channel, 
+  #                    names_from = cell_types,
+  #                    values_from = n)
+```
+
+It avoided extensive variation and is also how we could rapidly process hundreds of mice for scRNA-seq. We then report the number of total ILCs for each mouse recovered by scRNA-seq (new Extended Data Fig. ZZ).
+
+```{r}
+cell_count_per_mouse <- plot_df %>%
+  dplyr::filter(louvain_labels %in% (c(1,2,3,4,5,8))) %>%
+  group_by(BestCall) %>%
+  count()
+```
+
+```{r}
+cell_count_per_mouse %>% 
+  filter(BestCall != "AMB") %>% 
+  ggplot(aes(x=n)) + 
+    geom_histogram()
+```
